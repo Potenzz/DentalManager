@@ -1,0 +1,789 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { format, addDays, startOfToday, addMinutes  } from "date-fns";
+import { TopAppBar } from "../components/layout/top-app-bar";
+import { Sidebar } from "../components/layout/sidebar";
+import { AddAppointmentModal } from "../components/appointments/add-appointment-modal";
+import { ClaimModal } from "../components/claims/claim-modal";
+import { Button } from "../components/ui/button";
+import { z } from "zod";
+import { 
+  Calendar as CalendarIcon, 
+  Plus, 
+  ChevronLeft, 
+  ChevronRight, 
+  RefreshCw, 
+  Move,
+  Trash2,
+  FileText
+} from "lucide-react";
+import { useToast } from "../hooks/use-toast";
+import { Calendar } from "../components/ui/calendar";
+import { apiRequest, queryClient } from "../lib/queryClient";
+import { useAuth } from "../hooks/use-auth";
+import { Card, CardContent, CardHeader, CardDescription, CardTitle } from "../components/ui/card";
+import { DndProvider, useDrag, useDrop } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
+import { Menu, Item, useContextMenu } from 'react-contexify';
+import 'react-contexify/ReactContexify.css';
+import { useLocation } from "wouter";
+
+// Define types for scheduling
+interface TimeSlot {
+  time: string;
+  displayTime: string;
+}
+
+interface Staff {
+  id: string;
+  name: string;
+  role: 'doctor' | 'hygienist';
+  color: string;
+}
+
+interface ScheduledAppointment {
+  id: number;
+  patientId: number;
+  patientName: string;
+  staffId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: string | null;
+  type: string;
+}
+
+// Define a unique ID for the appointment context menu
+const APPOINTMENT_CONTEXT_MENU_ID = "appointment-context-menu";
+
+export default function AppointmentsPage() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimAppointmentId, setClaimAppointmentId] = useState<number | null>(null);
+  const [claimPatientId, setClaimPatientId] = useState<number | null>(null);
+  const [editingAppointment, setEditingAppointment] = useState<any | undefined>(undefined);
+  const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [location] = useLocation();
+  
+  // Create context menu hook
+  const { show } = useContextMenu({
+    id: APPOINTMENT_CONTEXT_MENU_ID,
+  });
+  
+  // Staff members (doctors and hygienists)
+  const staffMembers: Staff[] = [
+    { id: "doctor1", name: "Dr. Kai Gao", role: "doctor", color: "bg-blue-600" },
+    { id: "doctor2", name: "Dr. Jane Smith", role: "doctor", color: "bg-emerald-600" },
+    { id: "hygienist1", name: "Hygienist One", role: "hygienist", color: "bg-purple-600" },
+    { id: "hygienist2", name: "Hygienist Two", role: "hygienist", color: "bg-rose-500" },
+    { id: "hygienist3", name: "Hygienist Three", role: "hygienist", color: "bg-amber-500" },
+  ];
+
+  // Generate time slots from 8:00 AM to 6:00 PM in 30-minute increments
+  const timeSlots: TimeSlot[] = [];
+  for (let hour = 8; hour <= 18; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
+      const hour12 = hour > 12 ? hour - 12 : hour;
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      const displayTime = `${hour12}:${minute.toString().padStart(2, '0')} ${period}`;
+      timeSlots.push({ time: timeStr, displayTime });
+    }
+  }
+  
+  // Fetch appointments
+  const {
+    data: appointments,
+    isLoading: isLoadingAppointments,
+    refetch: refetchAppointments,
+  } = useQuery<any>({
+    queryKey: ["/api/appointments"],
+    enabled: !!user,
+  });
+
+  // Fetch patients (needed for the dropdowns)
+  const {
+    data: patients = [],
+    isLoading: isLoadingPatients,
+  } = useQuery<any>({
+    queryKey: ["/api/patients"],
+    enabled: !!user,
+  });
+  
+  // Handle creating a new appointment at a specific time slot and for a specific staff member
+  const handleCreateAppointmentAtSlot = (timeSlot: TimeSlot, staffId: string) => {
+    // Calculate end time (30 minutes after start time)
+    const startHour = parseInt(timeSlot.time.split(':')[0] as string);
+    const startMinute = parseInt(timeSlot.time.split(':')[1] as string);
+    const startDate = new Date(selectedDate);
+    startDate.setHours(startHour, startMinute, 0);
+    
+    const endDate = addMinutes(startDate, 30);
+    const endTime = `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Find staff member
+    const staff = staffMembers.find(s => s.id === staffId);
+    
+    console.log(`Creating appointment at time slot: ${timeSlot.time} (${timeSlot.displayTime})`);
+    
+    // Pre-fill appointment form with default values
+    const newAppointment = {
+      date: format(selectedDate, 'yyyy-MM-dd'),
+      startTime: timeSlot.time, // This is in "HH:MM" format
+      endTime: endTime,
+      type: staff?.role === 'doctor' ? 'checkup' : 'cleaning',
+      status: 'scheduled',
+      title: `Appointment with ${staff?.name}`, // Add staff name in title for easier display
+      notes: `Appointment with ${staff?.name}`, // Store staff info in notes for processing
+      staff: staffId // This matches the 'staff' field in the appointment form schema
+    };
+    
+    console.log('Created appointment data to pass to modal:', newAppointment);
+    
+    // For new appointments, set editingAppointment to undefined
+    // This will ensure we go to the "create" branch in handleAppointmentSubmit
+    setEditingAppointment(undefined);
+    
+    // But still pass the pre-filled data to the modal
+    setIsAddModalOpen(true);
+    
+    // Store the prefilled values in state or sessionStorage to access in the modal
+    // Clear any existing data first to ensure we're not using old data
+    sessionStorage.removeItem('newAppointmentData');
+    sessionStorage.setItem('newAppointmentData', JSON.stringify(newAppointment));
+  };
+  
+  // Check for newPatient parameter in URL
+  useEffect(() => {
+    if (patients.length === 0 || !user) return;
+    
+    // Parse URL search params to check for newPatient
+    const params = new URLSearchParams(window.location.search);
+    const newPatientId = params.get('newPatient');
+    
+    if (newPatientId) {
+      const patientId = parseInt(newPatientId);
+      // Find the patient in our list
+      const patient = patients.find((p: { id: number }) => p.id === patientId) ?? undefined;
+
+      
+      if (patient) {
+        toast({
+          title: "Patient Added",
+          description: `${patient.firstName} ${patient.lastName} was added successfully. You can now schedule an appointment.`,
+        });
+        
+        // Select first available staff member
+        
+        const staffId = staffMembers[0]!.id;
+        
+        // Find first time slot today (9:00 AM is a common starting time)
+        const defaultTimeSlot = timeSlots.find(slot => slot.time === "09:00") || timeSlots[0];
+        
+        // Open appointment modal with prefilled patient
+        handleCreateAppointmentAtSlot(defaultTimeSlot!, staffId);
+        
+        // Pre-select the patient in the appointment form
+        const patientData = {
+          patientId: patient.id
+        };
+        
+        // Store info in session storage for the modal to pick up
+        const existingData = sessionStorage.getItem('newAppointmentData');
+        if (existingData) {
+          const parsedData = JSON.parse(existingData);
+          sessionStorage.setItem('newAppointmentData', JSON.stringify({
+            ...parsedData,
+            ...patientData
+          }));
+        }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patients, user, location]);
+
+  // Create appointment mutation
+  const createAppointmentMutation = useMutation({
+    mutationFn: async (appointment: any) => {
+      const res = await apiRequest("POST", "/api/appointments", appointment);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Appointment created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      setIsAddModalOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to create appointment: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update appointment mutation
+  const updateAppointmentMutation = useMutation({
+    mutationFn: async ({ id, appointment }: { id: number; appointment: any }) => {
+      const res = await apiRequest("PUT", `/api/appointments/${id}`, appointment);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Appointment updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      setEditingAppointment(undefined);
+      setIsAddModalOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update appointment: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete appointment mutation
+  const deleteAppointmentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/appointments/${id}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Appointment deleted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to delete appointment: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle appointment submission (create or update)
+  const handleAppointmentSubmit = (appointmentData: any) => {
+    // Make sure the date is for the selected date
+    const updatedData = {
+      ...appointmentData,
+      date: format(selectedDate, 'yyyy-MM-dd')
+    };
+    
+    // Check if we're editing an existing appointment with a valid ID
+    if (editingAppointment && 'id' in editingAppointment && typeof editingAppointment.id === 'number') {
+      updateAppointmentMutation.mutate({
+        id: editingAppointment.id,
+        appointment: updatedData as any,
+      });
+    } else {
+      // This is a new appointment
+      if (user) {
+        createAppointmentMutation.mutate({
+          ...updatedData as any,
+          userId: user.id
+        });
+      }
+    }
+  };
+
+  // Handle edit appointment
+  const handleEditAppointment = (appointment: any) => {
+    setEditingAppointment(appointment);
+    setIsAddModalOpen(true);
+  };
+
+  // Handle delete appointment
+  const handleDeleteAppointment = (id: number) => {
+    if (confirm("Are you sure you want to delete this appointment?")) {
+      deleteAppointmentMutation.mutate(id);
+    }
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  // Get formatted date string for display
+  const formattedDate = format(selectedDate, 'MMMM d, yyyy');
+  
+  // Filter appointments for the selected date
+  const selectedDateAppointments = appointments.filter((apt: { date: string }) =>
+    apt.date === format(selectedDate, 'yyyy-MM-dd')
+  );
+  
+  
+  // Add debugging logs
+  console.log("Selected date:", format(selectedDate, 'yyyy-MM-dd'));
+  console.log("All appointments:", appointments);
+  console.log("Filtered appointments for selected date:", selectedDateAppointments);
+
+
+  // Process appointments for the scheduler view
+  const processedAppointments: ScheduledAppointment[] = selectedDateAppointments.map((apt: any) => {
+    // Find patient name
+    const patient = patients.find((p: any) => p.id === apt.patientId);
+    const patientName = patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown Patient';
+    
+    // Try to determine the staff from the notes or title
+    let staffId = 'doctor1'; // Default to first doctor if we can't determine
+    
+    console.log("Processing appointment:", {
+      id: apt.id,
+      notes: apt.notes,
+      title: apt.title
+    });
+    
+    // Check notes first
+    if (apt.notes) {
+      // Look for "Appointment with Dr. X" or similar patterns
+      console.log("Checking notes:", apt.notes);
+      for (const staff of staffMembers) {
+        console.log(`Checking if notes contains "${staff.name}":`, apt.notes.includes(staff.name));
+        if (apt.notes.includes(staff.name)) {
+          staffId = staff.id;
+          console.log(`Found staff in notes: ${staff.name} (${staffId})`);
+          break;
+        }
+      }
+    }
+    
+    // If no match in notes, check title
+    if (staffId === 'doctor1' && apt.title) {
+      console.log("Checking title:", apt.title);
+      for (const staff of staffMembers) {
+        if (apt.title.includes(staff.name)) {
+          staffId = staff.id;
+          console.log(`Found staff in title: ${staff.name} (${staffId})`);
+          break;
+        }
+      }
+    }
+    
+    console.log(`Final staffId assigned: ${staffId}`);
+    
+    const processed = {
+      ...apt,
+      patientName,
+      staffId
+    };
+    
+    console.log("Processed appointment:", processed);
+    return processed;
+  });
+  
+  // Check if appointment exists at a specific time slot and staff
+  const getAppointmentAtSlot = (timeSlot: TimeSlot, staffId: string) => {
+    if (processedAppointments.length === 0) {
+      return undefined;
+    }
+
+    // In appointments for a given time slot, we'll just display the first one
+    // In a real application, you might want to show multiple or stack them
+    const appointmentsAtSlot = processedAppointments.filter(apt => {
+      // Fix time format comparison - the database adds ":00" seconds to the time
+      const dbTime = apt.startTime.substring(0, 5); // Get just HH:MM, removing seconds
+      const timeMatches = dbTime === timeSlot.time;
+      const staffMatches = apt.staffId === staffId;
+      
+      return timeMatches && staffMatches;
+    });
+    
+    return appointmentsAtSlot.length > 0 ? appointmentsAtSlot[0] : undefined;
+  };
+
+  const isLoading = 
+    isLoadingAppointments || 
+    isLoadingPatients || 
+    createAppointmentMutation.isPending || 
+    updateAppointmentMutation.isPending ||
+    deleteAppointmentMutation.isPending;
+
+  // Define drag item types
+  const ItemTypes = {
+    APPOINTMENT: 'appointment',
+  };
+
+  // Handle moving an appointment to a new time slot and staff
+  const handleMoveAppointment = (appointmentId: number, newTimeSlot: TimeSlot, newStaffId: string) => {
+    const appointment = appointments.find((a:any) => a.id === appointmentId);
+    if (!appointment) return;
+
+    // Calculate new end time (30 minutes from start)
+    const startHour = parseInt(newTimeSlot.time.split(':')[0] as string);
+    const startMinute = parseInt(newTimeSlot.time.split(':')[1] as string);
+    const startDate = new Date(selectedDate);
+    startDate.setHours(startHour, startMinute, 0);
+    
+    const endDate = addMinutes(startDate, 30);
+    const endTime = `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Find staff member
+    const staff = staffMembers.find(s => s.id === newStaffId);
+    
+    // Update appointment data
+    // Make sure we handle the time format correctly - backend expects HH:MM but stores as HH:MM:SS
+    const updatedAppointment: any = {
+      ...appointment,
+      startTime: newTimeSlot.time, // Already in HH:MM format
+      endTime: endTime, // Already in HH:MM format
+      notes: `Appointment with ${staff?.name}`,
+    };
+    
+    // Call update mutation
+    updateAppointmentMutation.mutate({
+      id: appointmentId,
+      appointment: updatedAppointment,
+    });
+  };
+
+  // Function to display context menu
+  const handleContextMenu = (e: React.MouseEvent, appointmentId: number) => {
+    // Prevent the default browser context menu
+    e.preventDefault();
+    
+    // Show our custom context menu with appointment ID as data
+    show({
+      event: e,
+      props: {
+        appointmentId,
+      },
+    });
+  };
+
+  // Create a draggable appointment component
+  function DraggableAppointment({ appointment, staff }: { appointment: ScheduledAppointment, staff: Staff }) {
+    const [{ isDragging }, drag] = useDrag(() => ({
+      type: ItemTypes.APPOINTMENT,
+      item: { id: appointment.id },
+      collect: (monitor) => ({
+        isDragging: !!monitor.isDragging(),
+      }),
+    }));
+
+    return (
+      <div 
+        ref={drag as unknown as React.RefObject<HTMLDivElement>} // Type assertion to make TypeScript happy
+
+        className={`${staff.color} border border-white shadow-md text-white rounded p-1 text-xs h-full overflow-hidden cursor-move relative ${
+          isDragging ? 'opacity-50' : 'opacity-100'
+        }`}
+        style={{ fontWeight: 500 }}
+        onClick={(e) => {
+          // Only allow edit on click if we're not dragging
+          if (!isDragging) {
+            const fullAppointment = appointments.find((a:any) => a.id === appointment.id);
+            if (fullAppointment) {
+              e.stopPropagation();
+              handleEditAppointment(fullAppointment);
+            }
+          }
+        }}
+        onContextMenu={(e) => handleContextMenu(e, appointment.id)}
+      >
+        <div className="font-bold truncate flex items-center gap-1">
+          <Move className="h-3 w-3" />
+          {appointment.patientName}
+        </div>
+        <div className="truncate">{appointment.type}</div>
+      </div>
+    );
+  }
+
+  // Create a drop target for appointments
+  function DroppableTimeSlot({ 
+    timeSlot, 
+    staffId, 
+    appointment, 
+    staff 
+  }: { 
+    timeSlot: TimeSlot, 
+    staffId: string, 
+    appointment: ScheduledAppointment | undefined,
+    staff: Staff 
+  }) {
+    const [{ isOver, canDrop }, drop] = useDrop(() => ({
+      accept: ItemTypes.APPOINTMENT,
+      drop: (item: { id: number }) => {
+        handleMoveAppointment(item.id, timeSlot, staffId);
+      },
+      canDrop: (item: { id: number }) => {
+        // Prevent dropping if there's already an appointment here
+        return !appointment;
+      },
+      collect: (monitor) => ({
+        isOver: !!monitor.isOver(),
+        canDrop: !!monitor.canDrop(),
+      }),
+    }));
+
+    return (
+      <td 
+        ref={drop as unknown as React.RefObject<HTMLTableCellElement>} 
+
+
+        key={`${timeSlot.time}-${staffId}`} 
+        className={`px-1 py-1 border relative h-14 ${isOver && canDrop ? 'bg-green-100' : ''}`}
+      >
+        {appointment ? (
+          <DraggableAppointment appointment={appointment} staff={staff} />
+        ) : (
+          <button 
+            className={`w-full h-full ${isOver && canDrop ? 'bg-green-100' : 'text-gray-400 hover:bg-gray-100'} rounded flex items-center justify-center`}
+            onClick={() => handleCreateAppointmentAtSlot(timeSlot, staffId)}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
+      </td>
+    );
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-gray-100">
+      <Sidebar isMobileOpen={isMobileMenuOpen} setIsMobileOpen={setIsMobileMenuOpen} />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopAppBar toggleMobileMenu={toggleMobileMenu} />
+        
+        <main className="flex-1 overflow-y-auto p-4">
+          <div className="container mx-auto">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Appointment Schedule</h1>
+                <p className="text-muted-foreground">
+                  View and manage the dental practice schedule
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingAppointment(undefined);
+                  setIsAddModalOpen(true);
+                }}
+                className="gap-1"
+                disabled={isLoading}
+              >
+                <Plus className="h-4 w-4" />
+                New Appointment
+              </Button>
+            </div>
+            
+            {/* Context Menu */}
+            <Menu id={APPOINTMENT_CONTEXT_MENU_ID} animation="fade">
+              <Item
+                onClick={({ props }) => {
+                  const fullAppointment = appointments.find((a:any) => a.id === props.appointmentId);
+                  if (fullAppointment) {
+                    handleEditAppointment(fullAppointment);
+                  }
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  Edit Appointment
+                </span>
+              </Item>
+              <Item
+                onClick={({ props }) => {
+                  const fullAppointment = appointments.find((a:any) => a.id === props.appointmentId);
+                  if (fullAppointment) {
+                    // Set the appointment and patient IDs for the claim modal
+                    setClaimAppointmentId(fullAppointment.id);
+                    setClaimPatientId(fullAppointment.patientId);
+                    
+                    // Find the patient name for the toast notification
+                    const patient = patients.find((p:any) => p.id === fullAppointment.patientId);
+                    const patientName = patient ? `${patient.firstName} ${patient.lastName}` : `Patient #${fullAppointment.patientId}`;
+                    
+                    // Show a toast notification
+                    toast({
+                      title: "Claim Services Initiated",
+                      description: `Started insurance claim process for ${patientName}`,
+                    });
+                    
+                    // Open the claim modal
+                    setIsClaimModalOpen(true);
+                  }
+                }}
+              >
+                <span className="flex items-center gap-2 text-blue-600">
+                  <FileText className="h-4 w-4" />
+                  Claim Services
+                </span>
+              </Item>
+              <Item
+                onClick={({ props }) => handleDeleteAppointment(props.appointmentId)}
+              >
+                <span className="flex items-center gap-2 text-red-600">
+                  <Trash2 className="h-4 w-4" />
+                  Delete Appointment
+                </span>
+              </Item>
+            </Menu>
+            
+            {/* Main Content - Split into Schedule and Calendar */}
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left side - Schedule Grid */}
+              <div className="w-full lg:w-3/4 overflow-x-auto bg-white rounded-md shadow">
+                <div className="p-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => setSelectedDate(addDays(selectedDate, -1))}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <h2 className="text-xl font-semibold">{formattedDate}</h2>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Schedule Grid with Drag and Drop */}
+                <DndProvider backend={HTML5Backend}>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse min-w-[800px]">
+                      <thead>
+                        <tr>
+                          <th className="p-2 border bg-gray-50 w-[100px]">Time</th>
+                          {staffMembers.map(staff => (
+                            <th 
+                              key={staff.id} 
+                              className={`p-2 border bg-gray-50 ${staff.role === 'doctor' ? 'font-bold' : ''}`}
+                            >
+                              {staff.name}
+                              <div className="text-xs text-gray-500">{staff.role}</div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timeSlots.map((timeSlot) => (
+                          <tr key={timeSlot.time}>
+                            <td className="border px-2 py-1 text-xs text-gray-600 font-medium">
+                              {timeSlot.displayTime}
+                            </td>
+                            {staffMembers.map((staff) => (
+                              <DroppableTimeSlot 
+                                key={`${timeSlot.time}-${staff.id}`}
+                                timeSlot={timeSlot} 
+                                staffId={staff.id} 
+                                appointment={getAppointmentAtSlot(timeSlot, staff.id)}
+                                staff={staff}
+                              />
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </DndProvider>
+              </div>
+              
+              {/* Right side - Calendar and Stats */}
+              <div className="w-full lg:w-1/4 space-y-6">
+                {/* Calendar Card */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle>Calendar</CardTitle>
+                    <CardDescription>Select a date to view or schedule appointments</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => {
+                        if (date) setSelectedDate(date);
+                      }}
+                      className="rounded-md border"
+                    />
+                  </CardContent>
+                </Card>
+                
+                {/* Statistics Card */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Appointments</span>
+                      <Button variant="ghost" size="icon" onClick={() => refetchAppointments()}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </CardTitle>
+                    <CardDescription>Statistics for {formattedDate}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">Total appointments:</span>
+                        <span className="font-semibold">{selectedDateAppointments.length}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">With doctors:</span>
+                        <span className="font-semibold">
+                          {processedAppointments.filter(apt => 
+                            staffMembers.find(s => s.id === apt.staffId)?.role === 'doctor'
+                          ).length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">With hygienists:</span>
+                        <span className="font-semibold">
+                          {processedAppointments.filter(apt => 
+                            staffMembers.find(s => s.id === apt.staffId)?.role === 'hygienist'
+                          ).length}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+      
+      {/* Add/Edit Appointment Modal */}
+      <AddAppointmentModal
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        onSubmit={handleAppointmentSubmit}
+        isLoading={createAppointmentMutation.isPending || updateAppointmentMutation.isPending}
+        appointment={editingAppointment}
+        patients={patients}
+      />
+      
+      {/* Claim Services Modal */}
+      {claimPatientId && claimAppointmentId && (
+        <ClaimModal
+          open={isClaimModalOpen}
+          onClose={() => {
+            setIsClaimModalOpen(false);
+            setClaimPatientId(null);
+            setClaimAppointmentId(null);
+          }}
+          patientId={claimPatientId}
+          appointmentId={claimAppointmentId}
+        />
+      )}
+    </div>
+  );
+}
