@@ -1,18 +1,41 @@
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { TopAppBar } from "../components/layout/top-app-bar";
-import { Sidebar } from "../components/layout/sidebar";
-import { PatientTable } from "../components/patients/patient-table";
-import { AddPatientModal } from "../components/patients/add-patient-modal";
-import { PatientSearch, SearchCriteria } from "../components/patients/patient-search";
-import { FileUploadZone } from "../components/file-upload/file-upload-zone";
-import { Button } from "../components/ui/button";
+import { TopAppBar } from "@/components/layout/top-app-bar";
+import { Sidebar } from "@/components/layout/sidebar";
+import { PatientTable } from "@/components/patients/patient-table";
+import { AddPatientModal } from "@/components/patients/add-patient-modal";
+import { PatientSearch, SearchCriteria } from "@/components/patients/patient-search";
+import { FileUploadZone } from "@/components/file-upload/file-upload-zone";
+import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw, File, FilePlus } from "lucide-react";
-import { useToast } from "../hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Patient, InsertPatient, UpdatePatient } from "@shared/schema";
-import { apiRequest, queryClient } from "../lib/queryClient";
-import { useAuth } from "../hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+// import { Patient, InsertPatient, UpdatePatient } from "@repo/db/shared/schemas";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import {z} from "zod";
+
+
+const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
+const insertPatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
+
+const updatePatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+}).partial();
+
+type UpdatePatient = z.infer<typeof updatePatientSchema>;
+
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {

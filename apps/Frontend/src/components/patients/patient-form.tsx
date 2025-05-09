@@ -1,7 +1,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertPatientSchema, InsertPatient, Patient, updatePatientSchema, UpdatePatient } from "@shared/schema";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+// import { insertPatientSchema, InsertPatient, Patient, updatePatientSchema, UpdatePatient } from "@repo/db/shared/schemas";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Form,
@@ -20,6 +21,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
+const insertPatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
+
+const updatePatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+}).partial();
+
+type UpdatePatient = z.infer<typeof updatePatientSchema>;
+
 
 interface PatientFormProps {
   patient?: Patient;

@@ -4,9 +4,25 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
+// import { insertUserSchema, User as SelectUser, InsertUser } from "@repo/db/shared/schemas";
+import { UserUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import {z} from "zod";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
-import { useToast } from "../hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+
+type SelectUser = z.infer<typeof UserUncheckedCreateInputObjectSchema>;
+
+const insertUserSchema = (UserUncheckedCreateInputObjectSchema as unknown as z.ZodObject<{
+    username: z.ZodString;
+    password: z.ZodString;
+  }>).pick({
+  username: true,
+  password: true,
+});
+
+type InsertUser = z.infer<typeof insertUserSchema>;
+
+
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -17,7 +33,11 @@ type AuthContextType = {
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
 };
 
-type LoginData = Pick<InsertUser, "username" | "password">;
+// type LoginData = Pick<InsertUser, "username" | "password">;
+type LoginData = {
+  username: InsertUser["username"];
+  password: InsertUser["password"];
+};
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {

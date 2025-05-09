@@ -12,7 +12,7 @@
   "type": "commonjs",
   "exports": {
     "./client": "./src/index.ts",
-    "./shared" : "./shared/schemas/index.ts"
+    "./shared/schemas" : "./shared/schemas/index.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.7.0",

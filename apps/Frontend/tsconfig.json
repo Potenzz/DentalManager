@@ -1,11 +1,13 @@
 {
-  "extends": "@repo/typescript-config/nextjs.json",
+  "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+    "moduleResolution": "node",
+    "module": "ESNext",
+    "jsx": "preserve",
+    "baseUrl": ".",  // This tells TypeScript where to start resolving paths
+    "paths": {
+      "@/*": ["src/*"]  // The @ alias will point to src folder inside the Frontend app
+    }
   },
   "include": [
     "**/*.ts",

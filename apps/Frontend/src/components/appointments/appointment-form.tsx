@@ -1,9 +1,30 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { format } from "date-fns";
-import { InsertAppointment, UpdateAppointment, Appointment, Patient } from "@shared/schema";
+// import { InsertAppointment, UpdateAppointment, Appointment, Patient } from "@repo/db/shared/schemas";
+import { AppointmentUncheckedCreateInputObjectSchema, PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+
+import {z} from "zod";
+type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
+
+const insertAppointmentSchema = (AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+const updateAppointmentSchema = (AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+}).partial();
+type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
+
+const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
 
 // Define staff members (should match those in appointments-page.tsx)
 const staffMembers = [
@@ -36,7 +57,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Create a schema for appointment validation
 const appointmentSchema = z.object({
   patientId: z.coerce.number().positive(),
   title: z.string().optional(),
@@ -52,7 +72,7 @@ const appointmentSchema = z.object({
   type: z.string().min(1, "Appointment type is required"),
   notes: z.string().optional(),
   status: z.string().default("scheduled"),
-  staff: z.string().default(staffMembers[0].id),
+  staff: z.string().default(staffMembers?.[0]?.id ?? "default-id"),
 });
 
 export type AppointmentFormValues = z.infer<typeof appointmentSchema>;
@@ -96,8 +116,8 @@ export function AppointmentForm({
         patientId: appointment.patientId,
         title: appointment.title,
         date: new Date(appointment.date),
-        startTime: appointment.startTime.slice(0, 5), // HH:MM from HH:MM:SS
-        endTime: appointment.endTime.slice(0, 5), // HH:MM from HH:MM:SS
+        startTime: typeof appointment.startTime === 'string' ? appointment.startTime.slice(0, 5) : "", 
+        endTime: typeof appointment.endTime === 'string' ? appointment.endTime.slice(0, 5) : "", 
         type: appointment.type,
         notes: appointment.notes || "",
         status: appointment.status || "scheduled",
@@ -112,7 +132,7 @@ export function AppointmentForm({
           type: parsedStoredData.type || "checkup",
           status: parsedStoredData.status || "scheduled",
           notes: parsedStoredData.notes || "",
-          staff: parsedStoredData.staff || staffMembers[0].id,
+          staff: parsedStoredData.staff || (staffMembers?.[0]?.id ?? "default-id")
         }
       : {
           date: new Date(),
@@ -187,7 +207,7 @@ export function AppointmentForm({
     
     // If there's no staff information in the notes, add it
     if (!notes.includes('Appointment with')) {
-      notes = notes ? `${notes}\nAppointment with ${selectedStaff.name}` : `Appointment with ${selectedStaff.name}`;
+      notes = notes ? `${notes}\nAppointment with ${selectedStaff?.name}` : `Appointment with ${selectedStaff?.name}`;
     }
     
     onSubmit({

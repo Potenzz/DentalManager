@@ -1,6 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, LayoutDashboard, Users, Calendar, FileText, Settings } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { LayoutDashboard, Users, Calendar, FileText, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {

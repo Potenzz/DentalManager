@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Patient } from "@shared/schema";
 import {
   Table,
   TableBody,
@@ -26,6 +25,15 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+// import { Patient } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import {z} from "zod";
+
+const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
 
 interface PatientTableProps {
   patients: Patient[];

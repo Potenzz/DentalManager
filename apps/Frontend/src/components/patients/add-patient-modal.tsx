@@ -9,10 +9,32 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { PatientForm } from "./patient-form";
-import { InsertPatient, Patient, UpdatePatient } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { X, Calendar } from "lucide-react";
 import { useLocation } from "wouter";
+// import { InsertPatient, Patient, UpdatePatient } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import {z} from "zod";
+
+const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
+const insertPatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
+
+const updatePatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+}).partial();
+
+type UpdatePatient = z.infer<typeof updatePatientSchema>;
+
 
 interface AddPatientModalProps {
   open: boolean;

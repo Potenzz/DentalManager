@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { format } from "date-fns";
-import { Appointment, Patient } from "@shared/schema";
 import {
   Table,
   TableBody,
@@ -11,13 +9,13 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
+import {
+  MoreHorizontal,
+  Edit,
+  Trash2,
   Eye,
   Calendar,
-  Clock
+  Clock,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,6 +25,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+// import { Appointment, Patient } from "@repo/db/shared/schemas";
+import {
+  AppointmentUncheckedCreateInputObjectSchema,
+  PatientUncheckedCreateInputObjectSchema,
+} from "@repo/db/shared/schemas";
+
+import { z } from "zod";
+type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
+
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
 
 interface AppointmentTableProps {
   appointments: Appointment[];
@@ -35,21 +48,34 @@ interface AppointmentTableProps {
   onDelete: (id: number) => void;
 }
 
-export function AppointmentTable({ 
-  appointments, 
-  patients, 
-  onEdit, 
-  onDelete 
+export function AppointmentTable({
+  appointments,
+  patients,
+  onEdit,
+  onDelete,
 }: AppointmentTableProps) {
   // Helper function to get patient name
   const getPatientName = (patientId: number) => {
-    const patient = patients.find(p => p.id === patientId);
-    return patient ? `${patient.firstName} ${patient.lastName}` : "Unknown Patient";
+    const patient = patients.find((p) => p.id === patientId);
+    return patient
+      ? `${patient.firstName} ${patient.lastName}`
+      : "Unknown Patient";
   };
 
   // Helper function to get status badge
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "success"; label: string }> = {
+    const statusConfig: Record<
+      string,
+      {
+        variant:
+          | "default"
+          | "secondary"
+          | "destructive"
+          | "outline"
+          | "success";
+        label: string;
+      }
+    > = {
       scheduled: { variant: "default", label: "Scheduled" },
       confirmed: { variant: "secondary", label: "Confirmed" },
       completed: { variant: "success", label: "Completed" },
@@ -57,20 +83,20 @@ export function AppointmentTable({
       "no-show": { variant: "outline", label: "No Show" },
     };
 
-    const config = statusConfig[status] || { variant: "default", label: status };
-    
-    return (
-      <Badge variant={config.variant as any}>
-        {config.label}
-      </Badge>
-    );
+    const config = statusConfig[status] || {
+      variant: "default",
+      label: status,
+    };
+
+    return <Badge variant={config.variant as any}>{config.label}</Badge>;
   };
 
   // Sort appointments by date and time (newest first)
   const sortedAppointments = [...appointments].sort((a, b) => {
-    const dateComparison = new Date(b.date).getTime() - new Date(a.date).getTime();
+    const dateComparison =
+      new Date(b.date).getTime() - new Date(a.date).getTime();
     if (dateComparison !== 0) return dateComparison;
-    return a.startTime.localeCompare(b.startTime);
+    return a.startTime.toString().localeCompare(b.startTime.toString());
   });
 
   return (
@@ -108,15 +134,20 @@ export function AppointmentTable({
                 <TableCell>
                   <div className="flex items-center">
                     <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                    {appointment.startTime.slice(0, 5)} - {appointment.endTime.slice(0, 5)}
+                    {appointment.startTime instanceof Date
+                      ? appointment.startTime.toISOString().slice(11, 16)
+                      : appointment.startTime.slice(0, 5)}{" "}
+                    -
+                    {appointment.endTime instanceof Date
+                      ? appointment.endTime.toISOString().slice(11, 16)
+                      : appointment.endTime.slice(0, 5)}
+                    {/* {appointment.startTime.slice(0, 5)} - {appointment.endTime.slice(0, 5)} */}
                   </div>
                 </TableCell>
                 <TableCell className="capitalize">
-                  {appointment.type.replace('-', ' ')}
+                  {appointment.type.replace("-", " ")}
                 </TableCell>
-                <TableCell>
-                  {getStatusBadge(appointment.status!)}
-                </TableCell>
+                <TableCell>{getStatusBadge(appointment.status!)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -132,8 +163,14 @@ export function AppointmentTable({
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => onDelete(appointment.id)}
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (typeof appointment.id === "number") {
+                            onDelete(appointment.id);
+                          } else {
+                            console.error("Invalid appointment ID");
+                          }
+                        }}
                         className="text-destructive focus:text-destructive"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />

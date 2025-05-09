@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { TopAppBar } from "../components/layout/top-app-bar";
-import { Sidebar } from "../components/layout/sidebar";
-import { StatCard } from "../components/ui/stat-card";
-import { PatientTable } from "../components/patients/patient-table";
-import { AddPatientModal } from "../components/patients/add-patient-modal";
-import { AddAppointmentModal } from "../components/appointments/add-appointment-modal";
-import { Card, CardContent } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { useToast } from "../hooks/use-toast";
-import { useAuth } from "../hooks/use-auth";
-import { apiRequest, queryClient } from "../lib/queryClient";
-import { InsertPatient, Patient, UpdatePatient, Appointment, InsertAppointment, UpdateAppointment } from "@repo/db/schema";
+import { TopAppBar } from "@/components/layout/top-app-bar";
+import { Sidebar } from "@/components/layout/sidebar";
+import { StatCard } from "@/components/ui/stat-card";
+import { PatientTable } from "@/components/patients/patient-table";
+import { AddPatientModal } from "@/components/patients/add-patient-modal";
+import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AppointmentUncheckedCreateInputObjectSchema, PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+// import { InsertPatient, Patient, UpdatePatient, Appointment, InsertAppointment, UpdateAppointment } from "@repo/db/shared/schemas";
 import { Users, Calendar, CheckCircle, CreditCard, Plus, Clock } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -21,7 +22,43 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "../components/ui/dialog";
+} from "@/components/ui/dialog";
+import {z} from "zod";
+
+//creating types out of schema auto generated.
+type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
+
+const insertAppointmentSchema = (AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+const updateAppointmentSchema = (AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+}).partial();
+type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
+
+const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
+const insertPatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
+
+const updatePatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+}).partial();
+
+type UpdatePatient = z.infer<typeof updatePatientSchema>;
+
 
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -174,7 +211,7 @@ export default function Dashboard() {
   
   // Handle appointment submission (create or update)
   const handleAppointmentSubmit = (appointmentData: InsertAppointment | UpdateAppointment) => {
-    if (selectedAppointment) {
+    if (selectedAppointment && typeof selectedAppointment.id === 'number') {
       updateAppointmentMutation.mutate({
         id: selectedAppointment.id,
         appointment: appointmentData as UpdateAppointment,
@@ -274,7 +311,7 @@ export default function Dashboard() {
                                 {patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown Patient'}
                               </h3>
                               <div className="text-sm text-gray-500 flex items-center space-x-2">
-                                <span>{appointment.startTime} - {appointment.endTime}</span>
+                                <span>{new Date(appointment.startTime).toLocaleString()} - {new Date(appointment.endTime).toLocaleString()}</span>
                                 <span>•</span>
                                 <span>{appointment.type.charAt(0).toUpperCase() + appointment.type.slice(1)}</span>
                               </div>

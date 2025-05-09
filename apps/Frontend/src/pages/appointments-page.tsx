@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, addDays, startOfToday, addMinutes  } from "date-fns";
-import { TopAppBar } from "../components/layout/top-app-bar";
-import { Sidebar } from "../components/layout/sidebar";
-import { AddAppointmentModal } from "../components/appointments/add-appointment-modal";
-import { ClaimModal } from "../components/claims/claim-modal";
-import { Button } from "../components/ui/button";
-import { z } from "zod";
+import { format, addDays, parse, startOfToday, startOfDay, addMinutes, isEqual } from "date-fns";
+import { TopAppBar } from "@/components/layout/top-app-bar";
+import { Sidebar } from "@/components/layout/sidebar";
+import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
+import { ClaimModal } from "@/components/claims/claim-modal";
+import { Button } from "@/components/ui/button";
 import { 
   Calendar as CalendarIcon, 
   Plus, 
+  Users, 
   ChevronLeft, 
   ChevronRight, 
   RefreshCw, 
@@ -17,16 +17,41 @@ import {
   Trash2,
   FileText
 } from "lucide-react";
-import { useToast } from "../hooks/use-toast";
-import { Calendar } from "../components/ui/calendar";
-import { apiRequest, queryClient } from "../lib/queryClient";
-import { useAuth } from "../hooks/use-auth";
-import { Card, CardContent, CardHeader, CardDescription, CardTitle } from "../components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+import { Calendar } from "@/components/ui/calendar";
+import { AppointmentUncheckedCreateInputObjectSchema, PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+// import { Appointment, InsertAppointment, UpdateAppointment, Patient } from "@repo/db/shared/schemas";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardHeader, CardDescription, CardTitle } from "@/components/ui/card";
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Menu, Item, useContextMenu } from 'react-contexify';
 import 'react-contexify/ReactContexify.css';
 import { useLocation } from "wouter";
+
+//creating types out of schema auto generated.
+type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
+
+const insertAppointmentSchema = (AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+const updateAppointmentSchema = (AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  id: true,
+  createdAt: true,
+}).partial();
+type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
+
+const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
+
 
 // Define types for scheduling
 interface TimeSlot {
@@ -42,13 +67,13 @@ interface Staff {
 }
 
 interface ScheduledAppointment {
-  id: number;
+  id?: number;
   patientId: number;
   patientName: string;
   staffId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
+  date: string | Date; // Allow both string and Date
+  startTime: string | Date; // Allow both string and Date
+  endTime: string | Date; // Allow both string and Date
   status: string | null;
   type: string;
 }
@@ -63,7 +88,7 @@ export default function AppointmentsPage() {
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [claimAppointmentId, setClaimAppointmentId] = useState<number | null>(null);
   const [claimPatientId, setClaimPatientId] = useState<number | null>(null);
-  const [editingAppointment, setEditingAppointment] = useState<any | undefined>(undefined);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [location] = useLocation();
@@ -96,10 +121,10 @@ export default function AppointmentsPage() {
   
   // Fetch appointments
   const {
-    data: appointments,
+    data: appointments = [] as Appointment[],
     isLoading: isLoadingAppointments,
     refetch: refetchAppointments,
-  } = useQuery<any>({
+  } = useQuery<Appointment[]>({
     queryKey: ["/api/appointments"],
     enabled: !!user,
   });
@@ -108,7 +133,7 @@ export default function AppointmentsPage() {
   const {
     data: patients = [],
     isLoading: isLoadingPatients,
-  } = useQuery<any>({
+  } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
     enabled: !!user,
   });
@@ -167,8 +192,7 @@ export default function AppointmentsPage() {
     if (newPatientId) {
       const patientId = parseInt(newPatientId);
       // Find the patient in our list
-      const patient = patients.find((p: { id: number }) => p.id === patientId) ?? undefined;
-
+      const patient = (patients as Patient[]).find(p => p.id === patientId);
       
       if (patient) {
         toast({
@@ -177,7 +201,6 @@ export default function AppointmentsPage() {
         });
         
         // Select first available staff member
-        
         const staffId = staffMembers[0]!.id;
         
         // Find first time slot today (9:00 AM is a common starting time)
@@ -207,7 +230,7 @@ export default function AppointmentsPage() {
 
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
-    mutationFn: async (appointment: any) => {
+    mutationFn: async (appointment: InsertAppointment) => {
       const res = await apiRequest("POST", "/api/appointments", appointment);
       return await res.json();
     },
@@ -230,7 +253,7 @@ export default function AppointmentsPage() {
 
   // Update appointment mutation
   const updateAppointmentMutation = useMutation({
-    mutationFn: async ({ id, appointment }: { id: number; appointment: any }) => {
+    mutationFn: async ({ id, appointment }: { id: number; appointment: UpdateAppointment }) => {
       const res = await apiRequest("PUT", `/api/appointments/${id}`, appointment);
       return await res.json();
     },
@@ -274,7 +297,7 @@ export default function AppointmentsPage() {
   });
 
   // Handle appointment submission (create or update)
-  const handleAppointmentSubmit = (appointmentData: any) => {
+  const handleAppointmentSubmit = (appointmentData: InsertAppointment | UpdateAppointment) => {
     // Make sure the date is for the selected date
     const updatedData = {
       ...appointmentData,
@@ -285,13 +308,13 @@ export default function AppointmentsPage() {
     if (editingAppointment && 'id' in editingAppointment && typeof editingAppointment.id === 'number') {
       updateAppointmentMutation.mutate({
         id: editingAppointment.id,
-        appointment: updatedData as any,
+        appointment: updatedData as unknown as UpdateAppointment,
       });
     } else {
       // This is a new appointment
       if (user) {
         createAppointmentMutation.mutate({
-          ...updatedData as any,
+          ...updatedData as unknown as InsertAppointment,
           userId: user.id
         });
       }
@@ -299,7 +322,7 @@ export default function AppointmentsPage() {
   };
 
   // Handle edit appointment
-  const handleEditAppointment = (appointment: any) => {
+  const handleEditAppointment = (appointment: Appointment) => {
     setEditingAppointment(appointment);
     setIsAddModalOpen(true);
   };
@@ -319,21 +342,19 @@ export default function AppointmentsPage() {
   const formattedDate = format(selectedDate, 'MMMM d, yyyy');
   
   // Filter appointments for the selected date
-  const selectedDateAppointments = appointments.filter((apt: { date: string }) =>
+  const selectedDateAppointments = appointments.filter(apt => 
     apt.date === format(selectedDate, 'yyyy-MM-dd')
   );
-  
   
   // Add debugging logs
   console.log("Selected date:", format(selectedDate, 'yyyy-MM-dd'));
   console.log("All appointments:", appointments);
   console.log("Filtered appointments for selected date:", selectedDateAppointments);
-
-
+  
   // Process appointments for the scheduler view
-  const processedAppointments: ScheduledAppointment[] = selectedDateAppointments.map((apt: any) => {
+  const processedAppointments: ScheduledAppointment[] = selectedDateAppointments.map(apt => {
     // Find patient name
-    const patient = patients.find((p: any) => p.id === apt.patientId);
+    const patient = patients.find(p => p.id === apt.patientId);
     const patientName = patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown Patient';
     
     // Try to determine the staff from the notes or title
@@ -376,7 +397,9 @@ export default function AppointmentsPage() {
     const processed = {
       ...apt,
       patientName,
-      staffId
+      staffId,
+      status: apt.status ?? null, // Default to null if status is undefined
+      date: apt.date instanceof Date ? apt.date.toISOString() : apt.date, // Ensure d
     };
     
     console.log("Processed appointment:", processed);
@@ -393,7 +416,8 @@ export default function AppointmentsPage() {
     // In a real application, you might want to show multiple or stack them
     const appointmentsAtSlot = processedAppointments.filter(apt => {
       // Fix time format comparison - the database adds ":00" seconds to the time
-      const dbTime = apt.startTime.substring(0, 5); // Get just HH:MM, removing seconds
+      const dbTime = typeof apt.startTime === 'string' ? apt.startTime.substring(0, 5) : '';
+
       const timeMatches = dbTime === timeSlot.time;
       const staffMatches = apt.staffId === staffId;
       
@@ -417,7 +441,7 @@ export default function AppointmentsPage() {
 
   // Handle moving an appointment to a new time slot and staff
   const handleMoveAppointment = (appointmentId: number, newTimeSlot: TimeSlot, newStaffId: string) => {
-    const appointment = appointments.find((a:any) => a.id === appointmentId);
+    const appointment = appointments.find(a => a.id === appointmentId);
     if (!appointment) return;
 
     // Calculate new end time (30 minutes from start)
@@ -434,7 +458,7 @@ export default function AppointmentsPage() {
     
     // Update appointment data
     // Make sure we handle the time format correctly - backend expects HH:MM but stores as HH:MM:SS
-    const updatedAppointment: any = {
+    const updatedAppointment: UpdateAppointment = {
       ...appointment,
       startTime: newTimeSlot.time, // Already in HH:MM format
       endTime: endTime, // Already in HH:MM format
@@ -475,7 +499,6 @@ export default function AppointmentsPage() {
     return (
       <div 
         ref={drag as unknown as React.RefObject<HTMLDivElement>} // Type assertion to make TypeScript happy
-
         className={`${staff.color} border border-white shadow-md text-white rounded p-1 text-xs h-full overflow-hidden cursor-move relative ${
           isDragging ? 'opacity-50' : 'opacity-100'
         }`}
@@ -483,14 +506,14 @@ export default function AppointmentsPage() {
         onClick={(e) => {
           // Only allow edit on click if we're not dragging
           if (!isDragging) {
-            const fullAppointment = appointments.find((a:any) => a.id === appointment.id);
+            const fullAppointment = appointments.find(a => a.id === appointment.id);
             if (fullAppointment) {
               e.stopPropagation();
               handleEditAppointment(fullAppointment);
             }
           }
         }}
-        onContextMenu={(e) => handleContextMenu(e, appointment.id)}
+        onContextMenu={(e) => handleContextMenu(e, appointment.id ?? 0)}
       >
         <div className="font-bold truncate flex items-center gap-1">
           <Move className="h-3 w-3" />
@@ -531,8 +554,6 @@ export default function AppointmentsPage() {
     return (
       <td 
         ref={drop as unknown as React.RefObject<HTMLTableCellElement>} 
-
-
         key={`${timeSlot.time}-${staffId}`} 
         className={`px-1 py-1 border relative h-14 ${isOver && canDrop ? 'bg-green-100' : ''}`}
       >
@@ -583,7 +604,7 @@ export default function AppointmentsPage() {
             <Menu id={APPOINTMENT_CONTEXT_MENU_ID} animation="fade">
               <Item
                 onClick={({ props }) => {
-                  const fullAppointment = appointments.find((a:any) => a.id === props.appointmentId);
+                  const fullAppointment = appointments.find(a => a.id === props.appointmentId);
                   if (fullAppointment) {
                     handleEditAppointment(fullAppointment);
                   }
@@ -596,14 +617,14 @@ export default function AppointmentsPage() {
               </Item>
               <Item
                 onClick={({ props }) => {
-                  const fullAppointment = appointments.find((a:any) => a.id === props.appointmentId);
+                  const fullAppointment = appointments.find(a => a.id === props.appointmentId);
                   if (fullAppointment) {
                     // Set the appointment and patient IDs for the claim modal
-                    setClaimAppointmentId(fullAppointment.id);
+                    setClaimAppointmentId(fullAppointment.id ?? null);
                     setClaimPatientId(fullAppointment.patientId);
                     
                     // Find the patient name for the toast notification
-                    const patient = patients.find((p:any) => p.id === fullAppointment.patientId);
+                    const patient = patients.find(p => p.id === fullAppointment.patientId);
                     const patientName = patient ? `${patient.firstName} ${patient.lastName}` : `Patient #${fullAppointment.patientId}`;
                     
                     // Show a toast notification

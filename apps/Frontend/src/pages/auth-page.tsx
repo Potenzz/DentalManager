@@ -1,11 +1,12 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserCreateOneSchema } from "@repo/db/shared";
+import { UserUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+// import { insertUserSchema } from "@repo/db/shared/schemas";
 import { useState } from "react";
-import { useAuth } from "../hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -13,18 +14,25 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../components/ui/form";
-import { Input } from "../components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Checkbox } from "../components/ui/checkbox";
-import { Card, CardContent } from "../components/ui/card";
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent } from "@/components/ui/card";
 import { BriefcaseMedical, CheckCircle, Torus } from "lucide-react";
+import { CheckedState } from "@radix-ui/react-checkbox";
 
-const loginSchema = UserCreateOneSchema.extend({
+const insertUserSchema = (UserUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).pick({
+  username: true,
+  password: true,
+});
+
+const loginSchema = (insertUserSchema as unknown as z.ZodObject<any>).extend({
   rememberMe: z.boolean().optional(),
 });
 
-const registerSchema = UserCreateOne.extend({
+
+const registerSchema = (insertUserSchema as unknown as z.ZodObject<any>).extend({
   confirmPassword: z.string().min(6, {
     message: "Password must be at least 6 characters long",
   }),
@@ -143,7 +151,7 @@ export default function AuthPage() {
                         <div className="flex items-center space-x-2">
                           <Checkbox
                             id="remember-me"
-                            checked={field.value}
+                            checked={field.value as CheckedState}
                             onCheckedChange={field.onChange}
                           />
                           <label
@@ -216,6 +224,8 @@ export default function AuthPage() {
                             placeholder="••••••••"
                             type="password"
                             {...field}
+                            value={typeof field.value === 'string' ? field.value : ''}
+
                           />
                         </FormControl>
                         <FormMessage />
@@ -230,7 +240,7 @@ export default function AuthPage() {
                       <FormItem className="flex items-start space-x-2 mt-4">
                         <FormControl>
                           <Checkbox
-                            checked={field.value}
+                            checked={field.value as CheckedState}
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>

@@ -1,6 +1,6 @@
-// Optional PostCSS configuration for applications that need it
+import tailwindcss from "@tailwindcss/postcss";
+import autoprefixer from "autoprefixer";
+
 export const postcssConfig = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-  },
+  plugins: [tailwindcss(), autoprefixer()]
 };

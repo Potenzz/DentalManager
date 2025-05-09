@@ -23,6 +23,8 @@
     "packages/*"
   ],
   "dependencies": {
-    "prisma": "^6.7.0"
+    "@tailwindcss/postcss": "^4.1.6",
+    "@tailwindcss/typography": "^0.5.16",
+    "tailwindcss-animate": "^1.0.7"
   }
 }

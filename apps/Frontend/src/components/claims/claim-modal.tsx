@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { ClaimForm } from "./claim-form";
-import { Patient } from "@shared/schema";
+// import { Patient } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import {z} from "zod";
+
+const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
 
 interface ClaimModalProps {
   open: boolean;
