@@ -1,14 +1,40 @@
-# Turborepo Tailwind CSS starter
+# Dental Manager - Starter 
 
-This Turborepo starter is maintained by the Turborepo core team.
+# Run the following command:
 
-## Using this example
+1. Install dependency
+```sh
+npm install
+```
 
-Run the following command:
+2. Generate Prisma, and its Types.
+```sh
+npm run db:generate
+```
+
+3. To Simply run all the app(Backend + Frontend).
+```sh
+npm run dev
+```
+
+
+4. Or if want to run specfic app (either Backend or Frontend). 
+```sh 
+cd apps/Backend 
+npm run dev
+```
+
+or 
 
 ```sh
-npx create-turbo@latest -e with-tailwind
+cd apps/Frontend
+npm run dev
 ```
+
+
+
+
+## This in a Turborepo.
 
 ## What's inside?
 
