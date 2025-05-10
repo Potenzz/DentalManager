@@ -1,6 +1,10 @@
 # Dental Manager - Starter 
 
-# Run the following command:
+A monorepo setup to manage both Backend and Frontend of the Dental Manager application.
+
+## 🚀 Getting Started
+
+Follow the steps below to set up and run the project:
 
 1. Install dependency
 ```sh
