@@ -4,6 +4,8 @@
     "moduleResolution": "node",
     "module": "ESNext",
     "jsx": "preserve",
+    "typeRoots": ["node_modules/@types", "node_modules"],
+    
     "baseUrl": ".",  // This tells TypeScript where to start resolving paths
     "paths": {
       "@/*": ["src/*"]  // The @ alias will point to src folder inside the Frontend app
