@@ -16,6 +16,15 @@ npm install
 npm run db:generate
 ```
 
+3. Copy Environment Variables
+
+Create `.env` files from the provided `.env.example` templates:
+Change the required ones env in .env files.
+
+```sh
+npm run setup:env
+```
+
 3. To Simply run all the app(Backend + Frontend).
 ```sh
 npm run dev

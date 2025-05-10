@@ -8,7 +8,9 @@
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "db:generate":"cd packages/db && npx prisma generate && cd ../.."
+    "db:generate": "cd packages/db && npx prisma generate && cd ../..",
+    "setup:env": "shx cp packages/db/.env.example packages/db/.env"
+
   },
   "devDependencies": {
     "prettier": "^3.5.3",
@@ -22,5 +24,8 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "shx": "^0.4.0"
+  }
 }
