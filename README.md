@@ -38,9 +38,7 @@ npm run dev
 
 
 
-## This in a Turborepo.
-
-## What's inside?
+## This in a Turborepo. What's inside?
 
 This Turborepo includes the following packages/apps:
 
