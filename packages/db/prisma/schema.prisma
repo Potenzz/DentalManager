@@ -8,9 +8,10 @@ generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
+
 generator zod {
   provider = "prisma-zod-generator"
-  output   = "../shared/"  // Zod schemas will be generated here inside `db/shared`
+  output   = "../shared/" // Zod schemas will be generated here inside `db/shared`
 }
 
 datasource db {
@@ -18,53 +19,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 model User {
-  id       Int       @id @default(autoincrement())
-  username String    @unique 
-  password String
-  patients Patient[]
+  id           Int           @id @default(autoincrement())
+  username     String        @unique
+  password     String
+  patients     Patient[]
   appointments Appointment[]
 }
 
 model Patient {
-  id                 Int       @id @default(autoincrement())
-  firstName          String
-  lastName           String
-  dateOfBirth        DateTime  @db.Date
-  gender             String
-  phone              String
-  email              String?
-  address            String?
-  city               String?
-  zipCode            String?
-  insuranceProvider  String?
-  insuranceId        String?
-  groupNumber        String?
-  policyHolder       String?
-  allergies          String?
-  medicalConditions  String?
-  status             String    @default("active")
-  userId             Int
-  createdAt          DateTime  @default(now())
-  user               User      @relation(fields: [userId], references: [id])
-  appointments       Appointment[]
+  id                Int           @id @default(autoincrement())
+  firstName         String
+  lastName          String
+  dateOfBirth       DateTime      @db.Date
+  gender            String
+  phone             String
+  email             String?
+  address           String?
+  city              String?
+  zipCode           String?
+  insuranceProvider String?
+  insuranceId       String?
+  groupNumber       String?
+  policyHolder      String?
+  allergies         String?
+  medicalConditions String?
+  status            String        @default("active")
+  userId            Int
+  createdAt         DateTime      @default(now())
+  user              User          @relation(fields: [userId], references: [id])
+  appointments      Appointment[]
 }
 
 model Appointment {
   id        Int      @id @default(autoincrement())
   patientId Int
   userId    Int
+  staffId   Int? // Optional: Appointment may or may not have staff assigned
   title     String
   date      DateTime @db.Date
-  startTime DateTime @db.Time
-  endTime   DateTime @db.Time
+  startTime String // Store time as "hh:mm"
+  endTime   String // Store time as "hh:mm"
   type      String // e.g., "checkup", "cleaning", "filling", etc.
   notes     String?
   status    String   @default("scheduled") // "scheduled", "completed", "cancelled", "no-show"
   createdAt DateTime @default(now())
 
-  patient   Patient  @relation(fields: [patientId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  staff   Staff?  @relation(fields: [staffId], references: [id])
+}
+
+model Staff {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String?       
+  role         String // e.g., "Dentist", "Hygienist", "Assistant"
+  phone        String?
+  createdAt    DateTime      @default(now())
+  appointments Appointment[]
 }

@@ -2,7 +2,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
-// import { insertPatientSchema, InsertPatient, Patient, updatePatientSchema, UpdatePatient } from "@repo/db/shared/schemas";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Form,
@@ -13,7 +12,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,26 +19,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useEffect, useMemo } from "react";
 
-const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   appointments: true,
 });
 type Patient = z.infer<typeof PatientSchema>;
 
-const insertPatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
-
-const updatePatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const insertPatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   id: true,
   createdAt: true,
   userId: true,
-}).partial();
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
+
+const updatePatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
 
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
-
 
 interface PatientFormProps {
   patient?: Patient;
@@ -53,50 +60,103 @@ interface PatientFormProps {
   onSubmit: (data: InsertPatient | UpdatePatient) => void;
 }
 
-export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormProps) {
+export type PatientFormRef = {
+  submit: () => void;
+};
+
+export function PatientForm({
+  patient,
+  extractedInfo,
+  onSubmit,
+}: PatientFormProps) {
   const { user } = useAuth();
   const isEditing = !!patient;
-  
-  const schema = isEditing ? updatePatientSchema : insertPatientSchema.extend({
-    userId: z.number().optional(),
-  });
 
-  // Merge extracted info into default values if available
-  const defaultValues = {
-    firstName: extractedInfo?.firstName || "",
-    lastName: extractedInfo?.lastName || "",
-    dateOfBirth: extractedInfo?.dateOfBirth || "",
-    gender: "",
-    phone: "",
-    email: "",
-    address: "",
-    city: "",
-    zipCode: "",
-    insuranceProvider: "",
-    insuranceId: extractedInfo?.insuranceId || "",
-    groupNumber: "",
-    policyHolder: "",
-    allergies: "",
-    medicalConditions: "",
-    status: "active",
-    userId: user?.id,
-  };
-  
+  const schema = useMemo(
+    () =>
+      isEditing
+        ? updatePatientSchema
+        : insertPatientSchema.extend({ userId: z.number().optional() }),
+    [isEditing]
+  );
+
+  const computedDefaultValues = useMemo(() => {
+    if (isEditing && patient) {
+      const { id, userId, createdAt, ...sanitizedPatient } = patient;
+      return {
+        ...sanitizedPatient,
+        dateOfBirth: patient.dateOfBirth
+          ? new Date(patient.dateOfBirth).toISOString().split("T")[0]
+          : "",
+      };
+    }
+
+    return {
+      firstName: extractedInfo?.firstName || "",
+      lastName: extractedInfo?.lastName || "",
+      dateOfBirth: extractedInfo?.dateOfBirth || "",
+      gender: "",
+      phone: "",
+      email: "",
+      address: "",
+      city: "",
+      zipCode: "",
+      insuranceProvider: "",
+      insuranceId: extractedInfo?.insuranceId || "",
+      groupNumber: "",
+      policyHolder: "",
+      allergies: "",
+      medicalConditions: "",
+      status: "active",
+      userId: user?.id,
+    };
+  }, [isEditing, patient, extractedInfo, user?.id]);
+
   const form = useForm<InsertPatient | UpdatePatient>({
     resolver: zodResolver(schema),
-    defaultValues: patient || defaultValues,
+    defaultValues: computedDefaultValues,
   });
 
-  const handleSubmit = (data: InsertPatient | UpdatePatient) => {
+  // Debug form errors
+  useEffect(() => {
+    const errors = form.formState.errors;
+    if (Object.keys(errors).length > 0) {
+      console.log("❌ Form validation errors:", errors);
+    }
+  }, [form.formState.errors]);
+
+  useEffect(() => {
+    if (patient) {
+      const { id, userId, createdAt, ...sanitizedPatient } = patient;
+      const resetValues: Partial<Patient> = {
+        ...sanitizedPatient,
+        dateOfBirth: patient.dateOfBirth
+          ? new Date(patient.dateOfBirth).toISOString().split("T")[0]
+          : "",
+      };
+      form.reset(resetValues);
+    }
+  }, [patient, computedDefaultValues, form]);
+
+  const handleSubmit2 = (data: InsertPatient | UpdatePatient) => {
     onSubmit(data);
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form
+        id="patient-form"
+        key={patient?.id || "new"}
+        onSubmit={form.handleSubmit((data) => {
+          handleSubmit2(data);
+        })}
+        className="space-y-6"
+      >
         {/* Personal Information */}
         <div>
-          <h4 className="text-md font-medium text-gray-700 mb-3">Personal Information</h4>
+          <h4 className="text-md font-medium text-gray-700 mb-3">
+            Personal Information
+          </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -111,7 +171,7 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="lastName"
@@ -125,7 +185,7 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="dateOfBirth"
@@ -139,15 +199,15 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="gender"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Gender *</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
+                  <Select
+                    onValueChange={field.onChange}
                     defaultValue={field.value as string}
                   >
                     <FormControl>
@@ -167,10 +227,12 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
             />
           </div>
         </div>
-        
+
         {/* Contact Information */}
         <div>
-          <h4 className="text-md font-medium text-gray-700 mb-3">Contact Information</h4>
+          <h4 className="text-md font-medium text-gray-700 mb-3">
+            Contact Information
+          </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -185,7 +247,7 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="email"
@@ -193,13 +255,13 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} value={field.value || ''} />
+                    <Input type="email" {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="address"
@@ -207,13 +269,13 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 <FormItem className="md:col-span-2">
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ''} />
+                    <Input {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="city"
@@ -221,13 +283,13 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 <FormItem>
                   <FormLabel>City</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ''} />
+                    <Input {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="zipCode"
@@ -235,7 +297,7 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 <FormItem>
                   <FormLabel>ZIP Code</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ''} />
+                    <Input {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -243,10 +305,12 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
             />
           </div>
         </div>
-        
+
         {/* Insurance Information */}
         <div>
-          <h4 className="text-md font-medium text-gray-700 mb-3">Insurance Information</h4>
+          <h4 className="text-md font-medium text-gray-700 mb-3">
+            Insurance Information
+          </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -254,9 +318,9 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Insurance Provider</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    defaultValue={field.value as string || ''}
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={(field.value as string) || ""}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -264,7 +328,9 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="placeholder">Select provider</SelectItem>
+                      <SelectItem value="placeholder">
+                        Select provider
+                      </SelectItem>
                       <SelectItem value="delta">Delta Dental</SelectItem>
                       <SelectItem value="metlife">MetLife</SelectItem>
                       <SelectItem value="cigna">Cigna</SelectItem>
@@ -277,7 +343,7 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="insuranceId"
@@ -285,13 +351,13 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 <FormItem>
                   <FormLabel>Insurance ID</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ''} />
+                    <Input {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="groupNumber"
@@ -299,13 +365,13 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 <FormItem>
                   <FormLabel>Group Number</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ''} />
+                    <Input {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="policyHolder"
@@ -313,7 +379,7 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
                 <FormItem>
                   <FormLabel>Policy Holder (if not self)</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ''} />
+                    <Input {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -321,7 +387,7 @@ export function PatientForm({ patient, extractedInfo, onSubmit }: PatientFormPro
             />
           </div>
         </div>
-        
+
         {/* Hidden submit button for form validation */}
         <button type="submit" className="hidden" aria-hidden="true"></button>
       </form>

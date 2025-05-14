@@ -1,4 +1,10 @@
-import { useState, forwardRef, useImperativeHandle } from "react";
+import {
+  useState,
+  forwardRef,
+  useImperativeHandle,
+  useEffect,
+  useRef,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -8,38 +14,44 @@ import {
   DialogContent,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { PatientForm } from "./patient-form";
+import { PatientForm, PatientFormRef } from "./patient-form"; 
 import { useToast } from "@/hooks/use-toast";
 import { X, Calendar } from "lucide-react";
 import { useLocation } from "wouter";
-// import { InsertPatient, Patient, UpdatePatient } from "@repo/db/shared/schemas";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
-import {z} from "zod";
+import { z } from "zod";
 
-const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   appointments: true,
 });
 type Patient = z.infer<typeof PatientSchema>;
 
-const insertPatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const insertPatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   id: true,
   createdAt: true,
 });
 type InsertPatient = z.infer<typeof insertPatientSchema>;
 
-const updatePatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
-  id: true,
-  createdAt: true,
-  userId: true,
-}).partial();
+const updatePatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
 
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
-
 
 interface AddPatientModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: InsertPatient | UpdatePatient) => void;
+  onSubmit: (data: InsertPatient | (UpdatePatient & { id?: number })) => void;
   isLoading: boolean;
   patient?: Patient;
   extractedInfo?: {
@@ -56,35 +68,49 @@ export type AddPatientModalRef = {
   navigateToSchedule: (patientId: number) => void;
 };
 
-export const AddPatientModal = forwardRef<AddPatientModalRef, AddPatientModalProps>(function AddPatientModal(props, ref) {
-  const { open, onOpenChange, onSubmit, isLoading, patient, extractedInfo } = props;
+export const AddPatientModal = forwardRef<
+  AddPatientModalRef,
+  AddPatientModalProps
+>(function AddPatientModal(props, ref) {
+  const { open, onOpenChange, onSubmit, isLoading, patient, extractedInfo } =
+    props;
   const { toast } = useToast();
-  const [formData, setFormData] = useState<InsertPatient | UpdatePatient | null>(null);
+  const [formData, setFormData] = useState<
+    InsertPatient | UpdatePatient | null
+  >(null);
   const isEditing = !!patient;
   const [, navigate] = useLocation();
   const [saveAndSchedule, setSaveAndSchedule] = useState(false);
+  const patientFormRef = useRef<PatientFormRef>(null); // Ref for PatientForm
 
   // Set up the imperativeHandle to expose functionality to the parent component
+  useEffect(() => {
+    if (isEditing && patient) {
+      const { id, userId, createdAt, ...sanitized } = patient;
+      setFormData(sanitized); // Update the form data with the patient data for editing
+    } else {
+      setFormData(null); // Reset form data when not editing
+    }
+  }, [isEditing, patient]);
+
   useImperativeHandle(ref, () => ({
     shouldSchedule: saveAndSchedule,
     navigateToSchedule: (patientId: number) => {
       navigate(`/appointments?newPatient=${patientId}`);
-    }
+    },
   }));
 
   const handleFormSubmit = (data: InsertPatient | UpdatePatient) => {
-    setFormData(data);
-    onSubmit(data);
+    if (patient && patient.id) {
+      onSubmit({ ...data, id: patient.id });
+    } else {
+      onSubmit(data);
+    }
   };
-  
+
   const handleSaveAndSchedule = () => {
     setSaveAndSchedule(true);
-    if (formData) {
-      onSubmit(formData);
-    } else {
-      // Trigger form validation by clicking the hidden submit button
-      document.querySelector('form')?.requestSubmit();
-    }
+    document.querySelector("form")?.requestSubmit();
   };
 
   return (
@@ -117,41 +143,41 @@ export const AddPatientModal = forwardRef<AddPatientModalRef, AddPatientModalPro
         />
 
         <DialogFooter className="mt-6">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          
+
           {!isEditing && (
             <Button
               variant="outline"
               className="gap-1"
-              onClick={handleSaveAndSchedule}
+              onClick={() => {
+                handleSaveAndSchedule();
+              }}
               disabled={isLoading}
             >
               <Calendar className="h-4 w-4" />
               Save & Schedule
             </Button>
           )}
-          
+
           <Button
             type="submit"
+            form="patient-form"
             onClick={() => {
-              if (formData) {
-                onSubmit(formData);
-              } else {
-                // Trigger form validation by clicking the hidden submit button
-                document.querySelector('form')?.requestSubmit();
+              if (patientFormRef.current) {
+                patientFormRef.current.submit();
               }
             }}
             disabled={isLoading}
           >
-            {isLoading 
-              ? isEditing ? "Updating..." : "Saving..." 
-              : isEditing ? "Update Patient" : "Save Patient"
-            }
+            {isLoading
+              ? patient
+                ? "Updating..."
+                : "Saving..."
+              : patient
+                ? "Update Patient"
+                : "Save Patient"}
           </Button>
         </DialogFooter>
       </DialogContent>

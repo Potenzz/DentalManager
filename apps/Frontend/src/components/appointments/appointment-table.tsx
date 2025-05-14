@@ -134,14 +134,8 @@ export function AppointmentTable({
                 <TableCell>
                   <div className="flex items-center">
                     <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                    {appointment.startTime instanceof Date
-                      ? appointment.startTime.toISOString().slice(11, 16)
-                      : appointment.startTime.slice(0, 5)}{" "}
-                    -
-                    {appointment.endTime instanceof Date
-                      ? appointment.endTime.toISOString().slice(11, 16)
-                      : appointment.endTime.slice(0, 5)}
-                    {/* {appointment.startTime.slice(0, 5)} - {appointment.endTime.slice(0, 5)} */}
+                    {appointment.startTime.slice(0, 5)} -{" "}
+                    {appointment.endTime.slice(0, 5)}
                   </div>
                 </TableCell>
                 <TableCell className="capitalize">

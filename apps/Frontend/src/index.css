@@ -1,3 +1,10 @@
+
+.form-container {
+  max-height: 80vh; /* Set a max height (80% of the viewport height or adjust as needed) */
+  overflow-y: auto; /* Enable vertical scrolling when the content overflows */
+  padding: 20px; /* Optional, for some spacing */
+}
+
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 47.4% 11.2%;

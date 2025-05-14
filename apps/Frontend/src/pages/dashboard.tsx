@@ -7,14 +7,23 @@ import { StatCard } from "@/components/ui/stat-card";
 import { PatientTable } from "@/components/patients/patient-table";
 import { AddPatientModal } from "@/components/patients/add-patient-modal";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { AppointmentUncheckedCreateInputObjectSchema, PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
-// import { InsertPatient, Patient, UpdatePatient, Appointment, InsertAppointment, UpdateAppointment } from "@repo/db/shared/schemas";
-import { Users, Calendar, CheckCircle, CreditCard, Plus, Clock } from "lucide-react";
+import {
+  AppointmentUncheckedCreateInputObjectSchema,
+  PatientUncheckedCreateInputObjectSchema,
+} from "@repo/db/shared/schemas";
+import {
+  Users,
+  Calendar,
+  CheckCircle,
+  CreditCard,
+  Plus,
+  Clock,
+} from "lucide-react";
 import { Link } from "wouter";
 import {
   Dialog,
@@ -23,78 +32,105 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {z} from "zod";
+import { z } from "zod";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
 
-const insertAppointmentSchema = (AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const insertAppointmentSchema = (
+  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   id: true,
   createdAt: true,
 });
 type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 
-const updateAppointmentSchema = (AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
-  id: true,
-  createdAt: true,
-}).partial();
+const updateAppointmentSchema = (
+  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .partial();
 type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
 
-const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   appointments: true,
 });
 type Patient = z.infer<typeof PatientSchema>;
 
-const insertPatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const insertPatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   id: true,
   createdAt: true,
 });
 type InsertPatient = z.infer<typeof insertPatientSchema>;
 
-const updatePatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
-  id: true,
-  createdAt: true,
-  userId: true,
-}).partial();
+const updatePatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
 
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
-
 
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isViewPatientOpen, setIsViewPatientOpen] = useState(false);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
-  const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(undefined);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | undefined>(undefined);
-  
+  const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(
+    undefined
+  );
+  const [selectedAppointment, setSelectedAppointment] = useState<
+    Appointment | undefined
+  >(undefined);
+
   const { toast } = useToast();
   const { user } = useAuth();
 
   // Fetch patients
-  const { data: patients = [], isLoading: isLoadingPatients } = useQuery<Patient[]>({
-    queryKey: ["/api/patients"],
+  const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
+    Patient[]
+  >({
+    queryKey: ["/api/patients/"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/patients/");
+      return res.json();
+    },
     enabled: !!user,
   });
-  
+
   // Fetch appointments
-  const { 
-    data: appointments = [] as Appointment[], 
-    isLoading: isLoadingAppointments 
+  const {
+    data: appointments = [] as Appointment[],
+    isLoading: isLoadingAppointments,
   } = useQuery<Appointment[]>({
-    queryKey: ["/api/appointments"],
+    queryKey: ["/api/appointments/all"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/appointments/all");
+      return res.json();
+    },
     enabled: !!user,
   });
 
   // Add patient mutation
   const addPatientMutation = useMutation({
     mutationFn: async (patient: InsertPatient) => {
-      const res = await apiRequest("POST", "/api/patients", patient);
+      const res = await apiRequest("POST", "/api/patients/", patient);
       return res.json();
     },
     onSuccess: () => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
       toast({
         title: "Success",
         description: "Patient added successfully!",
@@ -112,13 +148,19 @@ export default function Dashboard() {
 
   // Update patient mutation
   const updatePatientMutation = useMutation({
-    mutationFn: async ({ id, patient }: { id: number; patient: UpdatePatient }) => {
+    mutationFn: async ({
+      id,
+      patient,
+    }: {
+      id: number;
+      patient: UpdatePatient;
+    }) => {
       const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
       return res.json();
     },
     onSuccess: () => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
       toast({
         title: "Success",
         description: "Patient updated successfully!",
@@ -142,14 +184,25 @@ export default function Dashboard() {
     if (user) {
       addPatientMutation.mutate({
         ...patient,
-        userId: user.id
+        userId: user.id,
       });
     }
   };
 
-  const handleUpdatePatient = (patient: UpdatePatient) => {
-    if (currentPatient) {
-      updatePatientMutation.mutate({ id: currentPatient.id, patient });
+  const handleUpdatePatient = (patient: UpdatePatient & { id?: number }) => {
+    if (currentPatient && user) {
+      const { id, ...sanitizedPatient } = patient;
+      updatePatientMutation.mutate({
+        id: currentPatient.id,
+        patient: sanitizedPatient,
+      });
+    } else {
+      console.error("No current patient or user found for update");
+      toast({
+        title: "Error",
+        description: "Cannot update patient: No patient or user found",
+        variant: "destructive",
+      });
     }
   };
 
@@ -162,11 +215,11 @@ export default function Dashboard() {
     setCurrentPatient(patient);
     setIsViewPatientOpen(true);
   };
-  
+
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointment: InsertAppointment) => {
-      const res = await apiRequest("POST", "/api/appointments", appointment);
+      const res = await apiRequest("POST", "/api/appointments/", appointment);
       return await res.json();
     },
     onSuccess: () => {
@@ -175,7 +228,9 @@ export default function Dashboard() {
         title: "Success",
         description: "Appointment created successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      // Invalidate both appointments and patients queries
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
     },
     onError: (error: Error) => {
       toast({
@@ -185,11 +240,21 @@ export default function Dashboard() {
       });
     },
   });
-  
+
   // Update appointment mutation
   const updateAppointmentMutation = useMutation({
-    mutationFn: async ({ id, appointment }: { id: number; appointment: UpdateAppointment }) => {
-      const res = await apiRequest("PUT", `/api/appointments/${id}`, appointment);
+    mutationFn: async ({
+      id,
+      appointment,
+    }: {
+      id: number;
+      appointment: UpdateAppointment;
+    }) => {
+      const res = await apiRequest(
+        "PUT",
+        `/api/appointments/${id}`,
+        appointment
+      );
       return await res.json();
     },
     onSuccess: () => {
@@ -198,7 +263,9 @@ export default function Dashboard() {
         title: "Success",
         description: "Appointment updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      // Invalidate both appointments and patients queries
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
     },
     onError: (error: Error) => {
       toast({
@@ -208,10 +275,12 @@ export default function Dashboard() {
       });
     },
   });
-  
+
   // Handle appointment submission (create or update)
-  const handleAppointmentSubmit = (appointmentData: InsertAppointment | UpdateAppointment) => {
-    if (selectedAppointment && typeof selectedAppointment.id === 'number') {
+  const handleAppointmentSubmit = (
+    appointmentData: InsertAppointment | UpdateAppointment
+  ) => {
+    if (selectedAppointment && typeof selectedAppointment.id === "number") {
       updateAppointmentMutation.mutate({
         id: selectedAppointment.id,
         appointment: appointmentData as UpdateAppointment,
@@ -219,7 +288,7 @@ export default function Dashboard() {
     } else {
       if (user) {
         createAppointmentMutation.mutate({
-          ...appointmentData as InsertAppointment,
+          ...(appointmentData as InsertAppointment),
           userId: user.id,
         });
       }
@@ -228,27 +297,28 @@ export default function Dashboard() {
 
   // Since we removed filters, just return all patients
   const filteredPatients = patients;
-  
-  // Get today's date in YYYY-MM-DD format
-  const today = format(new Date(), 'yyyy-MM-dd');
-  
-  // Filter appointments for today
-  const todaysAppointments = appointments.filter(
-    (appointment) => appointment.date === today
-  );
-  
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const todaysAppointments = appointments.filter((appointment) => {
+    const appointmentDate = format(new Date(appointment.date), "yyyy-MM-dd");
+    return appointmentDate === today;
+  });
+
   // Count completed appointments today
-  const completedTodayCount = todaysAppointments.filter(
-    (appointment) => appointment.status === 'completed'
-  ).length;
+  const completedTodayCount = todaysAppointments.filter((appointment) => {
+    return appointment.status === "completed";
+  }).length;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar isMobileOpen={isMobileMenuOpen} setIsMobileOpen={setIsMobileMenuOpen} />
-      
+      <Sidebar
+        isMobileOpen={isMobileMenuOpen}
+        setIsMobileOpen={setIsMobileMenuOpen}
+      />
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-        
+
         <main className="flex-1 overflow-y-auto p-4">
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -281,9 +351,11 @@ export default function Dashboard() {
           {/* Today's Appointments Section */}
           <div className="flex flex-col space-y-4 mb-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-              <h2 className="text-xl font-medium text-gray-800">Today's Appointments</h2>
-              <Button 
-                className="mt-2 md:mt-0" 
+              <h2 className="text-xl font-medium text-gray-800">
+                Today's Appointments
+              </h2>
+              <Button
+                className="mt-2 md:mt-0"
                 onClick={() => {
                   setSelectedAppointment(undefined);
                   setIsAddAppointmentOpen(true);
@@ -293,39 +365,76 @@ export default function Dashboard() {
                 New Appointment
               </Button>
             </div>
-            
+
             <Card>
               <CardContent className="p-0">
                 {todaysAppointments.length > 0 ? (
                   <div className="divide-y">
                     {todaysAppointments.map((appointment) => {
-                      const patient = patients.find(p => p.id === appointment.patientId);
+                      const patient = patients.find(
+                        (p) => p.id === appointment.patientId
+                      );
                       return (
-                        <div key={appointment.id} className="p-4 flex items-center justify-between">
+                        <div
+                          key={appointment.id}
+                          className="p-4 flex items-center justify-between"
+                        >
                           <div className="flex items-center space-x-4">
                             <div className="h-10 w-10 rounded-full bg-primary bg-opacity-10 text-primary flex items-center justify-center">
                               <Clock className="h-5 w-5" />
                             </div>
                             <div>
                               <h3 className="font-medium">
-                                {patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown Patient'}
+                                {patient
+                                  ? `${patient.firstName} ${patient.lastName}`
+                                  : "Unknown Patient"}
                               </h3>
                               <div className="text-sm text-gray-500 flex items-center space-x-2">
-                                <span>{new Date(appointment.startTime).toLocaleString()} - {new Date(appointment.endTime).toLocaleString()}</span>
+                                <span>
+                                  {new Date(
+                                    `${appointment.date.toString().slice(0, 10)}T${appointment.startTime}:00`
+                                  ).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}{" "}
+                                  -{" "}
+                                  {new Date(
+                                    `${appointment.date.toString().slice(0, 10)}T${appointment.endTime}:00`
+                                  ).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
                                 <span>•</span>
-                                <span>{appointment.type.charAt(0).toUpperCase() + appointment.type.slice(1)}</span>
+                                <span>
+                                  {appointment.type.charAt(0).toUpperCase() +
+                                    appointment.type.slice(1)}
+                                </span>
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                              ${appointment.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                                appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
-                                appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-800' : 
-                                'bg-yellow-100 text-yellow-800'}`}>
-                              {appointment.status ? appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1) : 'Scheduled'}
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                              ${
+                                appointment.status === "completed"
+                                  ? "bg-green-100 text-green-800"
+                                  : appointment.status === "cancelled"
+                                    ? "bg-red-100 text-red-800"
+                                    : appointment.status === "confirmed"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {appointment.status
+                                ? appointment.status.charAt(0).toUpperCase() +
+                                  appointment.status.slice(1)
+                                : "Scheduled"}
                             </span>
-                            <Link to="/appointments" className="text-primary hover:text-primary/80 text-sm">
+                            <Link
+                              to="/appointments"
+                              className="text-primary hover:text-primary/80 text-sm"
+                            >
                               View All
                             </Link>
                           </div>
@@ -336,7 +445,9 @@ export default function Dashboard() {
                 ) : (
                   <div className="p-6 text-center">
                     <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                    <h3 className="text-lg font-medium text-gray-900">No appointments today</h3>
+                    <h3 className="text-lg font-medium text-gray-900">
+                      No appointments today
+                    </h3>
                     <p className="mt-1 text-gray-500">
                       You don't have any appointments scheduled for today.
                     </p>
@@ -355,14 +466,16 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Patient Management Section */}
           <div className="flex flex-col space-y-4">
             {/* Patient Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-              <h2 className="text-xl font-medium text-gray-800">Patient Management</h2>
-              <Button 
-                className="mt-2 md:mt-0" 
+              <h2 className="text-xl font-medium text-gray-800">
+                Patient Management
+              </h2>
+              <Button
+                className="mt-2 md:mt-0"
                 onClick={() => {
                   setCurrentPatient(undefined);
                   setIsAddPatientOpen(true);
@@ -373,13 +486,11 @@ export default function Dashboard() {
               </Button>
             </div>
 
-            {/* Search and filters removed */}
-            
             {/* Patient Table */}
-            <PatientTable 
-              patients={filteredPatients} 
-              onEdit={handleEditPatient} 
-              onView={handleViewPatient} 
+            <PatientTable
+              patients={filteredPatients}
+              onEdit={handleEditPatient}
+              onView={handleViewPatient}
             />
           </div>
         </main>
@@ -390,7 +501,9 @@ export default function Dashboard() {
         open={isAddPatientOpen}
         onOpenChange={setIsAddPatientOpen}
         onSubmit={currentPatient ? handleUpdatePatient : handleAddPatient}
-        isLoading={addPatientMutation.isPending || updatePatientMutation.isPending}
+        isLoading={
+          addPatientMutation.isPending || updatePatientMutation.isPending
+        }
         patient={currentPatient}
       />
 
@@ -403,120 +516,138 @@ export default function Dashboard() {
               Complete information about the patient.
             </DialogDescription>
           </DialogHeader>
-          
+
           {currentPatient && (
             <div className="space-y-4">
               <div className="flex items-center space-x-4">
                 <div className="h-16 w-16 rounded-full bg-primary text-white flex items-center justify-center text-xl font-medium">
-                  {currentPatient.firstName.charAt(0)}{currentPatient.lastName.charAt(0)}
+                  {currentPatient.firstName.charAt(0)}
+                  {currentPatient.lastName.charAt(0)}
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold">{currentPatient.firstName} {currentPatient.lastName}</h3>
-                  <p className="text-gray-500">Patient ID: {currentPatient.id.toString().padStart(4, '0')}</p>
+                  <h3 className="text-xl font-semibold">
+                    {currentPatient.firstName} {currentPatient.lastName}
+                  </h3>
+                  <p className="text-gray-500">
+                    Patient ID: {currentPatient.id.toString().padStart(4, "0")}
+                  </p>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                 <div>
-                  <h4 className="font-medium text-gray-900">Personal Information</h4>
+                  <h4 className="font-medium text-gray-900">
+                    Personal Information
+                  </h4>
                   <div className="mt-2 space-y-2">
                     <p>
-                      <span className="text-gray-500">Date of Birth:</span>{' '}
-                      {new Date(currentPatient.dateOfBirth).toLocaleDateString()}
+                      <span className="text-gray-500">Date of Birth:</span>{" "}
+                      {new Date(
+                        currentPatient.dateOfBirth
+                      ).toLocaleDateString()}
                     </p>
                     <p>
-                      <span className="text-gray-500">Gender:</span>{' '}
-                      {currentPatient.gender.charAt(0).toUpperCase() + currentPatient.gender.slice(1)}
+                      <span className="text-gray-500">Gender:</span>{" "}
+                      {currentPatient.gender.charAt(0).toUpperCase() +
+                        currentPatient.gender.slice(1)}
                     </p>
                     <p>
-                      <span className="text-gray-500">Status:</span>{' '}
-                      <span className={`${
-                        currentPatient.status === 'active'
-                          ? 'text-green-600'
-                          : 'text-amber-600'
-                      } font-medium`}>
-                        {currentPatient.status.charAt(0).toUpperCase() + currentPatient.status.slice(1)}
+                      <span className="text-gray-500">Status:</span>{" "}
+                      <span
+                        className={`${
+                          currentPatient.status === "active"
+                            ? "text-green-600"
+                            : "text-amber-600"
+                        } font-medium`}
+                      >
+                        {currentPatient.status.charAt(0).toUpperCase() +
+                          currentPatient.status.slice(1)}
                       </span>
                     </p>
                   </div>
                 </div>
-                
+
                 <div>
-                  <h4 className="font-medium text-gray-900">Contact Information</h4>
+                  <h4 className="font-medium text-gray-900">
+                    Contact Information
+                  </h4>
                   <div className="mt-2 space-y-2">
                     <p>
-                      <span className="text-gray-500">Phone:</span>{' '}
+                      <span className="text-gray-500">Phone:</span>{" "}
                       {currentPatient.phone}
                     </p>
                     <p>
-                      <span className="text-gray-500">Email:</span>{' '}
-                      {currentPatient.email || 'N/A'}
+                      <span className="text-gray-500">Email:</span>{" "}
+                      {currentPatient.email || "N/A"}
                     </p>
                     <p>
-                      <span className="text-gray-500">Address:</span>{' '}
+                      <span className="text-gray-500">Address:</span>{" "}
                       {currentPatient.address ? (
                         <>
                           {currentPatient.address}
                           {currentPatient.city && `, ${currentPatient.city}`}
-                          {currentPatient.zipCode && ` ${currentPatient.zipCode}`}
+                          {currentPatient.zipCode &&
+                            ` ${currentPatient.zipCode}`}
                         </>
                       ) : (
-                        'N/A'
+                        "N/A"
                       )}
                     </p>
                   </div>
                 </div>
-                
+
                 <div>
                   <h4 className="font-medium text-gray-900">Insurance</h4>
                   <div className="mt-2 space-y-2">
                     <p>
-                      <span className="text-gray-500">Provider:</span>{' '}
-                      {currentPatient.insuranceProvider 
-                        ? currentPatient.insuranceProvider === 'delta'
-                          ? 'Delta Dental'
-                          : currentPatient.insuranceProvider === 'metlife'
-                          ? 'MetLife'
-                          : currentPatient.insuranceProvider === 'cigna'
-                          ? 'Cigna'
-                          : currentPatient.insuranceProvider === 'aetna'
-                          ? 'Aetna'
-                          : currentPatient.insuranceProvider
-                        : 'N/A'}
+                      <span className="text-gray-500">Provider:</span>{" "}
+                      {currentPatient.insuranceProvider
+                        ? currentPatient.insuranceProvider === "delta"
+                          ? "Delta Dental"
+                          : currentPatient.insuranceProvider === "metlife"
+                            ? "MetLife"
+                            : currentPatient.insuranceProvider === "cigna"
+                              ? "Cigna"
+                              : currentPatient.insuranceProvider === "aetna"
+                                ? "Aetna"
+                                : currentPatient.insuranceProvider
+                        : "N/A"}
                     </p>
                     <p>
-                      <span className="text-gray-500">ID:</span>{' '}
-                      {currentPatient.insuranceId || 'N/A'}
+                      <span className="text-gray-500">ID:</span>{" "}
+                      {currentPatient.insuranceId || "N/A"}
                     </p>
                     <p>
-                      <span className="text-gray-500">Group Number:</span>{' '}
-                      {currentPatient.groupNumber || 'N/A'}
+                      <span className="text-gray-500">Group Number:</span>{" "}
+                      {currentPatient.groupNumber || "N/A"}
                     </p>
                     <p>
-                      <span className="text-gray-500">Policy Holder:</span>{' '}
-                      {currentPatient.policyHolder || 'Self'}
+                      <span className="text-gray-500">Policy Holder:</span>{" "}
+                      {currentPatient.policyHolder || "Self"}
                     </p>
                   </div>
                 </div>
-                
+
                 <div>
-                  <h4 className="font-medium text-gray-900">Medical Information</h4>
+                  <h4 className="font-medium text-gray-900">
+                    Medical Information
+                  </h4>
                   <div className="mt-2 space-y-2">
                     <p>
-                      <span className="text-gray-500">Allergies:</span>{' '}
-                      {currentPatient.allergies || 'None reported'}
+                      <span className="text-gray-500">Allergies:</span>{" "}
+                      {currentPatient.allergies || "None reported"}
                     </p>
                     <p>
-                      <span className="text-gray-500">Medical Conditions:</span>{' '}
-                      {currentPatient.medicalConditions || 'None reported'}
+                      <span className="text-gray-500">Medical Conditions:</span>{" "}
+                      {currentPatient.medicalConditions || "None reported"}
                     </p>
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-2 pt-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setIsViewPatientOpen(false)}
                 >
                   Close
@@ -534,13 +665,16 @@ export default function Dashboard() {
           )}
         </DialogContent>
       </Dialog>
-      
+
       {/* Add/Edit Appointment Modal */}
       <AddAppointmentModal
         open={isAddAppointmentOpen}
         onOpenChange={setIsAddAppointmentOpen}
         onSubmit={handleAppointmentSubmit}
-        isLoading={createAppointmentMutation.isPending || updateAppointmentMutation.isPending}
+        isLoading={
+          createAppointmentMutation.isPending ||
+          updateAppointmentMutation.isPending
+        }
         appointment={selectedAppointment}
         patients={patients}
       />

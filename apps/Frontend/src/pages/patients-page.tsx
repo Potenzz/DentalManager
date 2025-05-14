@@ -4,38 +4,54 @@ import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PatientTable } from "@/components/patients/patient-table";
 import { AddPatientModal } from "@/components/patients/add-patient-modal";
-import { PatientSearch, SearchCriteria } from "@/components/patients/patient-search";
+import {
+  PatientSearch,
+  SearchCriteria,
+} from "@/components/patients/patient-search";
 import { FileUploadZone } from "@/components/file-upload/file-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw, File, FilePlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
 // import { Patient, InsertPatient, UpdatePatient } from "@repo/db/shared/schemas";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import {z} from "zod";
+import { z } from "zod";
 
-
-const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   appointments: true,
 });
 type Patient = z.infer<typeof PatientSchema>;
 
-const insertPatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
-
-const updatePatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const insertPatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   id: true,
   createdAt: true,
   userId: true,
-}).partial();
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
+
+const updatePatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
 
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
-
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
@@ -48,11 +64,15 @@ export default function PatientsPage() {
   const { user } = useAuth();
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isViewPatientOpen, setIsViewPatientOpen] = useState(false);
-  const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(undefined);
+  const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(
+    undefined
+  );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(null);
+  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(
+    null
+  );
   const addPatientModalRef = useRef<AddPatientModalRef | null>(null);
-  
+
   // File upload states
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -65,25 +85,29 @@ export default function PatientsPage() {
     isLoading: isLoadingPatients,
     refetch: refetchPatients,
   } = useQuery<Patient[]>({
-    queryKey: ["/api/patients"],
+    queryKey: ["/api/patients/"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/patients/");
+      return res.json();
+    },
     enabled: !!user,
   });
 
   // Add patient mutation
   const addPatientMutation = useMutation({
     mutationFn: async (patient: InsertPatient) => {
-      const res = await apiRequest("POST", "/api/patients", patient);
+      const res = await apiRequest("POST", "/api/patients/", patient);
       return res.json();
     },
     onSuccess: (newPatient) => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
       toast({
         title: "Success",
         description: "Patient added successfully!",
         variant: "default",
       });
-      
+
       // If the add patient modal wants to proceed to scheduling, redirect to appointments page
       if (addPatientModalRef.current?.shouldSchedule) {
         addPatientModalRef.current.navigateToSchedule(newPatient.id);
@@ -100,13 +124,19 @@ export default function PatientsPage() {
 
   // Update patient mutation
   const updatePatientMutation = useMutation({
-    mutationFn: async ({ id, patient }: { id: number; patient: UpdatePatient }) => {
+    mutationFn: async ({
+      id,
+      patient,
+    }: {
+      id: number;
+      patient: UpdatePatient;
+    }) => {
       const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
       return res.json();
     },
     onSuccess: () => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
       toast({
         title: "Success",
         description: "Patient updated successfully!",
@@ -131,14 +161,25 @@ export default function PatientsPage() {
     if (user) {
       addPatientMutation.mutate({
         ...patient,
-        userId: user.id
+        userId: user.id,
       });
     }
   };
 
-  const handleUpdatePatient = (patient: UpdatePatient) => {
-    if (currentPatient) {
-      updatePatientMutation.mutate({ id: currentPatient.id, patient });
+  const handleUpdatePatient = (patient: UpdatePatient & { id?: number }) => {
+    if (currentPatient && user) {
+      const { id, ...sanitizedPatient } = patient;
+      updatePatientMutation.mutate({
+        id: currentPatient.id,
+        patient: sanitizedPatient,
+      });
+    } else {
+      console.error("No current patient or user found for update");
+      toast({
+        title: "Error",
+        description: "Cannot update patient: No patient or user found",
+        variant: "destructive",
+      });
     }
   };
 
@@ -152,29 +193,32 @@ export default function PatientsPage() {
     setIsViewPatientOpen(true);
   };
 
-  const isLoading = isLoadingPatients || addPatientMutation.isPending || updatePatientMutation.isPending;
-  
+  const isLoading =
+    isLoadingPatients ||
+    addPatientMutation.isPending ||
+    updatePatientMutation.isPending;
+
   // Search handling
   const handleSearch = (criteria: SearchCriteria) => {
     setSearchCriteria(criteria);
   };
-  
+
   const handleClearSearch = () => {
     setSearchCriteria(null);
   };
-  
+
   // File upload handling
   const handleFileUpload = (file: File) => {
     setUploadedFile(file);
     setIsUploading(false); // In a real implementation, this would be set to true during upload
-    
+
     toast({
       title: "File Selected",
       description: `${file.name} is ready for processing.`,
       variant: "default",
     });
   };
-  
+
   // Process file and extract patient information
   const handleExtractInfo = async () => {
     if (!uploadedFile) {
@@ -185,79 +229,81 @@ export default function PatientsPage() {
       });
       return;
     }
-    
+
     setIsExtracting(true);
-    
+
     try {
       // Read the file as base64
       const reader = new FileReader();
-      
+
       // Set up a Promise to handle file reading
       const fileReadPromise = new Promise<string>((resolve, reject) => {
         reader.onload = (event) => {
-          if (event.target && typeof event.target.result === 'string') {
+          if (event.target && typeof event.target.result === "string") {
             resolve(event.target.result);
           } else {
-            reject(new Error('Failed to read file as base64'));
+            reject(new Error("Failed to read file as base64"));
           }
         };
-        
+
         reader.onerror = () => {
-          reject(new Error('Error reading file'));
+          reject(new Error("Error reading file"));
         };
-        
+
         // Read the file as a data URL (base64)
         reader.readAsDataURL(uploadedFile);
       });
-      
+
       // Get the base64 data
       const base64Data = await fileReadPromise;
-      
+
       // Send file to server as base64
-      const response = await fetch('/api/upload-file', {
-        method: 'POST',
+      const response = await fetch("/api/upload-file", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           pdfData: base64Data,
-          filename: uploadedFile.name
+          filename: uploadedFile.name,
         }),
-        credentials: 'include'
+        credentials: "include",
       });
-      
+
       if (!response.ok) {
-        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        throw new Error(
+          `Server returned ${response.status}: ${response.statusText}`
+        );
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         // Only keep firstName, lastName, dateOfBirth, and insuranceId from the extracted info
         const simplifiedInfo = {
           firstName: data.extractedInfo.firstName,
           lastName: data.extractedInfo.lastName,
           dateOfBirth: data.extractedInfo.dateOfBirth,
-          insuranceId: data.extractedInfo.insuranceId
+          insuranceId: data.extractedInfo.insuranceId,
         };
-        
+
         setExtractedInfo(simplifiedInfo);
-        
+
         // Show success message
         toast({
           title: "Information Extracted",
-          description: "Basic patient information (name, DOB, ID) has been extracted successfully.",
+          description:
+            "Basic patient information (name, DOB, ID) has been extracted successfully.",
           variant: "default",
         });
-        
+
         // Open patient form pre-filled with extracted data
         setCurrentPatient(undefined);
-        
+
         // Pre-fill the form by opening the modal with the extracted information
         setTimeout(() => {
           setIsAddPatientOpen(true);
         }, 500);
-        
       } else {
         throw new Error(data.message || "Failed to extract information");
       }
@@ -265,35 +311,38 @@ export default function PatientsPage() {
       console.error("Error extracting information:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to extract information from file",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to extract information from file",
         variant: "destructive",
       });
     } finally {
       setIsExtracting(false);
     }
   };
-  
+
   // Filter patients based on search criteria
   const filteredPatients = useMemo(() => {
     if (!searchCriteria || !searchCriteria.searchTerm) {
       return patients;
     }
-    
+
     const term = searchCriteria.searchTerm.toLowerCase();
     return patients.filter((patient) => {
       switch (searchCriteria.searchBy) {
-        case 'name':
+        case "name":
           return (
             patient.firstName.toLowerCase().includes(term) ||
             patient.lastName.toLowerCase().includes(term)
           );
-        case 'phone':
+        case "phone":
           return patient.phone.toLowerCase().includes(term);
-        case 'insuranceProvider':
+        case "insuranceProvider":
           return patient.insuranceProvider?.toLowerCase().includes(term);
-        case 'insuranceId':
+        case "insuranceId":
           return patient.insuranceId?.toLowerCase().includes(term);
-        case 'all':
+        case "all":
         default:
           return (
             patient.firstName.toLowerCase().includes(term) ||
@@ -311,11 +360,14 @@ export default function PatientsPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar isMobileOpen={isMobileMenuOpen} setIsMobileOpen={setIsMobileMenuOpen} />
-      
+      <Sidebar
+        isMobileOpen={isMobileMenuOpen}
+        setIsMobileOpen={setIsMobileMenuOpen}
+      />
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-        
+
         <main className="flex-1 overflow-y-auto p-4">
           <div className="container mx-auto space-y-6">
             <div className="flex justify-between items-center">
@@ -361,7 +413,7 @@ export default function PatientsPage() {
                     <File className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <FileUploadZone 
+                    <FileUploadZone
                       onFileUpload={handleFileUpload}
                       isUploading={isUploading}
                       acceptedFileTypes="application/pdf"
@@ -370,9 +422,9 @@ export default function PatientsPage() {
                 </Card>
               </div>
               <div className="md:col-span-1 flex items-end">
-                <Button 
-                  className="w-full h-12 gap-2" 
-                  onClick={handleExtractInfo} 
+                <Button
+                  className="w-full h-12 gap-2"
+                  onClick={handleExtractInfo}
                   disabled={!uploadedFile || isExtracting}
                 >
                   {isExtracting ? (
@@ -399,23 +451,25 @@ export default function PatientsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <PatientSearch 
+                <PatientSearch
                   onSearch={handleSearch}
                   onClearSearch={handleClearSearch}
                   isSearchActive={!!searchCriteria}
                 />
-                
+
                 {searchCriteria && (
                   <div className="flex items-center my-4 px-2 py-1 bg-muted rounded-md text-sm">
                     <p>
-                      Found {filteredPatients.length} 
-                      {filteredPatients.length === 1 ? ' patient' : ' patients'} 
-                      {searchCriteria.searchBy !== 'all' ? ` with ${searchCriteria.searchBy}` : ''} 
+                      Found {filteredPatients.length}
+                      {filteredPatients.length === 1 ? " patient" : " patients"}
+                      {searchCriteria.searchBy !== "all"
+                        ? ` with ${searchCriteria.searchBy}`
+                        : ""}
                       matching "{searchCriteria.searchTerm}"
                     </p>
                   </div>
                 )}
-                
+
                 <PatientTable
                   patients={filteredPatients}
                   onEdit={handleEditPatient}
@@ -433,12 +487,16 @@ export default function PatientsPage() {
               isLoading={isLoading}
               patient={currentPatient}
               // Pass extracted info as a separate prop to avoid triggering edit mode
-              extractedInfo={!currentPatient && extractedInfo ? {
-                firstName: extractedInfo.firstName || "",
-                lastName: extractedInfo.lastName || "",
-                dateOfBirth: extractedInfo.dateOfBirth || "",
-                insuranceId: extractedInfo.insuranceId || ""
-              } : undefined}
+              extractedInfo={
+                !currentPatient && extractedInfo
+                  ? {
+                      firstName: extractedInfo.firstName || "",
+                      lastName: extractedInfo.lastName || "",
+                      dateOfBirth: extractedInfo.dateOfBirth || "",
+                      insuranceId: extractedInfo.insuranceId || "",
+                    }
+                  : undefined
+              }
             />
           </div>
         </main>
