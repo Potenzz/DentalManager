@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -31,7 +31,7 @@ import { CalendarIcon, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-
+import { useDebounce } from "use-debounce";
 import {
   AppointmentUncheckedCreateInputObjectSchema,
   PatientUncheckedCreateInputObjectSchema,
@@ -83,6 +83,15 @@ export function AppointmentForm({
   isLoading = false,
 }: AppointmentFormProps) {
   const { user } = useAuth();
+  const inputRef = useRef<HTMLInputElement>(null);
+useEffect(() => {
+  const timeout = setTimeout(() => {
+    inputRef.current?.focus();
+  }, 50); // small delay ensures content is mounted
+
+  return () => clearTimeout(timeout);
+}, []);
+
 
   const { data: staffMembersRaw = [] as Staff[], isLoading: isLoadingStaff } =
     useQuery<Staff[]>({
@@ -162,6 +171,24 @@ export function AppointmentForm({
     resolver: zodResolver(insertAppointmentSchema),
     defaultValues,
   });
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 200); // 1 seconds
+  const [filteredPatients, setFilteredPatients] = useState(patients);
+
+  useEffect(() => {
+  if (!debouncedSearchTerm.trim()) {
+    setFilteredPatients(patients);
+  } else {
+    const term = debouncedSearchTerm.toLowerCase();
+    setFilteredPatients(
+      patients.filter((p) =>
+        `${p.firstName} ${p.lastName} ${p.phone} ${p.dob}`.toLowerCase().includes(term)
+      )
+    );
+  }
+}, [debouncedSearchTerm, patients]);
+
 
   // Force form field values to update and clean up storage
   useEffect(() => {
@@ -277,14 +304,45 @@ export function AppointmentForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {patients.map((patient) => (
-                      <SelectItem
-                        key={patient.id}
-                        value={patient.id.toString()}
-                      >
-                        {patient.firstName} {patient.lastName}
-                      </SelectItem>
-                    ))}
+                        <div className="p-2" onKeyDown={(e) => e.stopPropagation()}>
+
+                      <Input
+                        ref={inputRef}
+                        placeholder="Search patients..."
+                        className="w-full"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => {
+      const navKeys = ['ArrowDown', 'ArrowUp', 'Enter'];
+      if (!navKeys.includes(e.key)) {
+        e.stopPropagation(); // Only stop keys that affect select state
+      }
+    }}
+                      />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/30">
+
+                      {filteredPatients.length > 0 ? (
+                        filteredPatients.map((patient) => (
+                          <SelectItem
+                            key={patient.id}
+                            value={patient.id.toString()}
+                          ><div className="flex flex-col">
+      <span className="font-medium">
+        {patient.firstName} {patient.lastName}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        DOB: {new Date(patient.dateOfBirth).toLocaleDateString()} • {patient.phone}
+      </span>
+      </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-2 text-muted-foreground text-sm">
+                          No patients found
+                        </div>
+                      )}
+                    </div>
                   </SelectContent>
                 </Select>
                 <FormMessage />
