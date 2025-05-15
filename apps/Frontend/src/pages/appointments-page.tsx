@@ -127,14 +127,20 @@ export default function AppointmentsPage() {
       enabled: !!user,
     });
 
-  const colorMap: Record<string, string> = {
-    "Dr. Kai Gao": "bg-blue-600",
-    "Dr. Jane Smith": "bg-emerald-600",
-  };
+  const colors = [
+    "bg-blue-600",
+    "bg-emerald-600",
+    "bg-purple-600",
+    "bg-pink-600",
+    "bg-yellow-500",
+    "bg-red-600",
+  ];
 
-  const staffMembers = staffMembersRaw.map((staff) => ({
+  // Assign colors cycling through the list
+  const staffMembers = staffMembersRaw.map((staff, index) => ({
     ...staff,
-    color: colorMap[staff.name] || "bg-gray-400",
+    
+    color: colors[index % colors.length] || "bg-gray-400",
   }));
 
   // Generate time slots from 8:00 AM to 6:00 PM in 30-minute increments

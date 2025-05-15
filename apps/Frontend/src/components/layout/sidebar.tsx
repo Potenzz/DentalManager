@@ -27,11 +27,6 @@ export function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps) {
       icon: <Users className="h-5 w-5" />,
     },
     {
-      name: "Reports",
-      path: "/reports",
-      icon: <FileText className="h-5 w-5" />,
-    },
-    {
       name: "Settings",
       path: "/settings",
       icon: <Settings className="h-5 w-5" />,

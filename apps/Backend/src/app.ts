@@ -17,13 +17,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // For form data
 app.use(apiLogger);
 
-
-console.log(FRONTEND_URL);
-
 app.use(cors({
-  origin: FRONTEND_URL, // Make sure this matches the frontend URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow necessary headers
+  origin: FRONTEND_URL, 
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
+  allowedHeaders: ['Content-Type', 'Authorization'], 
 credentials: true,     
 }));
 

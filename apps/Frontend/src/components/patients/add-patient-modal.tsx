@@ -109,9 +109,12 @@ export const AddPatientModal = forwardRef<
   };
 
   const handleSaveAndSchedule = () => {
-    setSaveAndSchedule(true);
-    document.querySelector("form")?.requestSubmit();
-  };
+  setSaveAndSchedule(true);
+  if (patientFormRef.current) {
+    patientFormRef.current.submit();
+  }
+};
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -137,6 +140,7 @@ export const AddPatientModal = forwardRef<
         </DialogHeader>
 
         <PatientForm
+          ref={patientFormRef}
           patient={patient}
           extractedInfo={extractedInfo}
           onSubmit={handleFormSubmit}

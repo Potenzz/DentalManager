@@ -9,6 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
+
+
 
 interface TopAppBarProps {
   toggleMobileMenu: () => void;
@@ -16,6 +19,7 @@ interface TopAppBarProps {
 
 export function TopAppBar({ toggleMobileMenu }: TopAppBarProps) {
   const { user, logoutMutation } = useAuth();
+  const [location, setLocation] = useLocation();
 
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -68,7 +72,8 @@ export function TopAppBar({ toggleMobileMenu }: TopAppBarProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuItem>{user?.username}</DropdownMenuItem>
               <DropdownMenuItem>My Profile</DropdownMenuItem>
-              <DropdownMenuItem>Account Settings</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation("/settings")}>
+                Account Settings</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 Log out

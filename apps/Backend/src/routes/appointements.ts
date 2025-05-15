@@ -111,15 +111,11 @@ router.post(
 
   async (req: Request, res: Response): Promise<any> => {
     try {
-      console.log("Appointment creation request body:", req.body);
-
       // Validate request body
       const appointmentData = insertAppointmentSchema.parse({
         ...req.body,
         userId: req.user!.id,
       });
-
-      console.log("Validated appointment data:", appointmentData);
 
       // Verify patient exists and belongs to user
       const patient = await storage.getPatient(appointmentData.patientId);
@@ -165,7 +161,6 @@ router.post(
 
       // Create appointment
       const appointment = await storage.createAppointment(appointmentData);
-      console.log("Appointment created successfully:", appointment);
       res.status(201).json(appointment);
     } catch (error) {
       console.error("Error creating appointment:", error);
@@ -201,12 +196,6 @@ router.put(
       }
       const appointmentId = parseInt(appointmentIdParam);
 
-      console.log(
-        "Update appointment request. ID:",
-        appointmentId,
-        "Body:",
-        req.body
-      );
 
       // Check if appointment exists and belongs to user
       const existingAppointment = await storage.getAppointment(appointmentId);

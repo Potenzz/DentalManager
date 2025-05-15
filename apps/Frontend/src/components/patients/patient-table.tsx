@@ -56,17 +56,19 @@ export function PatientTable({ patients, onEdit, onView }: PatientTableProps) {
   };
 
   const getAvatarColor = (id: number) => {
-    const colors = [
-      "bg-blue-500",
-      "bg-teal-500",
-      "bg-amber-500",
-      "bg-rose-500",
-      "bg-indigo-500",
-      "bg-green-500",
-      "bg-purple-500",
-    ];
-    return colors[id % colors.length];
-  };
+  const colorClasses = [
+    "bg-blue-500",
+    "bg-teal-500",
+    "bg-amber-500",
+    "bg-rose-500",
+    "bg-indigo-500",
+    "bg-green-500",
+    "bg-purple-500",
+  ];
+
+  // This returns a literal string from above — not a generated string
+  return colorClasses[id % colorClasses.length];
+};
 
   const formatDate = (dateString: string | Date) => {
     const date = new Date(dateString);
@@ -108,6 +110,7 @@ export function PatientTable({ patients, onEdit, onView }: PatientTableProps) {
                           {getInitials(patient.firstName, patient.lastName)}
                         </AvatarFallback>
                       </Avatar>
+                      
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
                           {patient.firstName} {patient.lastName}
