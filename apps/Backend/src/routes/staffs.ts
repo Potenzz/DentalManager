@@ -17,7 +17,7 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
   try {
     const validatedData = staffCreateSchema.parse(req.body);
     const newStaff = await storage.createStaff(validatedData);
-    res.status(201).json(newStaff);
+    res.status(200).json(newStaff);
   } catch (error) {
     console.error("Failed to create staff:", error);
     res.status(500).send("Failed to create staff");
