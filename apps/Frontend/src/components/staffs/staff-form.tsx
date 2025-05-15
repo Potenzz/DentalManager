@@ -11,18 +11,28 @@ interface StaffFormProps {
   isLoading?: boolean;
 }
 
-export function StaffForm({ initialData, onSubmit, onCancel, isLoading }: StaffFormProps) {
-  const [name, setName] = useState(initialData?.name || "");
-  const [email, setEmail] = useState(initialData?.email || "");
-  const [role, setRole] = useState(initialData?.role || "Staff");
-  const [phone, setPhone] = useState(initialData?.phone || "");
+export function StaffForm({
+  initialData,
+  onSubmit,
+  onCancel,
+  isLoading,
+}: StaffFormProps) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("Staff");
+  const [phone, setPhone] = useState("");
 
+  const [hasTypedRole, setHasTypedRole] = useState(false);
+
+  // Set initial values once on mount
   useEffect(() => {
-    setName(initialData?.name || "");
-    setEmail(initialData?.email || "");
-    setRole(initialData?.role || "Staff");
-    setPhone(initialData?.phone || "");
-  }, [initialData]);
+    if (initialData) {
+      if (initialData.name) setName(initialData.name);
+      if (initialData.email) setEmail(initialData.email);
+      if (initialData.role) setRole(initialData.role);
+      if (initialData.phone) setPhone(initialData.phone);
+    }
+  }, []); // run once only
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,13 +40,21 @@ export function StaffForm({ initialData, onSubmit, onCancel, isLoading }: StaffF
       alert("Name is required");
       return;
     }
-    onSubmit({ name, email: email || undefined, role, phone: phone || undefined });
+
+    onSubmit({
+      name: name.trim(),
+      email: email.trim() || undefined,
+      role: role.trim(),
+      phone: phone.trim() || undefined,
+    });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700">Name *</label>
+        <label className="block text-sm font-medium text-gray-700">
+          Name *
+        </label>
         <input
           type="text"
           className="mt-1 block w-full border rounded p-2"
@@ -46,6 +64,7 @@ export function StaffForm({ initialData, onSubmit, onCancel, isLoading }: StaffF
           disabled={isLoading}
         />
       </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700">Email</label>
         <input
@@ -56,17 +75,29 @@ export function StaffForm({ initialData, onSubmit, onCancel, isLoading }: StaffF
           disabled={isLoading}
         />
       </div>
+
       <div>
-        <label className="block text-sm font-medium text-gray-700">Role *</label>
+        <label className="block text-sm font-medium text-gray-700">
+          Role *
+        </label>
         <input
           type="text"
           className="mt-1 block w-full border rounded p-2"
           value={role}
-          onChange={(e) => setRole(e.target.value)}
+          onChange={(e) => {
+            setHasTypedRole(true);
+            setRole(e.target.value);
+          }}
+          onFocus={() => {
+            if (!hasTypedRole && role === "Staff") {
+              setRole("");
+            }
+          }}
           required
           disabled={isLoading}
         />
       </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700">Phone</label>
         <input
@@ -77,6 +108,7 @@ export function StaffForm({ initialData, onSubmit, onCancel, isLoading }: StaffF
           disabled={isLoading}
         />
       </div>
+
       <div className="flex justify-end space-x-2">
         <button
           type="button"

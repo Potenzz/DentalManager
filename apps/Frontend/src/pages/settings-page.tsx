@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -8,12 +8,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { StaffForm } from "@/components/staffs/staff-form";
 
+// Correctly infer Staff type from zod schema
 type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Modal and editing staff state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
 
   const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
 
@@ -35,8 +41,12 @@ export default function SettingsPage() {
     staleTime: 1000 * 60 * 5, // 5 minutes cache
   });
 
-  // Add Staff Mutation
-  const addStaffMutation = useMutation({
+  // Add Staff mutation
+  const addStaffMutate = useMutation<
+    Staff, // Return type
+    Error, // Error type
+    Omit<Staff, "id" | "createdAt"> // Variables
+  >({
     mutationFn: async (newStaff: Omit<Staff, "id" | "createdAt">) => {
       const res = await apiRequest("POST", "/api/staffs/", newStaff);
       if (!res.ok) {
@@ -62,8 +72,12 @@ export default function SettingsPage() {
     },
   });
 
-  // Update Staff Mutation
-  const updateStaffMutation = useMutation({
+  // Update Staff mutation
+  const updateStaffMutate = useMutation<
+    Staff,
+    Error,
+    { id: number; updatedFields: Partial<Staff> }
+  >({
     mutationFn: async ({
       id,
       updatedFields,
@@ -95,8 +109,8 @@ export default function SettingsPage() {
     },
   });
 
-  // Delete Staff Mutation
-  const deleteStaffMutation = useMutation({
+  // Delete Staff mutation
+  const deleteStaffMutation = useMutation<number, Error, number>({
     mutationFn: async (id: number) => {
       const res = await apiRequest("DELETE", `/api/staffs/${id}`);
       if (!res.ok) {
@@ -122,69 +136,117 @@ export default function SettingsPage() {
     },
   });
 
-  // Handlers for prompts and mutations
+  // Extract mutation states for modal control and loading
+
+  const isAdding = addStaffMutate.status === "pending";
+  const isAddSuccess = addStaffMutate.status === "success";
+
+  const isUpdating = updateStaffMutate.status === "pending";
+  const isUpdateSuccess = updateStaffMutate.status === "success";
+
+  // Open Add modal
   const openAddStaffModal = () => {
-    const name = prompt("Enter staff name:");
-    if (!name) return;
-    const email = prompt("Enter staff email (optional):") || undefined;
-    const role = prompt("Enter staff role:") || "Staff";
-    const phone = prompt("Enter staff phone (optional):") || undefined;
-    addStaffMutation.mutate({ name, email, role, phone });
+    setEditingStaff(null);
+    setModalOpen(true);
   };
 
+  // Open Edit modal
   const openEditStaffModal = (staff: Staff) => {
-    if (typeof staff.id !== "number") {
-      toast({
-        title: "Error",
-        description: "Staff ID is missing",
-        variant: "destructive",
-      });
-      return;
-    }
-    const name = prompt("Edit staff name:", staff.name);
-    if (!name) return;
-    const email = prompt("Edit staff email:", staff.email || "") || undefined;
-    const role = prompt("Edit staff role:", staff.role || "Staff") || "Staff";
-    const phone = prompt("Edit staff phone:", staff.phone || "") || undefined;
-    updateStaffMutation.mutate({
-      id: staff.id,
-      updatedFields: { name, email, role, phone },
-    });
+    setEditingStaff(staff);
+    setModalOpen(true);
   };
 
+  // Handle form submit for Add or Edit
+  const handleFormSubmit = (formData: Omit<Staff, "id" | "createdAt">) => {
+    if (editingStaff) {
+      // Editing existing staff
+      if (editingStaff.id === undefined) {
+        toast({
+          title: "Error",
+          description: "Staff ID is missing",
+          variant: "destructive",
+        });
+        return;
+      }
+      updateStaffMutate.mutate({
+        id: editingStaff.id,
+        updatedFields: formData,
+      });
+    } else {
+      addStaffMutate.mutate(formData);
+    }
+  };
+
+  const handleModalCancel = () => {
+    setModalOpen(false);
+  };
+
+  // Close modal on successful add/update
+  useEffect(() => {
+    if (isAddSuccess || isUpdateSuccess) {
+      setModalOpen(false);
+    }
+  }, [isAddSuccess, isUpdateSuccess]);
+
+  // Delete staff
   const handleDeleteStaff = (id: number) => {
     if (confirm("Are you sure you want to delete this staff member?")) {
       deleteStaffMutation.mutate(id);
     }
   };
 
+  // View staff handler (just an alert for now)
   const handleViewStaff = (staff: Staff) =>
-    alert(`Viewing staff member:\n${staff.name} (${staff.email || "No email"})`);
+    alert(
+      `Viewing staff member:\n${staff.name} (${staff.email || "No email"})`
+    );
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar isMobileOpen={isMobileMenuOpen} setIsMobileOpen={setIsMobileMenuOpen} />
+      <Sidebar
+        isMobileOpen={isMobileMenuOpen}
+        setIsMobileOpen={setIsMobileMenuOpen}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-        <main className="flex-1 overflow-y-auto p-4">
+        <main className="flex-1 overflow-y-auto p-2">
           <Card>
             <CardContent>
-              <StaffTable
-                staff={staff}
-                isLoading={isLoading}
-                isError={isError}
-                onAdd={openAddStaffModal}
-                onEdit={openEditStaffModal}
-                onDelete={handleDeleteStaff}
-                onView={handleViewStaff}
-              />
-              {isError && (
-                <p className="mt-4 text-red-600">
-                  {(error as Error)?.message || "Failed to load staff data."}
-                </p>
-              )}
+              <div className="mt-8">
+                <StaffTable
+                  staff={staff}
+                  isLoading={isLoading}
+                  isError={isError}
+                  onAdd={openAddStaffModal}
+                  onEdit={openEditStaffModal}
+                  onDelete={handleDeleteStaff}
+                  onView={handleViewStaff}
+                />
+                {isError && (
+                  <p className="mt-4 text-red-600">
+                    {(error as Error)?.message || "Failed to load staff data."}
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
+
+          {/* Modal Overlay */}
+          {modalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+              <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
+                <h2 className="text-lg font-bold mb-4">
+                  {editingStaff ? "Edit Staff" : "Add Staff"}
+                </h2>
+                <StaffForm
+                  initialData={editingStaff || undefined}
+                  onSubmit={handleFormSubmit}
+                  onCancel={handleModalCancel}
+                  isLoading={isAdding || isUpdating}
+                />
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>
