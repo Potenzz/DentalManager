@@ -16,6 +16,16 @@ npm install
 npm run db:generate
 ```
 
+- Migrate the db: 
+```sh
+npm run db:migrate
+```
+
+- seed the db if: 
+```sh
+npm run db:seed
+```
+
 3. Copy Environment Variables
 
 Create `.env` files from the provided `.env.example` templates:
