@@ -37,6 +37,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { Menu, Item, useContextMenu } from "react-contexify";
 import "react-contexify/ReactContexify.css";
 import { useLocation } from "wouter";
+import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -110,6 +111,11 @@ export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [location] = useLocation();
+  const [confirmDeleteState, setConfirmDeleteState] = useState<{
+    open: boolean;
+    appointmentId?: number;
+    appointmentTitle?: string;
+  }>({ open: false });
 
   // Create context menu hook
   const { show } = useContextMenu({
@@ -139,7 +145,7 @@ export default function AppointmentsPage() {
   // Assign colors cycling through the list
   const staffMembers = staffMembersRaw.map((staff, index) => ({
     ...staff,
-    
+
     color: colors[index % colors.length] || "bg-gray-400",
   }));
 
@@ -350,6 +356,7 @@ export default function AppointmentsPage() {
       // Invalidate both appointments and patients queries
       queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+      setConfirmDeleteState({ open: false });
     },
     onError: (error: Error) => {
       toast({
@@ -397,11 +404,25 @@ export default function AppointmentsPage() {
     setIsAddModalOpen(true);
   };
 
-  // Handle delete appointment
+  // When user confirms delete in dialog
+  const handleConfirmDelete = () => {
+    if (!confirmDeleteState.appointmentId) return;
+    deleteAppointmentMutation.mutate(confirmDeleteState.appointmentId);
+  };
+
   const handleDeleteAppointment = (id: number) => {
-    if (confirm("Are you sure you want to delete this appointment?")) {
-      deleteAppointmentMutation.mutate(id);
-    }
+    const appointment = appointments.find((a) => a.id === id);
+    if (!appointment) return;
+
+    // Find patient by patientId
+    const patient = patients.find((p) => p.id === appointment.patientId);
+
+
+    setConfirmDeleteState({
+      open: true,
+      appointmentId: id,
+      appointmentTitle: `${patient?.firstName ?? "Appointment"}`,
+    });
   };
 
   const toggleMobileMenu = () => {
@@ -911,6 +932,14 @@ export default function AppointmentsPage() {
         }
         appointment={editingAppointment}
         patients={patients}
+        onDelete={handleDeleteAppointment}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={confirmDeleteState.open}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDeleteState({ open: false })}
+        entityName={confirmDeleteState.appointmentTitle}
       />
 
       {/* Claim Services Modal */}

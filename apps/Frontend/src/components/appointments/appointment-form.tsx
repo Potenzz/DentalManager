@@ -73,6 +73,8 @@ interface AppointmentFormProps {
   appointment?: Appointment;
   patients: Patient[];
   onSubmit: (data: InsertAppointment | UpdateAppointment) => void;
+  onDelete?: (id: number) => void;
+  onOpenChange?: (open: boolean) => void;
   isLoading?: boolean;
 }
 
@@ -80,18 +82,19 @@ export function AppointmentForm({
   appointment,
   patients,
   onSubmit,
+  onDelete,
+  onOpenChange,
   isLoading = false,
 }: AppointmentFormProps) {
   const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
-useEffect(() => {
-  const timeout = setTimeout(() => {
-    inputRef.current?.focus();
-  }, 50); // small delay ensures content is mounted
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50); // small delay ensures content is mounted
 
-  return () => clearTimeout(timeout);
-}, []);
-
+    return () => clearTimeout(timeout);
+  }, []);
 
   const { data: staffMembersRaw = [] as Staff[], isLoading: isLoadingStaff } =
     useQuery<Staff[]>({
@@ -177,18 +180,19 @@ useEffect(() => {
   const [filteredPatients, setFilteredPatients] = useState(patients);
 
   useEffect(() => {
-  if (!debouncedSearchTerm.trim()) {
-    setFilteredPatients(patients);
-  } else {
-    const term = debouncedSearchTerm.toLowerCase();
-    setFilteredPatients(
-      patients.filter((p) =>
-        `${p.firstName} ${p.lastName} ${p.phone} ${p.dob}`.toLowerCase().includes(term)
-      )
-    );
-  }
-}, [debouncedSearchTerm, patients]);
-
+    if (!debouncedSearchTerm.trim()) {
+      setFilteredPatients(patients);
+    } else {
+      const term = debouncedSearchTerm.toLowerCase();
+      setFilteredPatients(
+        patients.filter((p) =>
+          `${p.firstName} ${p.lastName} ${p.phone} ${p.dob}`
+            .toLowerCase()
+            .includes(term)
+        )
+      );
+    }
+  }, [debouncedSearchTerm, patients]);
 
   // Force form field values to update and clean up storage
   useEffect(() => {
@@ -304,8 +308,7 @@ useEffect(() => {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                        <div className="p-2" onKeyDown={(e) => e.stopPropagation()}>
-
+                    <div className="p-2" onKeyDown={(e) => e.stopPropagation()}>
                       <Input
                         ref={inputRef}
                         placeholder="Search patients..."
@@ -313,28 +316,32 @@ useEffect(() => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onKeyDown={(e) => {
-      const navKeys = ['ArrowDown', 'ArrowUp', 'Enter'];
-      if (!navKeys.includes(e.key)) {
-        e.stopPropagation(); // Only stop keys that affect select state
-      }
-    }}
+                          const navKeys = ["ArrowDown", "ArrowUp", "Enter"];
+                          if (!navKeys.includes(e.key)) {
+                            e.stopPropagation(); // Only stop keys that affect select state
+                          }
+                        }}
                       />
                     </div>
                     <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/30">
-
                       {filteredPatients.length > 0 ? (
                         filteredPatients.map((patient) => (
                           <SelectItem
                             key={patient.id}
                             value={patient.id.toString()}
-                          ><div className="flex flex-col">
-      <span className="font-medium">
-        {patient.firstName} {patient.lastName}
-      </span>
-      <span className="text-xs text-muted-foreground">
-        DOB: {new Date(patient.dateOfBirth).toLocaleDateString()} • {patient.phone}
-      </span>
-      </div>
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {patient.firstName} {patient.lastName}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                DOB:{" "}
+                                {new Date(
+                                  patient.dateOfBirth
+                                ).toLocaleDateString()}{" "}
+                                • {patient.phone}
+                              </span>
+                            </div>
                           </SelectItem>
                         ))
                       ) : (
@@ -589,6 +596,22 @@ useEffect(() => {
           <Button type="submit" disabled={isLoading} className="w-full">
             {appointment ? "Update Appointment" : "Create Appointment"}
           </Button>
+
+          {appointment?.id && onDelete && (
+            <Button
+              type="button"
+              onClick={() => {
+                onOpenChange?.(false); // 👈 Close the modal first
+
+                setTimeout(() => {
+                  onDelete?.(appointment.id!);
+                }, 300); // 300ms is safe for most animations
+              }}
+              className="bg-red-600 text-white w-full rounded hover:bg-red-700"
+            >
+              Delete Appointment
+            </Button>
+          )}
         </form>
       </Form>
     </div>

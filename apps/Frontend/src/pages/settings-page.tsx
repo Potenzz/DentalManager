@@ -248,7 +248,7 @@ export default function SettingsPage() {
                   isOpen={isDeleteStaffOpen}
                   onConfirm={handleConfirmDeleteStaff}
                   onCancel={() => setIsDeleteStaffOpen(false)}
-                  patientName={currentStaff?.name}
+                  entityName={currentStaff?.name}
                 />
               </div>
             </CardContent>

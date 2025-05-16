@@ -28,6 +28,7 @@ interface AddAppointmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: InsertAppointment | UpdateAppointment) => void;
+  onDelete?: (id: number) => void; 
   isLoading: boolean;
   appointment?: Appointment;
   patients: Patient[];
@@ -37,10 +38,12 @@ export function AddAppointmentModal({
   open,
   onOpenChange,
   onSubmit,
+  onDelete,
   isLoading,
   appointment,
   patients,
 }: AddAppointmentModalProps) {
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -58,6 +61,8 @@ export function AddAppointmentModal({
               onOpenChange(false);
             }}
             isLoading={isLoading}
+            onDelete={onDelete}
+            onOpenChange={onOpenChange}  
           />
         </div>
       </DialogContent>
