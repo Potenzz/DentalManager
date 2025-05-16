@@ -9,6 +9,7 @@ import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StaffForm } from "@/components/staffs/staff-form";
+import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 
 // Correctly infer Staff type from zod schema
 type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
@@ -120,6 +121,7 @@ export default function SettingsPage() {
       return id;
     },
     onSuccess: () => {
+      setIsDeleteStaffOpen(false); 
       queryClient.invalidateQueries({ queryKey: ["/api/staffs/"] });
       toast({
         title: "Staff Removed",
@@ -188,14 +190,28 @@ export default function SettingsPage() {
     }
   }, [isAddSuccess, isUpdateSuccess]);
 
-  // Delete staff
-  const handleDeleteStaff = (id: number) => {
-    if (confirm("Are you sure you want to delete this staff member?")) {
-      deleteStaffMutation.mutate(id);
+  const [isDeleteStaffOpen, setIsDeleteStaffOpen] = useState(false);
+  const [currentStaff, setCurrentStaff] = useState<Staff | undefined>(
+    undefined
+  );
+
+  const handleDeleteStaff = (staff: Staff) => {
+    setCurrentStaff(staff);
+    setIsDeleteStaffOpen(true);
+  };
+
+  const handleConfirmDeleteStaff = async () => {
+    if (currentStaff?.id) {
+      deleteStaffMutation.mutate(currentStaff.id);
+    } else {
+      toast({
+        title: "Error",
+        description: "No Staff selected for deletion.",
+        variant: "destructive",
+      });
     }
   };
 
-  // View staff handler (just an alert for now)
   const handleViewStaff = (staff: Staff) =>
     alert(
       `Viewing staff member:\n${staff.name} (${staff.email || "No email"})`
@@ -227,6 +243,13 @@ export default function SettingsPage() {
                     {(error as Error)?.message || "Failed to load staff data."}
                   </p>
                 )}
+
+                <DeleteConfirmationDialog
+                  isOpen={isDeleteStaffOpen}
+                  onConfirm={handleConfirmDeleteStaff}
+                  onCancel={() => setIsDeleteStaffOpen(false)}
+                  patientName={currentStaff?.name}
+                />
               </div>
             </CardContent>
           </Card>

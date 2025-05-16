@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { z } from "zod";
 import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { Button } from "../ui/button";
+import { Delete, Edit } from "lucide-react";
 
 type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
@@ -15,7 +17,7 @@ interface StaffTableProps {
   isError?: boolean;
   onAdd: () => void;
   onEdit: (staff: Staff) => void;
-  onDelete: (id: number) => void;
+  onDelete: (staff: Staff) => void;
   onView: (staff: Staff) => void;
 }
 
@@ -148,22 +150,27 @@ export function StaffTable({
                       {formattedDate}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => staff.id !== undefined && onEdit(staff)}
-                        className="text-blue-600 hover:text-blue-900"
-                        aria-label="Edit Staff"
-                      >
-                        Edit
-                      </button>
-                      <button
+                      <Button
                         onClick={() =>
-                          staff.id !== undefined && onDelete(staff.id)
+                          staff !== undefined && onDelete(staff)
                         }
                         className="text-red-600 hover:text-red-900"
                         aria-label="Delete Staff"
+                        variant="ghost"
+                        size="icon"
                       >
-                        Delete
-                      </button>
+                        <Delete/>
+                      </Button>
+                      <Button
+                        onClick={() => staff.id !== undefined && onEdit(staff)}
+                        className="text-blue-600 hover:text-blue-900"
+                        aria-label="Edit Staff"
+                        variant="ghost"
+                        size="icon"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      
                     </td>
                   </tr>
                 );

@@ -200,6 +200,7 @@ router.delete(
       await storage.deletePatient(patientId);
       res.status(204).send();
     } catch (error) {
+      console.error("Delete patient error:", error);
       res.status(500).json({ message: "Failed to delete patient" });
     }
   }

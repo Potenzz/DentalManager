@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Edit, Eye, MoreVertical } from "lucide-react";
+import { Delete, Edit, Eye, MoreVertical } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,9 +39,10 @@ interface PatientTableProps {
   patients: Patient[];
   onEdit: (patient: Patient) => void;
   onView: (patient: Patient) => void;
+  onDelete: (patient: Patient) => void;
 }
 
-export function PatientTable({ patients, onEdit, onView }: PatientTableProps) {
+export function PatientTable({ patients, onEdit, onView, onDelete }: PatientTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const patientsPerPage = 5;
   
@@ -167,6 +168,17 @@ export function PatientTable({ patients, onEdit, onView }: PatientTableProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-2">
+                      <Button
+                        onClick={() =>
+                          onDelete(patient)
+                        }
+                        className="text-red-600 hover:text-red-900"
+                        aria-label="Delete Staff"
+                        variant="ghost"
+                        size="icon"
+                      >
+                        <Delete/>
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

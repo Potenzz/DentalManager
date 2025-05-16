@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef} from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { TopAppBar } from "@/components/layout/top-app-bar";
@@ -33,6 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { z } from "zod";
+import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -82,10 +83,17 @@ const updatePatientSchema = (
 
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
 
+// Type for the ref to access modal methods
+type AddPatientModalRef = {
+  shouldSchedule: boolean;
+  navigateToSchedule: (patientId: number) => void;
+};
+
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isViewPatientOpen, setIsViewPatientOpen] = useState(false);
+  const [isDeletePatientOpen, setIsDeletePatientOpen] = useState(false);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(
     undefined
@@ -96,6 +104,9 @@ export default function Dashboard() {
 
   const { toast } = useToast();
   const { user } = useAuth();
+  const addPatientModalRef = useRef<AddPatientModalRef | null>(null);
+  
+  
 
   // Fetch patients
   const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
@@ -176,6 +187,31 @@ export default function Dashboard() {
     },
   });
 
+  
+  const deletePatientMutation = useMutation({
+  mutationFn: async (id: number) => {
+    const res = await apiRequest("DELETE", `/api/patients/${id}`);
+    return;
+  },
+  onSuccess: () => {
+    setIsDeletePatientOpen(false);
+    queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+    toast({
+      title: "Success",
+      description: "Patient deleted successfully!",
+      variant: "default",
+    });
+  },
+  onError: (error) => {
+    console.log(error)
+    toast({
+      title: "Error",
+      description: `Failed to delete patient: ${error.message}`,
+      variant: "destructive",
+    });
+  },
+});
+
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
@@ -215,6 +251,28 @@ export default function Dashboard() {
     setCurrentPatient(patient);
     setIsViewPatientOpen(true);
   };
+
+  const handleDeletePatient = (patient: Patient) => {
+    setCurrentPatient(patient);
+    setIsDeletePatientOpen(true);
+  };
+
+  const handleConfirmDeletePatient = async () => {
+  if (currentPatient) {
+    deletePatientMutation.mutate(currentPatient.id);
+  } else {
+    toast({
+      title: "Error",
+      description: "No patient selected for deletion.",
+      variant: "destructive",
+    });
+  }
+};
+
+  const isLoading =
+    isLoadingPatients ||
+    addPatientMutation.isPending ||
+    updatePatientMutation.isPending;
 
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
@@ -491,19 +549,27 @@ export default function Dashboard() {
               patients={filteredPatients}
               onEdit={handleEditPatient}
               onView={handleViewPatient}
+              onDelete={handleDeletePatient}
             />
+
+            <DeleteConfirmationDialog
+              isOpen={isDeletePatientOpen}
+              onConfirm={handleConfirmDeletePatient}
+              onCancel={() => setIsDeletePatientOpen(false)}
+              patientName={currentPatient?.name}
+            />
+
           </div>
         </main>
       </div>
 
       {/* Add/Edit Patient Modal */}
       <AddPatientModal
+        ref={addPatientModalRef}
         open={isAddPatientOpen}
         onOpenChange={setIsAddPatientOpen}
         onSubmit={currentPatient ? handleUpdatePatient : handleAddPatient}
-        isLoading={
-          addPatientMutation.isPending || updatePatientMutation.isPending
-        }
+        isLoading={isLoading}
         patient={currentPatient}
       />
 
