@@ -166,7 +166,7 @@ export const AddPatientModal = forwardRef<
           )}
 
           <Button
-            type="submit"
+            type="button"
             form="patient-form"
             onClick={() => {
               if (patientFormRef.current) {

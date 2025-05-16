@@ -86,7 +86,6 @@ export default function PatientsPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [extractedInfo, setExtractedInfo] = useState<any>(null);
 
   // Fetch patients
   const {

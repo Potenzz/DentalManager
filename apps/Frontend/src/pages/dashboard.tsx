@@ -139,7 +139,7 @@ export default function Dashboard() {
       const res = await apiRequest("POST", "/api/patients/", patient);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (newPatient) => {
       setIsAddPatientOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
       toast({
@@ -147,6 +147,10 @@ export default function Dashboard() {
         description: "Patient added successfully!",
         variant: "default",
       });
+
+      if (addPatientModalRef.current?.shouldSchedule) {
+        addPatientModalRef.current.navigateToSchedule(newPatient.id);
+      }
     },
     onError: (error) => {
       toast({
