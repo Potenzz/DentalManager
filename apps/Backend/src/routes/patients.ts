@@ -130,7 +130,6 @@ router.put(
 
   async (req: Request, res: Response): Promise<any> => {
     try {
-
       const patientIdParam = req.params.id;
 
       // Ensure that patientIdParam exists and is a valid number
@@ -193,13 +192,26 @@ router.delete(
       }
 
       if (existingPatient.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
+        console.warn(
+          `User ${req.user!.id} tried to delete patient ${patientId} owned by ${existingPatient.userId}`
+        );
+        return res
+          .status(403)
+          .json({ message: "Forbidden: Patient belongs to a different user" });
       }
 
+      const appointments = await storage.getAppointmentsByPatientId(patientId);
+      console.log(appointments)
+        if (appointments.length > 0) {
+          throw new Error(`Cannot delete patient with ID ${patientId} because they have appointments`);
+          }
       // Delete patient
       await storage.deletePatient(patientId);
       res.status(204).send();
-    } catch (error) {
+    } catch (error:any) {
+      if (error.message.includes("have appointments")) {
+        return res.status(400).json({ message: error.message });
+      }
       console.error("Delete patient error:", error);
       res.status(500).json({ message: "Failed to delete patient" });
     }
