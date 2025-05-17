@@ -11,7 +11,16 @@ Follow the steps below to set up and run the project:
 npm install
 ```
 
-2. Generate Prisma, and its Types.
+2. Copy Environment Variables
+
+Create `.env` files from the provided `.env.example` templates:
+Change the required ones env in .env files.
+
+```sh
+npm run setup:env
+```
+
+3. Generate Prisma, and its Types.
 ```sh
 npm run db:generate
 ```
@@ -26,22 +35,14 @@ npm run db:migrate
 npm run db:seed
 ```
 
-3. Copy Environment Variables
 
-Create `.env` files from the provided `.env.example` templates:
-Change the required ones env in .env files.
-
-```sh
-npm run setup:env
-```
-
-3. To Simply run all the app(Backend + Frontend).
+4. To Simply run all the app(Backend + Frontend).
 ```sh
 npm run dev
 ```
 
 
-4. Or if want to run specfic app (either Backend or Frontend). 
+5. Or if want to run specfic app (either Backend or Frontend). 
 ```sh 
 cd apps/Backend 
 npm run dev
