@@ -417,7 +417,6 @@ export default function AppointmentsPage() {
     // Find patient by patientId
     const patient = patients.find((p) => p.id === appointment.patientId);
 
-
     setConfirmDeleteState({
       open: true,
       appointmentId: id,
@@ -432,16 +431,22 @@ export default function AppointmentsPage() {
   // Get formatted date string for display
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
-
   const selectedDateAppointments = appointments.filter((appointment) => {
-      // Convert appointment.date to 'yyyy-MM-dd' string
-      const dateStr =
-        typeof appointment.date === "string"
-          ? format(new Date(appointment.date), "yyyy-MM-dd")
-          : format(appointment.date, "yyyy-MM-dd");
-  
-      return dateStr === formattedDate;
-    });
+    const dateObj =
+      typeof appointment.date === "string"
+        ? new Date(appointment.date)
+        : appointment.date;
+
+    // Extract UTC year, month, day
+    const year = dateObj.getUTCFullYear();
+    const month = dateObj.getUTCMonth(); // zero-based
+    const day = dateObj.getUTCDate();
+
+    // Create a date string in UTC format
+    const utcDateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+    return utcDateStr === formattedDate; // formattedDate should be 'yyyy-MM-dd' string in UTC format as well
+  });
 
   // Process appointments for the scheduler view
   const processedAppointments: ScheduledAppointment[] =

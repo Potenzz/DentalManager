@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, parse } from "date-fns";
+import { format, parse, parseISO} from "date-fns";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { StatCard } from "@/components/ui/stat-card";
@@ -359,14 +359,12 @@ export default function Dashboard() {
   const today = format(new Date(), "yyyy-MM-dd");
 
   const todaysAppointments = appointments.filter((appointment) => {
-    // Convert appointment.date to 'yyyy-MM-dd' string
-    const dateStr =
-      typeof appointment.date === "string"
-        ? format(new Date(appointment.date), "yyyy-MM-dd")
-        : format(appointment.date, "yyyy-MM-dd");
+  const appointmentDate = typeof appointment.date === "string"
+    ? format(parseISO(appointment.date), "yyyy-MM-dd")
+    : format(appointment.date, "yyyy-MM-dd");
 
-    return dateStr === today;
-  });
+  return appointmentDate === today;
+});
 
   // Count completed appointments today
   const completedTodayCount = todaysAppointments.filter((appointment) => {
