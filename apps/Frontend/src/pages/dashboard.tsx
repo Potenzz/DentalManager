@@ -1,6 +1,6 @@
-import { useState, useRef} from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { StatCard } from "@/components/ui/stat-card";
@@ -105,8 +105,6 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
   const addPatientModalRef = useRef<AddPatientModalRef | null>(null);
-  
-  
 
   // Fetch patients
   const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
@@ -191,30 +189,29 @@ export default function Dashboard() {
     },
   });
 
-  
   const deletePatientMutation = useMutation({
-  mutationFn: async (id: number) => {
-    const res = await apiRequest("DELETE", `/api/patients/${id}`);
-    return;
-  },
-  onSuccess: () => {
-    setIsDeletePatientOpen(false);
-    queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
-    toast({
-      title: "Success",
-      description: "Patient deleted successfully!",
-      variant: "default",
-    });
-  },
-  onError: (error) => {
-    console.log(error)
-    toast({
-      title: "Error",
-      description: `Failed to delete patient: ${error.message}`,
-      variant: "destructive",
-    });
-  },
-});
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/patients/${id}`);
+      return;
+    },
+    onSuccess: () => {
+      setIsDeletePatientOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+      toast({
+        title: "Success",
+        description: "Patient deleted successfully!",
+        variant: "default",
+      });
+    },
+    onError: (error) => {
+      console.log(error);
+      toast({
+        title: "Error",
+        description: `Failed to delete patient: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -262,16 +259,16 @@ export default function Dashboard() {
   };
 
   const handleConfirmDeletePatient = async () => {
-  if (currentPatient) {
-    deletePatientMutation.mutate(currentPatient.id);
-  } else {
-    toast({
-      title: "Error",
-      description: "No patient selected for deletion.",
-      variant: "destructive",
-    });
-  }
-};
+    if (currentPatient) {
+      deletePatientMutation.mutate(currentPatient.id);
+    } else {
+      toast({
+        title: "Error",
+        description: "No patient selected for deletion.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const isLoading =
     isLoadingPatients ||
@@ -362,8 +359,13 @@ export default function Dashboard() {
   const today = format(new Date(), "yyyy-MM-dd");
 
   const todaysAppointments = appointments.filter((appointment) => {
-    const appointmentDate = format(new Date(appointment.date), "yyyy-MM-dd");
-    return appointmentDate === today;
+    // Convert appointment.date to 'yyyy-MM-dd' string
+    const dateStr =
+      typeof appointment.date === "string"
+        ? format(new Date(appointment.date), "yyyy-MM-dd")
+        : format(appointment.date, "yyyy-MM-dd");
+
+    return dateStr === today;
   });
 
   // Count completed appointments today
@@ -453,19 +455,23 @@ export default function Dashboard() {
                               </h3>
                               <div className="text-sm text-gray-500 flex items-center space-x-2">
                                 <span>
-                                  {new Date(
-                                    `${appointment.date.toString().slice(0, 10)}T${appointment.startTime}:00`
-                                  ).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}{" "}
-                                  -{" "}
-                                  {new Date(
-                                    `${appointment.date.toString().slice(0, 10)}T${appointment.endTime}:00`
-                                  ).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
+                                  <span>
+                                    {`${format(
+                                      parse(
+                                        `${format(new Date(appointment.date), "yyyy-MM-dd")} ${appointment.startTime}`,
+                                        "yyyy-MM-dd HH:mm",
+                                        new Date()
+                                      ),
+                                      "hh:mm a"
+                                    )} - ${format(
+                                      parse(
+                                        `${format(new Date(appointment.date), "yyyy-MM-dd")} ${appointment.endTime}`,
+                                        "yyyy-MM-dd HH:mm",
+                                        new Date()
+                                      ),
+                                      "hh:mm a"
+                                    )}`}
+                                  </span>
                                 </span>
                                 <span>•</span>
                                 <span>
@@ -560,9 +566,8 @@ export default function Dashboard() {
               isOpen={isDeletePatientOpen}
               onConfirm={handleConfirmDeletePatient}
               onCancel={() => setIsDeletePatientOpen(false)}
-              patientName={currentPatient?.name}
+              entityName={currentPatient?.name}
             />
-
           </div>
         </main>
       </div>
@@ -612,9 +617,15 @@ export default function Dashboard() {
                   <div className="mt-2 space-y-2">
                     <p>
                       <span className="text-gray-500">Date of Birth:</span>{" "}
-                      {new Date(
-                        currentPatient.dateOfBirth
-                      ).toLocaleDateString()}
+                      <span className="text-gray-500">Date of Birth:</span>{" "}
+                      {format(
+                        parse(
+                          currentPatient.dateOfBirth,
+                          "yyyy-MM-dd",
+                          new Date()
+                        ),
+                        "PPP"
+                      )}
                     </p>
                     <p>
                       <span className="text-gray-500">Gender:</span>{" "}

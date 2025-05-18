@@ -432,11 +432,16 @@ export default function AppointmentsPage() {
   // Get formatted date string for display
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
-  const selectedDateAppointments = appointments.filter((apt) => {
-    // Ensure apt.date is in 'yyyy-MM-dd' format before comparison
-    const appointmentDate = format(new Date(apt.date), "yyyy-MM-dd");
-    return appointmentDate === formattedDate;
-  });
+
+  const selectedDateAppointments = appointments.filter((appointment) => {
+      // Convert appointment.date to 'yyyy-MM-dd' string
+      const dateStr =
+        typeof appointment.date === "string"
+          ? format(new Date(appointment.date), "yyyy-MM-dd")
+          : format(appointment.date, "yyyy-MM-dd");
+  
+      return dateStr === formattedDate;
+    });
 
   // Process appointments for the scheduler view
   const processedAppointments: ScheduledAppointment[] =

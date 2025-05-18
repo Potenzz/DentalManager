@@ -425,7 +425,7 @@ export default function PatientsPage() {
                   isOpen={isDeletePatientOpen}
                   onConfirm={handleConfirmDeletePatient}
                   onCancel={() => setIsDeletePatientOpen(false)}
-                  patientName={currentPatient?.name}
+                  entityName={currentPatient?.name}
                 />
               </CardContent>
             </Card>
