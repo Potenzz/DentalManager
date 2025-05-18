@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, parse, parseISO} from "date-fns";
+import { format, parse, parseISO } from "date-fns";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { StatCard } from "@/components/ui/stat-card";
@@ -356,15 +356,24 @@ export default function Dashboard() {
 
   // Since we removed filters, just return all patients
   const filteredPatients = patients;
-  const today = format(new Date(), "yyyy-MM-dd");
+  const now = new Date();
+  const todayUTC = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
 
   const todaysAppointments = appointments.filter((appointment) => {
-  const appointmentDate = typeof appointment.date === "string"
-    ? format(parseISO(appointment.date), "yyyy-MM-dd")
-    : format(appointment.date, "yyyy-MM-dd");
+    const dateObj =
+      typeof appointment.date === "string"
+        ? parseISO(appointment.date)
+        : appointment.date;
 
-  return appointmentDate === today;
-});
+    // Extract UTC year, month, day from appointment date
+    const year = dateObj.getUTCFullYear();
+    const month = dateObj.getUTCMonth();
+    const day = dateObj.getUTCDate();
+
+    const appointmentUTCDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+    return appointmentUTCDate === todayUTC;
+  });
 
   // Count completed appointments today
   const completedTodayCount = todaysAppointments.filter((appointment) => {
