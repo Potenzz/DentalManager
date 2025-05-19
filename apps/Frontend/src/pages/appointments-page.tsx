@@ -394,15 +394,10 @@ export default function AppointmentsPage() {
 
     const rawDate = parseLocalDate(appointmentData.date);
 
-    console.log("Appointment date.date ", appointmentData.date);
-    console.log("Raw date", rawDate);
-
     const updatedData = {
       ...appointmentData,
       date: rawDate.toLocaleDateString("en-CA"),
     };
-
-    console.log("update data: ", updatedData.date);
 
     // Check if we're editing an existing appointment with a valid ID
     if (
