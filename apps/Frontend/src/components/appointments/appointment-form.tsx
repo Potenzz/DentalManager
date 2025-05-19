@@ -258,11 +258,6 @@ export function AppointmentForm({
     }
 
     const formattedDate = format(data.date, "yyyy-MM-dd");
-    console.log(
-      "Updating with date:",
-      data.date,
-      format(data.date, "yyyy-MM-dd")
-    );
 
     onSubmit({
       ...data,
