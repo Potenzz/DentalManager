@@ -382,16 +382,17 @@ export default function AppointmentsPage() {
     const rawDate =
       appointmentData.date instanceof Date
         ? appointmentData.date
-        : new Date(appointmentData.date); // this is unsafe if it's "yyyy-MM-dd"
-    
-    console.log("Appoiment date.date ",appointmentData.date);
+        : new Date(appointmentData.date);
+
+    console.log("Appoiment date.date ", appointmentData.date);
     console.log("Raw date", rawDate);
+
     const updatedData = {
       ...appointmentData,
-      date: toUTCDateString(rawDate), // 👈 This ensures consistent date across all environments
+      date: rawDate.toLocaleDateString("en-CA"),
     };
+    console.log("update data: ", updatedData.date);
 
-    console.log("update data: ", toUTCDateString(rawDate));
 
     // Check if we're editing an existing appointment with a valid ID
     if (
