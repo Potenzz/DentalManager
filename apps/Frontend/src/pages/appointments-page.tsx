@@ -373,26 +373,36 @@ export default function AppointmentsPage() {
   ) => {
     // Converts local date to exact UTC date with no offset issues
 
-    function toUTCDateString(date: Date): string {
-      return format(
-        new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())),
-        "yyyy-MM-dd"
-      );
-    }
-    const rawDate =
-      appointmentData.date instanceof Date
-        ? appointmentData.date
-        : new Date(appointmentData.date);
+    function parseLocalDate(dateInput: Date | string): Date {
+      if (dateInput instanceof Date) return dateInput;
 
-    console.log("Appoiment date.date ", appointmentData.date);
+      const parts = dateInput.split("-");
+      if (parts.length !== 3) {
+        throw new Error(`Invalid date format: ${dateInput}`);
+      }
+
+      const year = Number(parts[0]);
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
+
+      if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+        throw new Error(`Invalid date parts in date string: ${dateInput}`);
+      }
+
+      return new Date(year, month - 1, day); // month is 0-indexed
+    }
+
+    const rawDate = parseLocalDate(appointmentData.date);
+
+    console.log("Appointment date.date ", appointmentData.date);
     console.log("Raw date", rawDate);
 
     const updatedData = {
       ...appointmentData,
       date: rawDate.toLocaleDateString("en-CA"),
     };
-    console.log("update data: ", updatedData.date);
 
+    console.log("update data: ", updatedData.date);
 
     // Check if we're editing an existing appointment with a valid ID
     if (
