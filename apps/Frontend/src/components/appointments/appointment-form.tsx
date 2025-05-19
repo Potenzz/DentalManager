@@ -257,20 +257,19 @@ export function AppointmentForm({
         : `Appointment with ${selectedStaff?.name}`;
     }
 
-    // 👇 Use current date if none provided
-    const appointmentDate = data.date ? new Date(data.date) : new Date();
-
-    if (isNaN(appointmentDate.getTime())) {
-      console.error("Invalid date:", data.date);
-      return;
-    }
+    const formattedDate = format(data.date, "yyyy-MM-dd");
+    console.log(
+      "Updating with date:",
+      data.date,
+      format(data.date, "yyyy-MM-dd")
+    );
 
     onSubmit({
       ...data,
       title,
       notes,
       patientId,
-      date: format(appointmentDate, "yyyy-MM-dd"),
+      date: formattedDate,
       startTime: data.startTime,
       endTime: data.endTime,
     });

@@ -371,10 +371,15 @@ export default function AppointmentsPage() {
   const handleAppointmentSubmit = (
     appointmentData: InsertAppointment | UpdateAppointment
   ) => {
-    // Make sure the date is for the selected date
+
     const updatedData = {
       ...appointmentData,
-      date: format(selectedDate, "yyyy-MM-dd"),
+      date: format(
+        appointmentData.date instanceof Date
+          ? appointmentData.date
+          : new Date(appointmentData.date),
+        "yyyy-MM-dd"
+      ),
     };
 
     // Check if we're editing an existing appointment with a valid ID
