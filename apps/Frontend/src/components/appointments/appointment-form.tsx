@@ -116,6 +116,23 @@ export function AppointmentForm({
     color: colorMap[staff.name] || "bg-gray-400",
   }));
 
+  function parseLocalDate(dateString: string): Date {
+    const parts = dateString.split("-");
+    if (parts.length !== 3) {
+      return new Date();
+    }
+    const year = parseInt(parts[0] ?? "", 10);
+    const month = parseInt(parts[1] ?? "", 10);
+    const day = parseInt(parts[2] ?? "", 10);
+
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      return new Date();
+    }
+
+    // Create date at UTC midnight instead of local midnight
+    return new Date(year, month - 1, day);
+  }
+
   // Get the stored data from session storage
   const storedDataString = sessionStorage.getItem("newAppointmentData");
   let parsedStoredData = null;
@@ -134,7 +151,10 @@ export function AppointmentForm({
     ? {
         patientId: appointment.patientId,
         title: appointment.title,
-        date: new Date(appointment.date),
+        date:
+          typeof appointment.date === "string"
+            ? parseLocalDate(appointment.date)
+            : appointment.date,
         startTime: appointment.startTime || "09:00", // Default "09:00"
         endTime: appointment.endTime || "09:30", // Default "09:30"
         type: appointment.type,
@@ -148,7 +168,12 @@ export function AppointmentForm({
     : parsedStoredData
       ? {
           patientId: Number(parsedStoredData.patientId),
-          date: new Date(parsedStoredData.date),
+          date: parsedStoredData.date
+            ? typeof parsedStoredData.date === "string"
+              ? parseLocalDate(parsedStoredData.date)
+              : new Date(parsedStoredData.date) // in case it’s a stringified date or timestamp
+            : new Date(),
+
           title: parsedStoredData.title || "",
           startTime: parsedStoredData.startTime,
           endTime: parsedStoredData.endTime,
@@ -211,7 +236,11 @@ export function AppointmentForm({
       }
 
       if (parsedStoredData.date) {
-        form.setValue("date", new Date(parsedStoredData.date));
+        const parsedDate =
+          typeof parsedStoredData.date === "string"
+            ? parseLocalDate(parsedStoredData.date)
+            : new Date(parsedStoredData.date);
+        form.setValue("date", parsedDate);
       }
 
       // Clean up session storage
@@ -258,7 +287,6 @@ export function AppointmentForm({
     }
 
     const formattedDate = data.date.toLocaleDateString("en-CA");
-
 
     onSubmit({
       ...data,
@@ -404,8 +432,12 @@ export function AppointmentForm({
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={field.value ? new Date(field.value) : undefined}
-                      onSelect={field.onChange}
+                      selected={field.value}
+                      onSelect={(date) => {
+                        if (date) {
+                          field.onChange(date); 
+                        }
+                      }}
                       disabled={(date) =>
                         date < new Date(new Date().setHours(0, 0, 0, 0))
                       }
