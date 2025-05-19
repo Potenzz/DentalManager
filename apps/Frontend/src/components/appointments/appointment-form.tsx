@@ -257,7 +257,8 @@ export function AppointmentForm({
         : `Appointment with ${selectedStaff?.name}`;
     }
 
-    const formattedDate = format(data.date, "yyyy-MM-dd");
+    const formattedDate = data.date.toLocaleDateString("en-CA");
+
 
     onSubmit({
       ...data,

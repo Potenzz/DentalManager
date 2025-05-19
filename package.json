@@ -30,6 +30,7 @@
     "packages/*"
   ],
   "dependencies": {
+    "date-fns-tz": "^3.2.0",
     "dotenv": "^16.5.0",
     "dotenv-cli": "^8.0.0",
     "shx": "^0.4.0"
