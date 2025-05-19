@@ -372,19 +372,21 @@ export default function AppointmentsPage() {
     appointmentData: InsertAppointment | UpdateAppointment
   ) => {
     // Converts local date to exact UTC date with no offset issues
-    function getUTCDateOnly(date: Date) {
-      return new Date(
-        Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+
+    function toUTCDateString(date: Date): string {
+      return format(
+        new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())),
+        "yyyy-MM-dd"
       );
     }
     const rawDate =
       appointmentData.date instanceof Date
         ? appointmentData.date
-        : new Date(appointmentData.date);
+        : new Date(appointmentData.date); // this is unsafe if it's "yyyy-MM-dd"
 
     const updatedData = {
       ...appointmentData,
-      date: getUTCDateOnly(rawDate), // 👈 This ensures consistent date across all environments
+      date: toUTCDateString(rawDate), // 👈 This ensures consistent date across all environments
     };
 
     // Check if we're editing an existing appointment with a valid ID
