@@ -216,7 +216,6 @@ router.put(
 
       // Validate request body
       const appointmentData = updateAppointmentSchema.parse(req.body);
-      console.log("Validated appointment update data:", appointmentData);
 
       // If patient ID is being updated, verify the new patient belongs to user
       if (
@@ -282,7 +281,6 @@ router.put(
         appointmentId,
         appointmentData
       );
-      console.log("Appointment updated successfully:", updatedAppointment);
       res.json(updatedAppointment);
     } catch (error) {
       console.error("Error updating appointment:", error);
