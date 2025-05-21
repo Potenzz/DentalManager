@@ -36,7 +36,7 @@ import {
   AppointmentUncheckedCreateInputObjectSchema,
   PatientUncheckedCreateInputObjectSchema,
   StaffUncheckedCreateInputObjectSchema,
-} from "@repo/db/shared/schemas";
+} from "@repo/db/usedSchemas";
 
 import { z } from "zod";
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;

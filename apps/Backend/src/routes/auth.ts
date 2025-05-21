@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';  
 import { storage } from '../storage'; 
-import { UserUncheckedCreateInputObjectSchema } from '@repo/db/shared/schemas';
+import { UserUncheckedCreateInputObjectSchema } from '@repo/db/usedSchemas';
 import { z } from 'zod';
 
 type SelectUser = z.infer<typeof UserUncheckedCreateInputObjectSchema>;

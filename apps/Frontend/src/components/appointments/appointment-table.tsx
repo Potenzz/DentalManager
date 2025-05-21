@@ -25,11 +25,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-// import { Appointment, Patient } from "@repo/db/shared/schemas";
 import {
   AppointmentUncheckedCreateInputObjectSchema,
   PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/shared/schemas";
+} from "@repo/db/usedSchemas";
 
 import { z } from "zod";
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;

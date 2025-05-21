@@ -15,8 +15,7 @@ import { X, Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-// import { Patient } from "@repo/db/shared/schemas";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import {z} from "zod";
 
 const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({

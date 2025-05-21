@@ -1,8 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
-// import { insertUserSchema } from "@repo/db/shared/schemas";
+import { UserUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";

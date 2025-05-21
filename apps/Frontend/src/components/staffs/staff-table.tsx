@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { z } from "zod";
-import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { Button } from "../ui/button";
 import { Delete, Edit } from "lucide-react";
 

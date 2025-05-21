@@ -4,7 +4,7 @@ import { storage } from "../storage";
 import {
   AppointmentUncheckedCreateInputObjectSchema,
   PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/shared/schemas";
+} from "@repo/db/usedSchemas";
 import { z } from "zod";
 
 const router = Router();

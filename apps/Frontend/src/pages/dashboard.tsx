@@ -12,10 +12,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import {
-  AppointmentUncheckedCreateInputObjectSchema,
-  PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/shared/schemas";
+import { AppointmentUncheckedCreateInputObjectSchema } from '@repo/db/usedSchemas';
+import { PatientUncheckedCreateInputObjectSchema } from '@repo/db/usedSchemas';
+
 import {
   Users,
   Calendar,

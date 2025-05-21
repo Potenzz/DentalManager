@@ -19,8 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
-// import { Patient, InsertPatient, UpdatePatient } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { z } from "zod";

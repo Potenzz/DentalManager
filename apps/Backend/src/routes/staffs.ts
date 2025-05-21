@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
-import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 
 type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 

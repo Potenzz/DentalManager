@@ -4,8 +4,7 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-// import { insertUserSchema, User as SelectUser, InsertUser } from "@repo/db/shared/schemas";
-import { UserUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { UserUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { z } from "zod";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
