@@ -31,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import useExtractPdfData from "@/hooks/use-extractPdfData";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -85,6 +86,9 @@ export default function PatientsPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [formData, setFormData] = useState({ PatientName: "", PatientMemberId: "", PatientDob:"" });
+  const { mutate: extractPdf, isPending } = useExtractPdfData();
+
 
   // Fetch patients
   const {
@@ -240,10 +244,7 @@ export default function PatientsPage() {
     }
   };
 
-  const isLoading =
-    isLoadingPatients ||
-    addPatientMutation.isPending ||
-    updatePatientMutation.isPending;
+  const isLoading = isLoadingPatients || addPatientMutation.isPending || updatePatientMutation.isPending;
 
   // Search handling
   const handleSearch = (criteria: SearchCriteria) => {
@@ -252,18 +253,6 @@ export default function PatientsPage() {
 
   const handleClearSearch = () => {
     setSearchCriteria(null);
-  };
-
-  // File upload handling
-  const handleFileUpload = (file: File) => {
-    setUploadedFile(file);
-    setIsUploading(false); // In a real implementation, this would be set to true during upload
-
-    toast({
-      title: "File Selected",
-      description: `${file.name} is ready for processing.`,
-      variant: "default",
-    });
   };
 
   // Filter patients based on search criteria
@@ -302,6 +291,30 @@ export default function PatientsPage() {
     });
   }, [patients, searchCriteria]);
 
+
+  // File upload handling
+  const handleFileUpload = (file: File) => {
+    setUploadedFile(file);
+    setIsUploading(false); // In a real implementation, this would be set to true during upload
+
+    toast({
+      title: "File Selected",
+      description: `${file.name} is ready for processing.`,
+      variant: "default",
+    });
+  };
+
+  // data extraction
+  const handleExtract = () => {
+    if (!uploadedFile) return alert("Please upload a PDF.");
+    extractPdf(uploadedFile, {
+      onSuccess: (data) => {
+        setFormData({ PatientName: data.name || "", PatientMemberId: data.memberId || "",  PatientDob: data.dob || ""});
+      },
+    });
+      
+  };
+  
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
       <Sidebar
@@ -369,6 +382,7 @@ export default function PatientsPage() {
                 <Button
                   className="w-full h-12 gap-2"
                   disabled={!uploadedFile || isExtracting}
+                  onClick={handleExtract}
                 >
                   {isExtracting ? (
                     <>
