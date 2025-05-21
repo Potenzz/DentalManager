@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AppointmentsByDay } from "@/components/analytics/appointments-by-day";
+import { NewPatients } from "@/components/analytics/new-patients";
 import {
   AppointmentUncheckedCreateInputObjectSchema,
   PatientUncheckedCreateInputObjectSchema,
@@ -540,6 +542,12 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
+          </div>
+
+          {/* Analytics Dashboard Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <AppointmentsByDay appointments={appointments} />
+            <NewPatients patients={patients} />
           </div>
 
           {/* Patient Management Section */}

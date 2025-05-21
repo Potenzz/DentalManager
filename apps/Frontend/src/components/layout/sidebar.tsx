@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Calendar, FileText, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Settings, FileCheck, ClipboardCheck, CreditCard } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -25,6 +26,21 @@ export function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps) {
       name: "Patients",
       path: "/patients",
       icon: <Users className="h-5 w-5" />,
+    },
+    {
+      name: "Claims",
+      path: "/claims",
+      icon: <FileCheck className="h-5 w-5" />,
+    },
+    {
+      name: "Pre-authorizations",
+      path: "/preauthorizations",
+      icon: <ClipboardCheck className="h-5 w-5" />,
+    },
+    {
+      name: "Payments",
+      path: "/payments",
+      icon: <CreditCard className="h-5 w-5" />,
     },
     {
       name: "Settings",
