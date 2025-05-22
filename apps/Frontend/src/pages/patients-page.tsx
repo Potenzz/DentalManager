@@ -87,7 +87,7 @@ export default function PatientsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [formData, setFormData] = useState({ PatientName: "", PatientMemberId: "", PatientDob:"" });
-  const { mutate: extractPdf, isPending } = useExtractPdfData();
+  const { mutate: extractPdf} = useExtractPdfData();
 
 
   // Fetch patients
@@ -294,21 +294,39 @@ export default function PatientsPage() {
 
   // File upload handling
   const handleFileUpload = (file: File) => {
+    setIsUploading(true); 
     setUploadedFile(file);
-    setIsUploading(false); // In a real implementation, this would be set to true during upload
 
     toast({
       title: "File Selected",
       description: `${file.name} is ready for processing.`,
       variant: "default",
     });
+
+    setIsUploading(false);
   };
 
   // data extraction
-  const handleExtract = () => {
-    if (!uploadedFile) return alert("Please upload a PDF.");
+  const handleExtract = () =>{
+    setIsExtracting(true);
+
+    if (!uploadedFile){
+       return toast({
+        title: "Error",
+        description:"Please upload a PDF",
+        variant: "destructive",
+      });
+    }
     extractPdf(uploadedFile, {
       onSuccess: (data) => {
+        setIsExtracting(false);
+
+        toast({
+        title: "Success Pdf Data Extracted",
+        description: `Name: ${data.name}, Member ID: ${data.memberId}, DOB: ${data.dob}`,
+        variant: "default",
+      });
+
         setFormData({ PatientName: data.name || "", PatientMemberId: data.memberId || "",  PatientDob: data.dob || ""});
       },
     });

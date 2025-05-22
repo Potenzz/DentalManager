@@ -1,13 +1,8 @@
-from flask import Flask, request, jsonify
 import fitz  # PyMuPDF
 import re
 
-app = Flask(__name__)
-
-@app.route("/extract", methods=["POST"])
-def extract():
-    file = request.files['pdf']
-    doc = fitz.open(stream=file.read(), filetype="pdf")
+def extract_from_pdf(file_path):
+    doc = fitz.open(file_path)
     text = "\n".join(page.get_text() for page in doc)
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     member_id = ""
@@ -35,4 +30,8 @@ def extract():
     }
 
 if __name__ == "__main__":
-    app.run(port=5001)
+    result = extract_from_pdf("PDF_To_Test/sample1.pdf")
+    print(result)
+
+
+

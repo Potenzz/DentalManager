@@ -6,7 +6,7 @@ export interface ExtractedData {
   name?: string;
   memberId?: string;
   dob?: string;
-  [key: string]: any; // In case your extraction returns additional dynamic fields
+  [key: string]: any; 
 }
 
 export default async function forwardToPythonService(

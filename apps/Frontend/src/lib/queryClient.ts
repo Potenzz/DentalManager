@@ -16,14 +16,18 @@ export async function apiRequest(
 ): Promise<Response> {
   const token = localStorage.getItem("token");
 
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    // Only set Content-Type if not using FormData
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+  };
+
   const res = await fetch(`${API_BASE_URL}${url}`, {
     method,
-    // headers: data ? { "Content-Type": "application/json" } : {},
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}), // Include JWT token if available
-    },
-    body: data ? JSON.stringify(data) : undefined,
+    headers,
+    body: isFormData ? data as FormData : JSON.stringify(data),
     credentials: "include",
   });
 
