@@ -9,7 +9,6 @@ import { AuthProvider } from "./hooks/use-auth";
 import Dashboard from "./pages/dashboard"; 
 import LoadingScreen from "./components/ui/LoadingScreen";
 
-
 const AuthPage = lazy(() => import("./pages/auth-page"));
 const AppointmentsPage = lazy(() => import("./pages/appointments-page"));
 const PatientsPage = lazy(() => import("./pages/patients-page"));
