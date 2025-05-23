@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Form,

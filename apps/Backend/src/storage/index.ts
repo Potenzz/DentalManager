@@ -4,7 +4,7 @@ import {
   PatientUncheckedCreateInputObjectSchema,
   UserUncheckedCreateInputObjectSchema,
   StaffUncheckedCreateInputObjectSchema,
-} from "@repo/db/shared/schemas";
+} from "@repo/db/usedSchemas";
 import { z } from "zod";
 
 //creating types out of schema auto generated.

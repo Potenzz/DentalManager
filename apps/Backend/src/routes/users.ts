@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
-import { UserUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { UserUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 
 const router = Router();
 

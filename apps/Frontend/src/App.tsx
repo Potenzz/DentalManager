@@ -6,8 +6,10 @@ import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
-
 import Dashboard from "./pages/dashboard"; 
+import LoadingScreen from "./components/ui/LoadingScreen";
+
+
 const AuthPage = lazy(() => import("./pages/auth-page"));
 const AppointmentsPage = lazy(() => import("./pages/appointments-page"));
 const PatientsPage = lazy(() => import("./pages/patients-page"));
@@ -40,7 +42,7 @@ function App() {
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<LoadingScreen />}>
             <Router />
           </Suspense>
         </TooltipProvider>

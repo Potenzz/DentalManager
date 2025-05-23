@@ -25,8 +25,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-// import { Patient } from "@repo/db/shared/schemas";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import {z} from "zod";
 
 const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({

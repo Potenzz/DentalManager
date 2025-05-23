@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AppointmentForm } from "./appointment-form";
-// import { Appointment, InsertAppointment, UpdateAppointment, Patient } from "@repo/db/shared/schemas";
-import { AppointmentUncheckedCreateInputObjectSchema, PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { AppointmentUncheckedCreateInputObjectSchema, PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 
 import {z} from "zod";
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;

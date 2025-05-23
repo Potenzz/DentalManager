@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { z } from "zod";
 
 type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;

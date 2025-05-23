@@ -22,7 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   AppointmentUncheckedCreateInputObjectSchema,
   PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/shared/schemas";
+} from "@repo/db/usedSchemas";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import {

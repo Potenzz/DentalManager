@@ -18,7 +18,7 @@ import { PatientForm, PatientFormRef } from "./patient-form";
 import { useToast } from "@/hooks/use-toast";
 import { X, Calendar } from "lucide-react";
 import { useLocation } from "wouter";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { z } from "zod";
 
 const PatientSchema = (

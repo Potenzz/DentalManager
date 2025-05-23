@@ -14,10 +14,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AppointmentsByDay } from "@/components/analytics/appointments-by-day";
 import { NewPatients } from "@/components/analytics/new-patients";
-import {
-  AppointmentUncheckedCreateInputObjectSchema,
-  PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/shared/schemas";
+import { AppointmentUncheckedCreateInputObjectSchema } from '@repo/db/usedSchemas';
+import { PatientUncheckedCreateInputObjectSchema } from '@repo/db/usedSchemas';
+
 import {
   Users,
   Calendar,

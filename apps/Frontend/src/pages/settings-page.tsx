@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { StaffTable } from "@/components/staffs/staff-table";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
-import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StaffForm } from "@/components/staffs/staff-form";
