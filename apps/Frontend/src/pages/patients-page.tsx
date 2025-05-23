@@ -410,7 +410,7 @@ export default function PatientsPage() {
                   ) : (
                     <>
                       <FilePlus className="h-4 w-4" />
-                      Extract Info
+                      Extract Info And Claim
                     </>
                   )}
                 </Button>
