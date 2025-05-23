@@ -6,10 +6,60 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ClaimForm } from "@/components/claims/claim-form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-// import { Patient, Appointment } from "@shared/schema";
-import { PatientUncheckedCreateInputObjectSchema, AppointmentUncheckedCreateInputObjectSchema } from "@repo/db/shared/schemas";
+import { PatientUncheckedCreateInputObjectSchema, AppointmentUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { Plus, FileCheck, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import {z} from "zod";
+import { apiRequest } from "@/lib/queryClient";
+
+//creating types out of schema auto generated.
+type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
+
+const insertAppointmentSchema = (
+  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+const updateAppointmentSchema = (
+  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .partial();
+type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
+
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
+const insertPatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
+
+const updatePatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
+
+type UpdatePatient = z.infer<typeof updatePatientSchema>;
+
 
 export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -21,19 +71,29 @@ export default function ClaimsPage() {
   const { user } = useAuth();
 
   // Fetch patients
-  const { data: patients = [], isLoading: isLoadingPatients } = useQuery<Patient[]>({
-    queryKey: ["/api/patients"],
-    enabled: !!user,
-  });
-  
+  const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
+      Patient[]
+    >({
+      queryKey: ["/api/patients/"],
+      queryFn: async () => {
+        const res = await apiRequest("GET", "/api/patients/");
+        return res.json();
+      },
+      enabled: !!user,
+    });
+    
   // Fetch appointments
-  const { 
-    data: appointments = [] as Appointment[], 
-    isLoading: isLoadingAppointments 
-  } = useQuery<Appointment[]>({
-    queryKey: ["/api/appointments"],
-    enabled: !!user,
-  });
+  const {
+      data: appointments = [] as Appointment[],
+      isLoading: isLoadingAppointments,
+    } = useQuery<Appointment[]>({
+      queryKey: ["/api/appointments/all"],
+      queryFn: async () => {
+        const res = await apiRequest("GET", "/api/appointments/all");
+        return res.json();
+      },
+      enabled: !!user,
+    });
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -59,10 +119,10 @@ export default function ClaimsPage() {
         acc.push({
           patientId: patient.id,
           patientName: `${patient.firstName} ${patient.lastName}`,
-          appointmentId: appointment.id,
+          appointmentId: Number(appointment.id),
           insuranceProvider: patient.insuranceProvider || 'N/A',
           insuranceId: patient.insuranceId || 'N/A',
-          lastAppointment: appointment.date
+          lastAppointment: String(appointment.date)
         });
       }
     }
@@ -98,7 +158,7 @@ export default function ClaimsPage() {
                 onClick={() => {
                   if (patientsWithAppointments.length > 0) {
                     const firstPatient = patientsWithAppointments[0];
-                    handleNewClaim(firstPatient.patientId, firstPatient.appointmentId);
+                    handleNewClaim(Number(firstPatient?.patientId), Number(firstPatient?.appointmentId));
                   } else {
                     toast({
                       title: "No patients available",

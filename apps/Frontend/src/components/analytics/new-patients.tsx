@@ -16,7 +16,9 @@ export function NewPatients({ patients }: NewPatientsProps) {
   patients.forEach(patient => {
     const createdDate = new Date(patient.createdAt);
     const monthIndex = createdDate.getMonth();
-    patientsByMonth[monthIndex].count += 1;
+    if (patientsByMonth[monthIndex]) {
+  patientsByMonth[monthIndex].count += 1;
+}
   });
 
   // Add some sample data for visual effect if no patients
@@ -24,9 +26,10 @@ export function NewPatients({ patients }: NewPatientsProps) {
     // Sample data pattern similar to the screenshot
     const sampleData = [17, 12, 22, 16, 15, 17, 22, 28, 20, 16];
     sampleData.forEach((value, index) => {
-      if (index < patientsByMonth.length) {
+      if (index < patientsByMonth.length ) {
+        if (patientsByMonth[index]) {
         patientsByMonth[index].count = value;
-      }
+      }}
     });
   }
 
