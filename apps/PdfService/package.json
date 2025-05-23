@@ -1,0 +1,8 @@
+{
+  "name": "pdfservice",
+  "private": true,
+  "scripts": {
+    "postinstall": "pip install -r requirements.txt",
+    "dev": "python main.py"
+  }
+}

@@ -11,7 +11,8 @@
     "db:generate": "prisma generate --schema=packages/db/prisma/schema.prisma",
     "db:migrate": "dotenv -e packages/db/.env -- prisma migrate dev --schema=packages/db/prisma/schema.prisma",
     "db:seed": "prisma db seed --schema=packages/db/prisma/schema.prisma",
-    "setup:env": "shx cp packages/db/prisma/.env.example packages/db/prisma/.env && shx cp apps/Frontend/.env.example apps/Frontend/.env && shx cp apps/Backend/.env.example apps/Backend/.env"
+    "setup:env": "shx cp packages/db/prisma/.env.example packages/db/prisma/.env && shx cp apps/Frontend/.env.example apps/Frontend/.env && shx cp apps/Backend/.env.example apps/Backend/.env",
+    "postinstall": "cd apps/pdfservice && npm run postinstall"
   },
   "prisma": {
     "seed": "ts-node packages/db/prisma/seed.ts"
