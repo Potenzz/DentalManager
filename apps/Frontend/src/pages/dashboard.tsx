@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, parse, parseISO } from "date-fns";
+import { format, parse, isValid, parseISO } from "date-fns";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { StatCard } from "@/components/ui/stat-card";
@@ -14,8 +14,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AppointmentsByDay } from "@/components/analytics/appointments-by-day";
 import { NewPatients } from "@/components/analytics/new-patients";
-import { AppointmentUncheckedCreateInputObjectSchema } from '@repo/db/usedSchemas';
-import { PatientUncheckedCreateInputObjectSchema } from '@repo/db/usedSchemas';
+import { AppointmentUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
+import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 
 import {
   Users,
@@ -630,15 +630,26 @@ export default function Dashboard() {
                   </h4>
                   <div className="mt-2 space-y-2">
                     <p>
-                      <span className="text-gray-500">Date of Birth:</span>{" "}
-                      <span className="text-gray-500">Date of Birth:</span>{" "}
-                      {format(
-                        parse(
-                          currentPatient.dateOfBirth,
-                          "yyyy-MM-dd",
-                          new Date()
-                        ),
-                        "PPP"
+                      {currentPatient.dateOfBirth ? (
+                        (() => {
+                          const dobDate = parseISO(currentPatient.dateOfBirth);
+                          return isValid(dobDate) ? (
+                            <span>
+                              <span className="text-gray-500">
+                                Date of Birth:
+                              </span>{" "}
+                              {format(dobDate, "PPP")}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">
+                              Date of Birth: N/A
+                            </span>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-gray-500">
+                          Date of Birth: N/A
+                        </span>
                       )}
                     </p>
                     <p>

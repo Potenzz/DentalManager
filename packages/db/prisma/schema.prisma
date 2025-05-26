@@ -25,6 +25,7 @@ model User {
   password     String
   patients     Patient[]
   appointments Appointment[]
+  claims       Claim[]
 }
 
 model Patient {
@@ -49,6 +50,7 @@ model Patient {
   createdAt         DateTime      @default(now())
   user              User          @relation(fields: [userId], references: [id])
   appointments      Appointment[]
+  claims            Claim[]
 }
 
 model Appointment {
@@ -68,14 +70,44 @@ model Appointment {
   patient Patient @relation(fields: [patientId], references: [id])
   user    User    @relation(fields: [userId], references: [id])
   staff   Staff?  @relation(fields: [staffId], references: [id])
+  claims  Claim[]
 }
 
 model Staff {
   id           Int           @id @default(autoincrement())
   name         String
-  email        String?       
+  email        String?
   role         String // e.g., "Dentist", "Hygienist", "Assistant"
   phone        String?
   createdAt    DateTime      @default(now())
   appointments Appointment[]
+}
+
+model Claim {
+  id            Int           @id @default(autoincrement())
+  patientId     Int
+  appointmentId Int
+  clinicalNotes String
+  serviceDate   DateTime
+  doctorName    String
+  carrier       String // e.g., "Delta MA"
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  patient       Patient       @relation(fields: [patientId], references: [id])
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
+  serviceLines  ServiceLine[]
+  User          User?         @relation(fields: [userId], references: [id])
+  userId        Int?
+}
+
+model ServiceLine {
+  id            Int     @id @default(autoincrement())
+  claimId       Int
+  procedureCode String
+  toothNumber   String?
+  surface       String?
+  quadrant      String?
+  authNumber    String?
+  billedAmount  Float
+  claim         Claim   @relation(fields: [claimId], references: [id])
 }
