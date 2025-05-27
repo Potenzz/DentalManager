@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -63,16 +63,6 @@ const updatePatientSchema = (
   .partial();
 
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
-
-function getQueryParams() {
-  const search = window.location.search;
-  const params = new URLSearchParams(search);
-  return {
-    name: params.get("name") || "",
-    memberId: params.get("memberId") || "",
-    dob: params.get("dob") || "",
-  };
-}
 
 export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -186,6 +176,18 @@ export default function ClaimsPage() {
     },
   });
 
+  const [location] = useLocation(); // gets path, e.g. "/claims"
+
+  const { name, memberId, dob } = useMemo(() => {
+    const search = window.location.search; // this gets the real query string
+    const params = new URLSearchParams(search);
+    return {
+      name: params.get("name") || "",
+      memberId: params.get("memberId") || "",
+      dob: params.get("dob") || "",
+    };
+  }, [location]); // <== re-run when route changes
+
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
@@ -194,27 +196,44 @@ export default function ClaimsPage() {
     setSelectedPatient(patientId);
     setSelectedAppointment(appointmentId);
     setIsClaimFormOpen(true);
+
+    const patient = patients.find((p) => p.id === patientId);
+    if (!patient) return;
+
+    prefillClaimForm(patient);
   };
 
   const closeClaim = () => {
     setIsClaimFormOpen(false);
     setSelectedPatient(null);
     setSelectedAppointment(null);
+    setClaimFormData({
+      patientId: null,
+      carrier: "",
+      doctorName: "",
+      serviceDate: "",
+      clinicalNotes: "",
+      serviceLines: [],
+    });
   };
 
-  const { name, memberId, dob } = getQueryParams();
   const prefillClaimForm = (patient: Patient) => {
+    const lastAppointment = appointments.find(
+      (a) => a.patientId === patient.id
+    );
+
     setClaimFormData((prev: any) => ({
       ...prev,
       patientId: patient.id,
       carrier: patient.insuranceProvider || "",
       doctorName: user?.username || "",
-      serviceDate: new Date().toISOString().slice(0, 10),
+      serviceDate: lastAppointment
+        ? new Date(lastAppointment.date).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
       clinicalNotes: "",
       serviceLines: [],
     }));
   };
-
 
   useEffect(() => {
     if (memberId && dob) {
@@ -231,13 +250,17 @@ export default function ClaimsPage() {
         const [firstName, ...rest] = name.trim().split(" ");
         const lastName = rest.join(" ") || "";
 
+        const parsedDob = new Date(dob);
+        const isValidDob = !isNaN(parsedDob.getTime());
+
         const newPatient: InsertPatient = {
           firstName,
           lastName,
-          dateOfBirth: new Date(dob),
-          gender: "unknown",
-          phone: "000-000-0000",
+          dateOfBirth: isValidDob ? parsedDob : new Date(),
+          gender: "",
+          phone: "",
           userId: user?.id ?? 1,
+          status: "active",
           insuranceId: memberId,
         };
 
@@ -255,6 +278,17 @@ export default function ClaimsPage() {
   function handleClaimSubmit(claimData: any) {
     createClaimMutation.mutate(claimData);
   }
+
+   const getDisplayProvider = (provider: string) => {
+  const insuranceMap: Record<string, string> = {
+    delta: "Delta Dental",
+    metlife: "MetLife",
+    cigna: "Cigna",
+    aetna: "Aetna",
+  };
+  return insuranceMap[provider?.toLowerCase()] || provider;
+};
+
 
   // Get unique patients with appointments
   const patientsWithAppointments = appointments.reduce(
@@ -357,18 +391,8 @@ export default function ClaimsPage() {
                         <div>
                           <h3 className="font-medium">{item.patientName}</h3>
                           <div className="text-sm text-gray-500">
-                            <span>
-                              Insurance:{" "}
-                              {item.insuranceProvider === "delta"
-                                ? "Delta Dental"
-                                : item.insuranceProvider === "metlife"
-                                  ? "MetLife"
-                                  : item.insuranceProvider === "cigna"
-                                    ? "Cigna"
-                                    : item.insuranceProvider === "aetna"
-                                      ? "Aetna"
-                                      : item.insuranceProvider}
-                            </span>
+                            <span>Insurance: {getDisplayProvider(item.insuranceProvider)}</span>
+
                             <span className="mx-2">•</span>
                             <span>ID: {item.insuranceId}</span>
                             <span className="mx-2">•</span>

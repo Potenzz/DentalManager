@@ -56,7 +56,11 @@ export function ClaimForm({
   const { toast } = useToast();
 
   // Query patient if patientId provided
-  const { data: fetchedPatient, isLoading, error } = useQuery<Patient>({
+  const {
+    data: fetchedPatient,
+    isLoading,
+    error,
+  } = useQuery<Patient>({
     queryKey: ["/api/patients/", patientId],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/patients/${patientId}`);
@@ -78,10 +82,22 @@ export function ClaimForm({
     }
   }, [fetchedPatient]);
 
-
-   // Service date state
+  // Service date state
   const [serviceDateValue, setServiceDateValue] = useState<Date>(new Date());
-  const [serviceDate, setServiceDate] = useState<string>(format(new Date(), "MM/dd/yy"));
+  const [serviceDate, setServiceDate] = useState<string>(
+    format(new Date(), "MM/dd/yy")
+  );
+
+useEffect(() => {
+  console.log("🚨 extractedData in effect:", extractedData);
+  if (extractedData?.serviceDate) {
+    const parsed = new Date(extractedData.serviceDate);
+    console.log("✅ Parsed serviceDate from extractedData:", parsed);
+    setServiceDateValue(parsed);
+    setServiceDate(format(parsed, "MM/dd/yy"));
+  }
+}, [extractedData]);
+
 
   // Clinical notes state
   const [clinicalNotes, setClinicalNotes] = useState<string>("");
@@ -121,7 +137,6 @@ export function ClaimForm({
     setPatient((prev) => (prev ? { ...prev, [field]: value } : null));
   };
 
-
   // Update service date when calendar date changes
   const onServiceDateChange = (date: Date | undefined) => {
     if (date) {
@@ -132,19 +147,19 @@ export function ClaimForm({
 
   // Determine patient date of birth format
   const formatDOB = (dob: string | undefined) => {
-  if (!dob) return "";
+    if (!dob) return "";
 
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) return dob; // already MM/DD/YYYY
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) return dob; // already MM/DD/YYYY
 
-  if (/^\d{4}-\d{2}-\d{2}/.test(dob)) {
-    const datePart = dob?.split("T")[0]; // safe optional chaining
-    if (!datePart) return "";
-    const [year, month, day] = datePart.split("-");
-    return `${month}/${day}/${year}`;
-  }
+    if (/^\d{4}-\d{2}-\d{2}/.test(dob)) {
+      const datePart = dob?.split("T")[0]; // safe optional chaining
+      if (!datePart) return "";
+      const [year, month, day] = datePart.split("-");
+      return `${month}/${day}/${year}`;
+    }
 
-  return dob;
-};
+    return dob;
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -166,7 +181,9 @@ export function ClaimForm({
                 <Input
                   id="memberId"
                   value={patient?.insuranceId || ""}
-                  onChange={(e) => updatePatientField("insuranceId", e.target.value)}
+                  onChange={(e) =>
+                    updatePatientField("insuranceId", e.target.value)
+                  }
                   disabled={isLoading}
                 />
               </div>
@@ -175,7 +192,9 @@ export function ClaimForm({
                 <Input
                   id="dateOfBirth"
                   value={formatDOB(patient?.dateOfBirth)}
-                  onChange={(e) => updatePatientField("dateOfBirth", e.target.value)}
+                  onChange={(e) =>
+                    updatePatientField("dateOfBirth", e.target.value)
+                  }
                   disabled={isLoading}
                 />
               </div>
@@ -184,7 +203,9 @@ export function ClaimForm({
                 <Input
                   id="firstName"
                   value={patient?.firstName || ""}
-                  onChange={(e) => updatePatientField("firstName", e.target.value)}
+                  onChange={(e) =>
+                    updatePatientField("firstName", e.target.value)
+                  }
                   disabled={isLoading}
                 />
               </div>
@@ -193,7 +214,9 @@ export function ClaimForm({
                 <Input
                   id="lastName"
                   value={patient?.lastName || ""}
-                  onChange={(e) => updatePatientField("lastName", e.target.value)}
+                  onChange={(e) =>
+                    updatePatientField("lastName", e.target.value)
+                  }
                   disabled={isLoading}
                 />
               </div>
