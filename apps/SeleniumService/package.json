@@ -1,0 +1,7 @@
+{
+  "name": "seleniumservice",
+  "private": true,
+  "scripts": {
+    "postinstall": "pip install -r requirements.txt"
+  }
+}

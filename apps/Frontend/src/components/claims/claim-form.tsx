@@ -105,7 +105,8 @@ useEffect(() => {
   // Doctor selection state
   const [doctor, setDoctor] = useState("doctor1");
 
-  // Service lines state with one empty default line
+  // Service lines state with one empty default line,, 
+  // note: this can be MAXIMUM 10
   const [serviceLines, setServiceLines] = useState<ServiceLine[]>([
     {
       procedureCode: "",
