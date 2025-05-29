@@ -87,11 +87,6 @@ export default function PatientsPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [formData, setFormData] = useState({
-    PatientName: "",
-    PatientMemberId: "",
-    PatientDob: "",
-  });
   const { mutate: extractPdf } = useExtractPdfData();
   const [location, navigate] = useLocation();
 

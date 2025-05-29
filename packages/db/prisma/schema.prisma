@@ -81,33 +81,37 @@ model Staff {
   phone        String?
   createdAt    DateTime      @default(now())
   appointments Appointment[]
+  claims       Claim[]       @relation("ClaimStaff")
 }
 
 model Claim {
-  id            Int           @id @default(autoincrement())
-  patientId     Int
-  appointmentId Int
-  clinicalNotes String
-  serviceDate   DateTime
-  doctorName    String
-  carrier       String // e.g., "Delta MA"
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  patient       Patient       @relation(fields: [patientId], references: [id])
-  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
-  serviceLines  ServiceLine[]
-  User          User?         @relation(fields: [userId], references: [id])
-  userId        Int?
+  id                Int           @id @default(autoincrement())
+  patientId         Int
+  appointmentId     Int
+  userId            Int
+  staffId           Int
+  remarks           String
+  serviceDate       DateTime
+  insuranceProvider String // e.g., "Delta MA"
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  status            String        @default("pending") // "pending", "completed", "cancelled", "no-show"
+
+  patient           Patient       @relation(fields: [patientId], references: [id])
+  appointment       Appointment   @relation(fields: [appointmentId], references: [id])
+  user              User?         @relation(fields: [userId], references: [id])
+  staff             Staff?        @relation("ClaimStaff", fields: [staffId], references: [id])
+  serviceLines      ServiceLine[]
 }
 
 model ServiceLine {
-  id            Int     @id @default(autoincrement())
-  claimId       Int
-  procedureCode String
-  toothNumber   String?
-  surface       String?
-  quadrant      String?
-  authNumber    String?
-  billedAmount  Float
-  claim         Claim   @relation(fields: [claimId], references: [id])
+  id             Int      @id @default(autoincrement())
+  claimId        Int
+  procedureCode  String
+  procedureDate  DateTime @db.Date
+  oralCavityArea String?
+  toothNumber    String?
+  toothSurface   String?
+  billedAmount   Float
+  claim          Claim    @relation(fields: [claimId], references: [id])
 }

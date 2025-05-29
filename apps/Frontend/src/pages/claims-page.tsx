@@ -75,11 +75,7 @@ export default function ClaimsPage() {
   const { user } = useAuth();
   const [claimFormData, setClaimFormData] = useState<any>({
     patientId: null,
-    carrier: "",
-    doctorName: "",
     serviceDate: "",
-    clinicalNotes: "",
-    serviceLines: [],
   });
 
   // Fetch patients
@@ -154,6 +150,99 @@ export default function ClaimsPage() {
     },
   });
 
+  // Update appointment mutation
+    const updateAppointmentMutation = useMutation({
+      mutationFn: async ({
+        id,
+        appointment,
+      }: {
+        id: number;
+        appointment: UpdateAppointment;
+      }) => {
+        const res = await apiRequest(
+          "PUT",
+          `/api/appointments/${id}`,
+          appointment
+        );
+        return await res.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Appointment updated successfully.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: `Failed to update appointment: ${error.message}`,
+          variant: "destructive",
+        });
+      },
+    });
+  
+  const handleAppointmentSubmit = (
+    appointmentData: InsertAppointment | UpdateAppointment
+  ) => {
+    // Converts local date to exact UTC date with no offset issues
+    function parseLocalDate(dateInput: Date | string): Date {
+      if (dateInput instanceof Date) return dateInput;
+
+      const parts = dateInput.split("-");
+      if (parts.length !== 3) {
+        throw new Error(`Invalid date format: ${dateInput}`);
+      }
+
+      const year = Number(parts[0]);
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
+
+      if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+        throw new Error(`Invalid date parts in date string: ${dateInput}`);
+      }
+
+      return new Date(year, month - 1, day); // month is 0-indexed
+    }
+
+    const rawDate = parseLocalDate(appointmentData.date);
+    const formattedDate = rawDate.toLocaleDateString("en-CA"); // YYYY-MM-DD format
+
+    // Prepare minimal data to update/create
+    const minimalData = {
+      date: rawDate.toLocaleDateString("en-CA"), // "YYYY-MM-DD" format
+      startTime: appointmentData.startTime || "09:00",
+      endTime: appointmentData.endTime || "09:30",
+      staffId: appointmentData.staffId,
+    };
+
+    // Find existing appointment for this patient on the same date
+    const existingAppointment = appointments.find(
+      (a) =>
+        a.patientId === appointmentData.patientId &&
+        new Date(a.date).toLocaleDateString("en-CA") === formattedDate
+    );
+
+    if (existingAppointment && typeof existingAppointment.id === 'number') {
+      // Update appointment with only date
+      updateAppointmentMutation.mutate({
+        id: existingAppointment.id,
+        appointment: minimalData,
+      });
+    } else {
+      // Create new appointment with required fields + defaults
+      createAppointmentMutation.mutate({
+        ...minimalData,
+        patientId: appointmentData.patientId,
+        userId:user?.id,
+        title: "Scheduled Appointment", // default title
+        type: "checkup", // default type
+      } as InsertAppointment);
+      
+    }
+  };
+
   const createClaimMutation = useMutation({
     mutationFn: async (claimData: any) => {
       const res = await apiRequest("POST", "/api/claims/", claimData);
@@ -186,7 +275,7 @@ export default function ClaimsPage() {
       memberId: params.get("memberId") || "",
       dob: params.get("dob") || "",
     };
-  }, [location]); // <== re-run when route changes
+  }, [location]);
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -209,11 +298,7 @@ export default function ClaimsPage() {
     setSelectedAppointment(null);
     setClaimFormData({
       patientId: null,
-      carrier: "",
-      doctorName: "",
       serviceDate: "",
-      clinicalNotes: "",
-      serviceLines: [],
     });
   };
 
@@ -225,13 +310,9 @@ export default function ClaimsPage() {
     setClaimFormData((prev: any) => ({
       ...prev,
       patientId: patient.id,
-      carrier: patient.insuranceProvider || "",
-      doctorName: user?.username || "",
       serviceDate: lastAppointment
         ? new Date(lastAppointment.date).toISOString().slice(0, 10)
         : new Date().toISOString().slice(0, 10),
-      clinicalNotes: "",
-      serviceLines: [],
     }));
   };
 
@@ -279,16 +360,15 @@ export default function ClaimsPage() {
     createClaimMutation.mutate(claimData);
   }
 
-   const getDisplayProvider = (provider: string) => {
-  const insuranceMap: Record<string, string> = {
-    delta: "Delta Dental",
-    metlife: "MetLife",
-    cigna: "Cigna",
-    aetna: "Aetna",
+  const getDisplayProvider = (provider: string) => {
+    const insuranceMap: Record<string, string> = {
+      delta: "Delta Dental",
+      metlife: "MetLife",
+      cigna: "Cigna",
+      aetna: "Aetna",
+    };
+    return insuranceMap[provider?.toLowerCase()] || provider;
   };
-  return insuranceMap[provider?.toLowerCase()] || provider;
-};
-
 
   // Get unique patients with appointments
   const patientsWithAppointments = appointments.reduce(
@@ -391,7 +471,10 @@ export default function ClaimsPage() {
                         <div>
                           <h3 className="font-medium">{item.patientName}</h3>
                           <div className="text-sm text-gray-500">
-                            <span>Insurance: {getDisplayProvider(item.insuranceProvider)}</span>
+                            <span>
+                              Insurance:{" "}
+                              {getDisplayProvider(item.insuranceProvider)}
+                            </span>
 
                             <span className="mx-2">•</span>
                             <span>ID: {item.insuranceId}</span>
@@ -435,6 +518,7 @@ export default function ClaimsPage() {
           onClose={closeClaim}
           extractedData={claimFormData}
           onSubmit={handleClaimSubmit}
+          onHandleAppointmentSubmit={handleAppointmentSubmit}
         />
       )}
     </div>

@@ -19,10 +19,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
+import { PatientUncheckedCreateInputObjectSchema, AppointmentUncheckedCreateInputObjectSchema} from "@repo/db/usedSchemas";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { MultipleFileUploadZone } from "../file-upload/multiple-file-upload-zone";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -31,12 +32,36 @@ const PatientSchema = (
 });
 type Patient = z.infer<typeof PatientSchema>;
 
+
+//creating types out of schema auto generated.
+type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
+
+const insertAppointmentSchema = (
+  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+const updateAppointmentSchema = (
+  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
+type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
+
+
 interface ServiceLine {
-  procedureCode: string;
+  procedure_code: string;
+  procedure_date: string;
+  oralCavityArea: string;
   toothNumber: string;
-  surface: string;
-  quad: string;
-  authNo: string;
+  toothSurface: string;
   billedAmount: string;
 }
 
@@ -44,12 +69,21 @@ interface ClaimFormProps {
   patientId?: number;
   extractedData?: Partial<Patient>;
   onSubmit: (claimData: any) => void;
+  onHandleAppointmentSubmit: (appointmentData: InsertAppointment | UpdateAppointment) => void;  
   onClose: () => void;
+}
+
+interface Staff {
+  id: string;
+  name: string;
+  role: "doctor" | "hygienist";
+  color: string;
 }
 
 export function ClaimForm({
   patientId,
   extractedData,
+  onHandleAppointmentSubmit,
   onSubmit,
   onClose,
 }: ClaimFormProps) {
@@ -82,41 +116,61 @@ export function ClaimForm({
     }
   }, [fetchedPatient]);
 
+  //Fetching staff memebers
+  const [staff, setStaff] = useState<Staff | null>(null);
+  const { data: staffMembersRaw = [] as Staff[], isLoading: isLoadingStaff } =
+    useQuery<Staff[]>({
+      queryKey: ["/api/staffs/"],
+      queryFn: async () => {
+        const res = await apiRequest("GET", "/api/staffs/");
+        return res.json();
+      },
+    });
+
   // Service date state
   const [serviceDateValue, setServiceDateValue] = useState<Date>(new Date());
   const [serviceDate, setServiceDate] = useState<string>(
-    format(new Date(), "MM/dd/yy")
+    format(new Date(), "MM/dd/yyyy")
   );
 
-useEffect(() => {
-  console.log("🚨 extractedData in effect:", extractedData);
-  if (extractedData?.serviceDate) {
-    const parsed = new Date(extractedData.serviceDate);
-    console.log("✅ Parsed serviceDate from extractedData:", parsed);
-    setServiceDateValue(parsed);
-    setServiceDate(format(parsed, "MM/dd/yy"));
-  }
-}, [extractedData]);
+  const formatServiceDate = (date: Date | undefined): string => {
+    return date ? format(date, "MM/dd/yyyy") : "";
+  };
+
+  useEffect(() => {
+    if (extractedData?.serviceDate) {
+      const parsed = new Date(extractedData.serviceDate);
+      setServiceDateValue(parsed);
+      setServiceDate(formatServiceDate(parsed));
+    }
+  }, [extractedData]);
+
+  // used in submit button to send correct date.
+  function convertToISODate(mmddyyyy: string): string {
+  const [month, day, year] = mmddyyyy.split("/");
+  return `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
+}
 
 
-  // Clinical notes state
-  const [clinicalNotes, setClinicalNotes] = useState<string>("");
+  // Remarks state
+  const [remarks, setRemarks] = useState<string>("");
 
-  // Doctor selection state
-  const [doctor, setDoctor] = useState("doctor1");
-
-  // Service lines state with one empty default line,, 
-  // note: this can be MAXIMUM 10
-  const [serviceLines, setServiceLines] = useState<ServiceLine[]>([
-    {
-      procedureCode: "",
-      toothNumber: "",
-      surface: "",
-      quad: "",
-      authNo: "",
-      billedAmount: "",
-    },
-  ]);
+  // Service lines state with one empty default line
+  const [serviceLines, setServiceLines] = useState<ServiceLine[]>([]);
+  useEffect(() => {
+    if (serviceDate) {
+      setServiceLines([
+        {
+          procedure_code: "",
+          procedure_date: serviceDate,
+          oralCavityArea: "",
+          toothNumber: "",
+          toothSurface: "",
+          billedAmount: "",
+        },
+      ]);
+    }
+  }, [serviceDate]);
 
   // Update a field in serviceLines at index
   const updateServiceLine = (
@@ -131,6 +185,11 @@ useEffect(() => {
       }
       return updated;
     });
+  };
+
+  const updateProcedureDate = (index: number, date: Date | undefined) => {
+    const formatted = formatServiceDate(date);
+    updateServiceLine(index, "procedure_date", formatted);
   };
 
   // Handle patient field changes (to make inputs controlled and editable)
@@ -149,17 +208,42 @@ useEffect(() => {
   // Determine patient date of birth format
   const formatDOB = (dob: string | undefined) => {
     if (!dob) return "";
-
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) return dob; // already MM/DD/YYYY
-
     if (/^\d{4}-\d{2}-\d{2}/.test(dob)) {
       const datePart = dob?.split("T")[0]; // safe optional chaining
       if (!datePart) return "";
       const [year, month, day] = datePart.split("-");
       return `${month}/${day}/${year}`;
     }
-
     return dob;
+  };
+
+  // FILE UPLOAD ZONE
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileUpload = (files: File[]) => {
+    setIsUploading(true);
+
+    const validFiles = files.filter((file) => file.type === "application/pdf");
+    if (validFiles.length > 10) {
+      toast({
+        title: "Too Many Files",
+        description: "You can only upload up to 10 PDFs.",
+        variant: "destructive",
+      });
+      setIsUploading(false);
+      return;
+    }
+
+    setUploadedFiles(validFiles);
+
+    toast({
+      title: "Files Selected",
+      description: `${validFiles.length} PDF file(s) ready for processing.`,
+    });
+
+    setIsUploading(false);
   };
 
   return (
@@ -225,38 +309,16 @@ useEffect(() => {
 
             {/* Clinical Notes Entry */}
             <div className="mb-4 flex items-center gap-2">
-              <Label htmlFor="clinicalNotes" className="whitespace-nowrap">
-                Clinical Notes:
+              <Label htmlFor="remarks" className="whitespace-nowrap">
+                Remarks:
               </Label>
               <Input
-                id="clinicalNotes"
+                id="remarks"
                 className="flex-grow"
                 placeholder="Paste clinical notes here"
-                value={clinicalNotes}
-                onChange={(e) => setClinicalNotes(e.target.value)}
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
               />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (clinicalNotes.trim()) {
-                    toast({
-                      title: "Field Extraction",
-                      description: "Clinical notes have been processed",
-                    });
-                    // Here you would add actual parsing logic to extract values
-                    // from the clinicalNotes and update form fields
-                  } else {
-                    toast({
-                      title: "Empty Input",
-                      description: "Please enter clinical notes to extract",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                Extract Fields
-              </Button>
             </div>
 
             {/* Service Lines */}
@@ -265,13 +327,14 @@ useEffect(() => {
                 Service Lines
               </h3>
               <div className="flex justify-end items-center mb-2">
+                {/* Service Date */}
                 <div className="flex gap-2">
                   <Label className="flex items-center">Service Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-[120px] justify-start text-left font-normal"
+                        className="w-[140px] justify-start text-left font-normal mr-4"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {serviceDate}
@@ -286,16 +349,28 @@ useEffect(() => {
                       />
                     </PopoverContent>
                   </Popover>
+                  {/* Treating doctor */}
                   <Label className="flex items-center ml-2">
                     Treating Doctor
                   </Label>
-                  <Select value={doctor} onValueChange={setDoctor}>
+                  <Select
+                    value={staff?.id || ""}
+                    onValueChange={(id) => {
+                      const selected = staffMembersRaw.find(
+                        (member) => member.id === id
+                      );
+                      if (selected) setStaff(selected);
+                    }}
+                  >
                     <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Select Doctor" />
+                      <SelectValue placeholder="Select Staff" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="doctor1">Kai Gao</SelectItem>
-                      <SelectItem value="doctor2">Jane Smith</SelectItem>
+                      {staffMembersRaw.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -303,10 +378,10 @@ useEffect(() => {
 
               <div className="grid grid-cols-6 gap-4 mb-2 font-medium text-sm text-gray-700">
                 <span>Procedure Code</span>
+                <span>Procedure Date</span>
+                <span>Oral Cavity Area</span>
                 <span>Tooth Number</span>
-                <span>Surface</span>
-                <span>Quadrant</span>
-                <span>Auth No.</span>
+                <span>Tooth Surface</span>
                 <span>Billed Amount</span>
               </div>
 
@@ -314,47 +389,52 @@ useEffect(() => {
               {serviceLines.map((line, i) => (
                 <div key={i} className="grid grid-cols-6 gap-4 mb-2">
                   <Input
-                    placeholder="e.g. D0120"
-                    value={line.procedureCode}
+                    placeholder="eg. D0120"
+                    value={line.procedure_code}
                     onChange={(e) =>
-                      updateServiceLine(i, "procedureCode", e.target.value)
+                      updateServiceLine(i, "procedure_code", e.target.value)
+                    }
+                  />
+
+                  {/* Date Picker */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {line.procedure_date || "Pick Date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={new Date(line.procedure_date)}
+                        onSelect={(date) => updateProcedureDate(i, date)}
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Input
+                    placeholder="Oral Cavity Area"
+                    value={line.oralCavityArea}
+                    onChange={(e) =>
+                      updateServiceLine(i, "oralCavityArea", e.target.value)
                     }
                   />
                   <Input
-                    placeholder="e.g. 14"
+                    placeholder="eg. 14"
                     value={line.toothNumber}
                     onChange={(e) =>
                       updateServiceLine(i, "toothNumber", e.target.value)
                     }
                   />
                   <Input
-                    placeholder="e.g. MOD"
-                    value={line.surface}
+                    placeholder="eg. MOD"
+                    value={line.toothSurface}
                     onChange={(e) =>
-                      updateServiceLine(i, "surface", e.target.value)
-                    }
-                  />
-                  <Select
-                    value={line.quad}
-                    onValueChange={(value) =>
-                      updateServiceLine(i, "quad", value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="UR">Upper Right</SelectItem>
-                      <SelectItem value="UL">Upper Left</SelectItem>
-                      <SelectItem value="LR">Lower Right</SelectItem>
-                      <SelectItem value="LL">Lower Left</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    placeholder="e.g. 123456"
-                    value={line.authNo}
-                    onChange={(e) =>
-                      updateServiceLine(i, "authNo", e.target.value)
+                      updateServiceLine(i, "toothSurface", e.target.value)
                     }
                   />
                   <Input
@@ -366,17 +446,18 @@ useEffect(() => {
                   />
                 </div>
               ))}
+
               <Button
                 variant="outline"
                 onClick={() =>
                   setServiceLines([
                     ...serviceLines,
                     {
-                      procedureCode: "",
+                      procedure_code: "",
+                      procedure_date: serviceDate,
+                      oralCavityArea: "",
                       toothNumber: "",
-                      surface: "",
-                      quad: "",
-                      authNo: "",
+                      toothSurface: "",
                       billedAmount: "",
                     },
                   ])
@@ -385,38 +466,54 @@ useEffect(() => {
                 + Add Service Line
               </Button>
 
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-2 mt-10 mb-10">
                 <Button variant="outline">Child Prophy Codes</Button>
                 <Button variant="outline">Adult Prophy Codes</Button>
                 <Button variant="outline">Customized Group Codes</Button>
                 <Button variant="outline">Map Price</Button>
               </div>
+            </div>
 
-              {/* File Upload Section */}
-              <div className="mt-4 bg-gray-100 p-3 rounded-md">
-                <p className="text-sm text-gray-500 mb-2">
-                  Please note that file types with 4 or more character
-                  extensions are not allowed, such as .DOCX, .PPTX, or .XLSX
-                </p>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Label>Select Field:</Label>
-                    <Select defaultValue="supportData">
-                      <SelectTrigger className="w-60">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="supportData">
-                          Support Data for Claim
-                        </SelectItem>
-                        <SelectItem value="xrays">X-Ray Images</SelectItem>
-                        <SelectItem value="photos">Clinical Photos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button>Upload Document</Button>
+            {/* File Upload Section */}
+            <div className="mt-4 bg-gray-100 p-4 rounded-md space-y-4">
+              <p className="text-sm text-gray-500">
+                Only PDF files allowed. You can upload up to 10 files. File
+                types with 4+ character extensions like .DOCX, .PPTX, or .XLSX
+                are not allowed.
+              </p>
+
+              <div className="flex flex-wrap gap-4 items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label>Select Field:</Label>
+                  <Select defaultValue="supportData">
+                    <SelectTrigger className="w-60">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="supportData">
+                        Support Data for Claim
+                      </SelectItem>
+                      <SelectItem value="xrays">X-Ray Images</SelectItem>
+                      <SelectItem value="photos">Clinical Photos</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+
+              <MultipleFileUploadZone
+                onFileUpload={handleFileUpload}
+                isUploading={isUploading}
+                acceptedFileTypes="application/pdf"
+                maxFiles={10}
+              />
+
+              {uploadedFiles.length > 0 && (
+                <ul className="text-sm text-gray-700 list-disc ml-6">
+                  {uploadedFiles.map((file, index) => (
+                    <li key={index}>{file.name}</li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* Insurance Carriers */}
@@ -425,7 +522,19 @@ useEffect(() => {
                 Insurance Carriers
               </h3>
               <div className="flex justify-between">
-                <Button className="w-32" variant="outline">
+                <Button
+                  className="w-32"
+                  variant="outline"
+                  onClick={() => {
+                     const appointmentData = {
+                          patientId: patientId,  
+                          date: convertToISODate(serviceDate), 
+                          staffId:staff?.id,
+                        };
+
+                  // 1. Create or update appointment
+                  onHandleAppointmentSubmit(appointmentData);}}
+                >
                   Delta MA
                 </Button>
                 <Button className="w-32" variant="outline">
