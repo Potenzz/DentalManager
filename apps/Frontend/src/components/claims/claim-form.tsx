@@ -19,7 +19,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PatientUncheckedCreateInputObjectSchema, AppointmentUncheckedCreateInputObjectSchema} from "@repo/db/usedSchemas";
+import {
+  PatientUncheckedCreateInputObjectSchema,
+  AppointmentUncheckedCreateInputObjectSchema,
+} from "@repo/db/usedSchemas";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,7 +34,6 @@ const PatientSchema = (
   appointments: true,
 });
 type Patient = z.infer<typeof PatientSchema>;
-
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -55,7 +57,6 @@ const updateAppointmentSchema = (
   .partial();
 type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
 
-
 interface ServiceLine {
   procedure_code: string;
   procedure_date: string;
@@ -69,7 +70,9 @@ interface ClaimFormProps {
   patientId?: number;
   extractedData?: Partial<Patient>;
   onSubmit: (claimData: any) => void;
-  onHandleAppointmentSubmit: (appointmentData: InsertAppointment | UpdateAppointment) => void;  
+  onHandleAppointmentSubmit: (
+    appointmentData: InsertAppointment | UpdateAppointment
+  ) => void;
   onClose: () => void;
 }
 
@@ -126,6 +129,12 @@ export function ClaimForm({
         return res.json();
       },
     });
+  useEffect(() => {
+    if (staffMembersRaw.length > 0 && !staff) {
+      const firstStaff = staffMembersRaw[0];
+      if (firstStaff) setStaff(firstStaff);
+    }
+  }, [staffMembersRaw, staff]);
 
   // Service date state
   const [serviceDateValue, setServiceDateValue] = useState<Date>(new Date());
@@ -147,10 +156,9 @@ export function ClaimForm({
 
   // used in submit button to send correct date.
   function convertToISODate(mmddyyyy: string): string {
-  const [month, day, year] = mmddyyyy.split("/");
-  return `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
-}
-
+    const [month, day, year] = mmddyyyy.split("/");
+    return `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
+  }
 
   // Remarks state
   const [remarks, setRemarks] = useState<string>("");
@@ -363,8 +371,11 @@ export function ClaimForm({
                     }}
                   >
                     <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Select Staff" />
+                      <SelectValue
+                        placeholder={staff ? staff.name : "Select Staff"}
+                      />
                     </SelectTrigger>
+
                     <SelectContent>
                       {staffMembersRaw.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
@@ -526,14 +537,18 @@ export function ClaimForm({
                   className="w-32"
                   variant="outline"
                   onClick={() => {
-                     const appointmentData = {
-                          patientId: patientId,  
-                          date: convertToISODate(serviceDate), 
-                          staffId:staff?.id,
-                        };
+                    const appointmentData = {
+                      patientId: patientId,
+                      date: convertToISODate(serviceDate),
+                      staffId: staff?.id,
+                    };
 
-                  // 1. Create or update appointment
-                  onHandleAppointmentSubmit(appointmentData);}}
+                    // 1. Create or update appointment
+                    onHandleAppointmentSubmit(appointmentData);
+                    
+                    // close form
+                    onClose();
+                  }}
                 >
                   Delta MA
                 </Button>

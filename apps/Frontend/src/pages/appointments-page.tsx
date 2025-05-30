@@ -85,7 +85,7 @@ interface ScheduledAppointment {
   id?: number;
   patientId: number;
   patientName: string;
-  staffId: string;
+  staffId: number;
   date: string | Date;
   startTime: string | Date;
   endTime: string | Date;
@@ -190,7 +190,7 @@ export default function AppointmentsPage() {
   // Handle creating a new appointment at a specific time slot and for a specific staff member
   const handleCreateAppointmentAtSlot = (
     timeSlot: TimeSlot,
-    staffId: string
+    staffId: number
   ) => {
     // Calculate end time (30 minutes after start time)
     const startHour = parseInt(timeSlot.time.split(":")[0] as string);
@@ -202,7 +202,7 @@ export default function AppointmentsPage() {
     const endTime = `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
 
     // Find staff member
-    const staff = staffMembers.find((s) => s.id === staffId);
+    const staff = staffMembers.find((s) => Number(s.id) === Number(staffId));
 
     // Pre-fill appointment form with default values
     const newAppointment = {
@@ -259,7 +259,7 @@ export default function AppointmentsPage() {
           timeSlots.find((slot) => slot.time === "09:00") || timeSlots[0];
 
         // Open appointment modal with prefilled patient
-        handleCreateAppointmentAtSlot(defaultTimeSlot!, staffId);
+        handleCreateAppointmentAtSlot(defaultTimeSlot!, Number(staffId));
 
         // Pre-select the patient in the appointment form
         const patientData = {
@@ -280,7 +280,6 @@ export default function AppointmentsPage() {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patients, user, location]);
 
   // Create appointment mutation
@@ -479,28 +478,17 @@ export default function AppointmentsPage() {
         ? `${patient.firstName} ${patient.lastName}`
         : "Unknown Patient";
 
-      // Try to determine the staff from the notes or title
-      let staffId = "doctor1"; // Default to first doctor if we can't determine
+      let staffId: number;
 
-      // Check notes first
-      if (apt.notes) {
-        // Look for "Appointment with Dr. X" or similar patterns
-        for (const staff of staffMembers) {
-          if (apt.notes.includes(staff.name)) {
-            staffId = staff.id;
-            break;
-          }
-        }
-      }
-
-      // If no match in notes, check title
-      if (staffId === "doctor1" && apt.title) {
-        for (const staff of staffMembers) {
-          if (apt.title.includes(staff.name)) {
-            staffId = staff.id;
-            break;
-          }
-        }
+      if (
+        staffMembers &&
+        staffMembers.length > 0 &&
+        staffMembers[0] !== undefined &&
+        staffMembers[0].id !== undefined
+      ) {
+        staffId = Number(apt.staffId);
+      } else {
+        staffId = 1;
       }
 
       const processed = {
@@ -515,7 +503,7 @@ export default function AppointmentsPage() {
     });
 
   // Check if appointment exists at a specific time slot and staff
-  const getAppointmentAtSlot = (timeSlot: TimeSlot, staffId: string) => {
+  const getAppointmentAtSlot = (timeSlot: TimeSlot, staffId: number) => {
     if (processedAppointments.length === 0) {
       return undefined;
     }
@@ -552,7 +540,7 @@ export default function AppointmentsPage() {
   const handleMoveAppointment = (
     appointmentId: number,
     newTimeSlot: TimeSlot,
-    newStaffId: string
+    newStaffId: number
   ) => {
     const appointment = appointments.find((a) => a.id === appointmentId);
     if (!appointment) return;
@@ -567,7 +555,7 @@ export default function AppointmentsPage() {
     const endTime = `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
 
     // Find staff member
-    const staff = staffMembers.find((s) => s.id === newStaffId);
+    const staff = staffMembers.find((s) => Number(s.id) === newStaffId);
 
     // Update appointment data
     const { id, createdAt, ...sanitizedAppointment } = appointment;
@@ -653,7 +641,7 @@ export default function AppointmentsPage() {
     staff,
   }: {
     timeSlot: TimeSlot;
-    staffId: string;
+    staffId: number;
     appointment: ScheduledAppointment | undefined;
     staff: Staff;
   }) {
@@ -851,10 +839,10 @@ export default function AppointmentsPage() {
                               <DroppableTimeSlot
                                 key={`${timeSlot.time}-${staff.id}`}
                                 timeSlot={timeSlot}
-                                staffId={staff.id}
+                                staffId={Number(staff.id)}
                                 appointment={getAppointmentAtSlot(
                                   timeSlot,
-                                  staff.id
+                                  Number(staff.id)
                                 )}
                                 staff={staff}
                               />
@@ -924,7 +912,7 @@ export default function AppointmentsPage() {
                           {
                             processedAppointments.filter(
                               (apt) =>
-                                staffMembers.find((s) => s.id === apt.staffId)
+                                staffMembers.find((s) => Number(s.id) === apt.staffId)
                                   ?.role === "doctor"
                             ).length
                           }
@@ -938,7 +926,7 @@ export default function AppointmentsPage() {
                           {
                             processedAppointments.filter(
                               (apt) =>
-                                staffMembers.find((s) => s.id === apt.staffId)
+                                staffMembers.find((s) => Number(s.id) === apt.staffId)
                                   ?.role === "hygienist"
                             ).length
                           }

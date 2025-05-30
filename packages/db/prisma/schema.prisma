@@ -57,7 +57,7 @@ model Appointment {
   id        Int      @id @default(autoincrement())
   patientId Int
   userId    Int
-  staffId   Int? // Optional: Appointment may or may not have staff assigned
+  staffId   Int
   title     String
   date      DateTime @db.Date
   startTime String // Store time as "hh:mm"
