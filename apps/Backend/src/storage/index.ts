@@ -4,6 +4,7 @@ import {
   PatientUncheckedCreateInputObjectSchema,
   UserUncheckedCreateInputObjectSchema,
   StaffUncheckedCreateInputObjectSchema,
+  ClaimUncheckedCreateInputObjectSchema,         
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
 
@@ -94,6 +95,29 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 // staff types:
 type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
+// Claim typse: 
+const insertClaimSchema = (
+  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+type InsertClaim = z.infer<typeof insertClaimSchema>;
+
+const updateClaimSchema = (
+  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .partial();
+type UpdateClaim = z.infer<typeof updateClaimSchema>;
+
+type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
+
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
@@ -127,6 +151,15 @@ export interface IStorage {
   createStaff(staff: Staff): Promise<Staff>;
   updateStaff(id: number, updates: Partial<Staff>): Promise<Staff | undefined>;
   deleteStaff(id: number): Promise<boolean>;
+
+  // Claim methods
+  getClaim(id: number): Promise<Claim | undefined>;
+  getClaimsByUserId(userId: number): Promise<Claim[]>;
+  getClaimsByPatientId(patientId: number): Promise<Claim[]>;
+  getClaimsByAppointmentId(appointmentId: number): Promise<Claim[]>;
+  createClaim(claim: InsertClaim): Promise<Claim>;
+  updateClaim(id: number, updates: UpdateClaim): Promise<Claim>;
+  deleteClaim(id: number): Promise<void>;
 }
 
 export const storage: IStorage = {
@@ -279,6 +312,47 @@ export const storage: IStorage = {
     } catch (error) {
       console.error("Error deleting staff:", error);
       return false;
+    }
+  },
+
+  // Claim methods implementation
+  async getClaim(id: number): Promise<Claim | undefined> {
+    const claim = await db.claim.findUnique({ where: { id } });
+    return claim ?? undefined;
+  },
+
+  async getClaimsByUserId(userId: number): Promise<Claim[]> {
+    return await db.claim.findMany({ where: { userId } });
+  },
+
+  async getClaimsByPatientId(patientId: number): Promise<Claim[]> {
+    return await db.claim.findMany({ where: { patientId } });
+  },
+
+  async getClaimsByAppointmentId(appointmentId: number): Promise<Claim[]> {
+    return await db.claim.findMany({ where: { appointmentId } });
+  },
+
+  async createClaim(claim: InsertClaim): Promise<Claim> {
+    return await db.claim.create({ data: claim as Claim });
+  },
+
+  async updateClaim(id: number, updates: UpdateClaim): Promise<Claim> {
+    try {
+      return await db.claim.update({
+        where: { id },
+        data: updates,
+      });
+    } catch (err) {
+      throw new Error(`Claim with ID ${id} not found`);
+    }
+  },
+
+  async deleteClaim(id: number): Promise<void> {
+    try {
+      await db.claim.delete({ where: { id } });
+    } catch (err) {
+      throw new Error(`Claim with ID ${id} not found`);
     }
   },
 };

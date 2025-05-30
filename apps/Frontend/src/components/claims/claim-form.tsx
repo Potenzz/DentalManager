@@ -35,6 +35,18 @@ const PatientSchema = (
 });
 type Patient = z.infer<typeof PatientSchema>;
 
+const updatePatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
+
+type UpdatePatient = z.infer<typeof updatePatientSchema>;
+
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
 
@@ -73,6 +85,7 @@ interface ClaimFormProps {
   onHandleAppointmentSubmit: (
     appointmentData: InsertAppointment | UpdateAppointment
   ) => void;
+  onHandleUpdatePatient: (patient: UpdatePatient & { id: number }) => void;
   onClose: () => void;
 }
 
@@ -87,11 +100,13 @@ export function ClaimForm({
   patientId,
   extractedData,
   onHandleAppointmentSubmit,
+  onHandleUpdatePatient,
   onSubmit,
   onClose,
 }: ClaimFormProps) {
   const { toast } = useToast();
 
+  const [insuranceProvider, setInsuranceProvider] = useState(null)
   // Query patient if patientId provided
   const {
     data: fetchedPatient,
@@ -252,6 +267,39 @@ export function ClaimForm({
     });
 
     setIsUploading(false);
+  };
+
+  const handleDeltaMASubmit = () => {
+    const appointmentData = {
+      patientId: patientId,
+      date: convertToISODate(serviceDate),
+      staffId: staff?.id,
+    };
+
+    // 1. Create or update appointment
+    onHandleAppointmentSubmit(appointmentData);
+
+    // 2. Update patient
+    if (patient && typeof patient.id === "number") {
+      const { id, createdAt, userId, ...sanitizedFields } = patient;
+      const updatedPatientFields = {
+        id, 
+        ... sanitizedFields,
+        insuranceProvider: "Delta MA",
+      }
+      onHandleUpdatePatient(updatedPatientFields);
+    } else {
+      toast({
+        title: "Error",
+        description: "Cannot update patient: Missing or invalid patient data",
+        variant: "destructive",
+      });
+    }
+
+    // 3. Create Claim(if not)
+
+    // 4. Close form
+    onClose();
   };
 
   return (
@@ -536,19 +584,7 @@ export function ClaimForm({
                 <Button
                   className="w-32"
                   variant="outline"
-                  onClick={() => {
-                    const appointmentData = {
-                      patientId: patientId,
-                      date: convertToISODate(serviceDate),
-                      staffId: staff?.id,
-                    };
-
-                    // 1. Create or update appointment
-                    onHandleAppointmentSubmit(appointmentData);
-                    
-                    // close form
-                    onClose();
-                  }}
+                  onClick={handleDeltaMASubmit}
                 >
                   Delta MA
                 </Button>

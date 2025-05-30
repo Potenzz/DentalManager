@@ -68,9 +68,6 @@ export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClaimFormOpen, setIsClaimFormOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<number | null>(null);
-  const [selectedAppointment, setSelectedAppointment] = useState<number | null>(
-    null
-  );
   const { toast } = useToast();
   const { user } = useAuth();
   const [claimFormData, setClaimFormData] = useState<any>({
@@ -126,6 +123,35 @@ export default function ClaimsPage() {
     },
   });
 
+  // Update patient mutation
+    const updatePatientMutation = useMutation({
+      mutationFn: async ({
+        id,
+        patient,
+      }: {
+        id: number;
+        patient: UpdatePatient;
+      }) => {
+        const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
+        return res.json();
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+        toast({
+          title: "Success",
+          description: "Patient updated successfully!",
+          variant: "default",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: `Failed to update patient: ${error.message}`,
+          variant: "destructive",
+        });
+      },
+    });
+  
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointment: InsertAppointment) => {
@@ -281,9 +307,8 @@ export default function ClaimsPage() {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  const handleNewClaim = (patientId: number, appointmentId: number) => {
+  const handleNewClaim = (patientId: number) => {
     setSelectedPatient(patientId);
-    setSelectedAppointment(appointmentId);
     setIsClaimFormOpen(true);
 
     const patient = patients.find((p) => p.id === patientId);
@@ -295,7 +320,6 @@ export default function ClaimsPage() {
   const closeClaim = () => {
     setIsClaimFormOpen(false);
     setSelectedPatient(null);
-    setSelectedAppointment(null);
     setClaimFormData({
       patientId: null,
       serviceDate: "",
@@ -398,6 +422,24 @@ export default function ClaimsPage() {
     }>
   );
 
+  // Update Patient ( for insuranceId and Insurance Provider)
+  const handleUpdatePatient = (patient: UpdatePatient & { id?: number }) => {
+    if (patient && user) {
+      const { id, ...sanitizedPatient } = patient;
+      updatePatientMutation.mutate({
+        id: Number(patient.id),
+        patient: sanitizedPatient,
+      });
+    } else {
+      console.error("No current patient or user found for update");
+      toast({
+        title: "Error",
+        description: "Cannot update patient: No patient or user found",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
       <Sidebar
@@ -429,7 +471,6 @@ export default function ClaimsPage() {
                     const firstPatient = patientsWithAppointments[0];
                     handleNewClaim(
                       Number(firstPatient?.patientId),
-                      Number(firstPatient?.appointmentId)
                     );
                   } else {
                     toast({
@@ -465,7 +506,7 @@ export default function ClaimsPage() {
                         key={item.patientId}
                         className="py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
                         onClick={() =>
-                          handleNewClaim(item.patientId, item.appointmentId)
+                          handleNewClaim(item.patientId)
                         }
                       >
                         <div>
@@ -519,6 +560,7 @@ export default function ClaimsPage() {
           extractedData={claimFormData}
           onSubmit={handleClaimSubmit}
           onHandleAppointmentSubmit={handleAppointmentSubmit}
+          onHandleUpdatePatient={handleUpdatePatient}
         />
       )}
     </div>
