@@ -2,9 +2,7 @@ import { Router } from "express";
 import { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
-import {
-  ClaimUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
+import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 
 const router = Router();
 
@@ -31,6 +29,13 @@ const updateClaimSchema = (
 
 type UpdateClaim = z.infer<typeof updateClaimSchema>;
 
+// Extend the schema to inject `userId` manually (since it's not passed by the client)
+const ExtendedClaimSchema = (
+  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).extend({
+  userId: z.number(),
+});
+
 // Routes
 
 // Get all claims for the logged-in user
@@ -48,11 +53,11 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
   try {
     const idParam = req.params.id;
     if (!idParam) {
-    return res.status(400).json({ error: "Missing claim ID" });
+      return res.status(400).json({ error: "Missing claim ID" });
     }
     const claimId = parseInt(idParam, 10);
     if (isNaN(claimId)) {
-    return res.status(400).json({ error: "Invalid claim ID" });
+      return res.status(400).json({ error: "Invalid claim ID" });
     }
 
     const claim = await storage.getClaim(claimId);
@@ -73,12 +78,16 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
 // Create a new claim
 router.post("/", async (req: Request, res: Response): Promise<any> => {
   try {
-    const claimData = ClaimSchema.parse({
+    if (Array.isArray(req.body.serviceLines)) {
+      req.body.serviceLines = { create: req.body.serviceLines };
+    }
+
+    const parsedClaim = ExtendedClaimSchema.parse({
       ...req.body,
       userId: req.user!.id,
     });
 
-    const newClaim = await storage.createClaim(claimData);
+    const newClaim = await storage.createClaim(parsedClaim);
     res.status(201).json(newClaim);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -87,7 +96,14 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
         errors: error.format(),
       });
     }
-    res.status(500).json({ message: "Failed to create claim" });
+
+    console.error("❌ Failed to create claim:", error); // logs full error to server
+
+    // Send more detailed info to the client (for dev only)
+    return res.status(500).json({
+      message: "Failed to create claim",
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 });
 
@@ -96,12 +112,12 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
   try {
     const idParam = req.params.id;
     if (!idParam) {
-    return res.status(400).json({ error: "Missing claim ID" });
+      return res.status(400).json({ error: "Missing claim ID" });
     }
 
     const claimId = parseInt(idParam, 10);
     if (isNaN(claimId)) {
-    return res.status(400).json({ error: "Invalid claim ID" });
+      return res.status(400).json({ error: "Invalid claim ID" });
     }
 
     const existingClaim = await storage.getClaim(claimId);
@@ -132,12 +148,12 @@ router.delete("/:id", async (req: Request, res: Response): Promise<any> => {
   try {
     const idParam = req.params.id;
     if (!idParam) {
-    return res.status(400).json({ error: "Missing claim ID" });
+      return res.status(400).json({ error: "Missing claim ID" });
     }
 
     const claimId = parseInt(idParam, 10);
     if (isNaN(claimId)) {
-    return res.status(400).json({ error: "Invalid claim ID" });
+      return res.status(400).json({ error: "Invalid claim ID" });
     }
 
     const existingClaim = await storage.getClaim(claimId);

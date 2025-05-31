@@ -124,34 +124,34 @@ export default function ClaimsPage() {
   });
 
   // Update patient mutation
-    const updatePatientMutation = useMutation({
-      mutationFn: async ({
-        id,
-        patient,
-      }: {
-        id: number;
-        patient: UpdatePatient;
-      }) => {
-        const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
-        return res.json();
-      },
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
-        toast({
-          title: "Success",
-          description: "Patient updated successfully!",
-          variant: "default",
-        });
-      },
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: `Failed to update patient: ${error.message}`,
-          variant: "destructive",
-        });
-      },
-    });
-  
+  const updatePatientMutation = useMutation({
+    mutationFn: async ({
+      id,
+      patient,
+    }: {
+      id: number;
+      patient: UpdatePatient;
+    }) => {
+      const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+      toast({
+        title: "Success",
+        description: "Patient updated successfully!",
+        variant: "default",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update patient: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointment: InsertAppointment) => {
@@ -177,41 +177,41 @@ export default function ClaimsPage() {
   });
 
   // Update appointment mutation
-    const updateAppointmentMutation = useMutation({
-      mutationFn: async ({
-        id,
-        appointment,
-      }: {
-        id: number;
-        appointment: UpdateAppointment;
-      }) => {
-        const res = await apiRequest(
-          "PUT",
-          `/api/appointments/${id}`,
-          appointment
-        );
-        return await res.json();
-      },
-      onSuccess: () => {
-        toast({
-          title: "Success",
-          description: "Appointment updated successfully.",
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
-      },
-      onError: (error: Error) => {
-        toast({
-          title: "Error",
-          description: `Failed to update appointment: ${error.message}`,
-          variant: "destructive",
-        });
-      },
-    });
-  
-  const handleAppointmentSubmit = (
+  const updateAppointmentMutation = useMutation({
+    mutationFn: async ({
+      id,
+      appointment,
+    }: {
+      id: number;
+      appointment: UpdateAppointment;
+    }) => {
+      const res = await apiRequest(
+        "PUT",
+        `/api/appointments/${id}`,
+        appointment
+      );
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Appointment updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update appointment: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAppointmentSubmit = async (
     appointmentData: InsertAppointment | UpdateAppointment
-  ) => {
+  ): Promise<number> => {
     // Converts local date to exact UTC date with no offset issues
     function parseLocalDate(dateInput: Date | string): Date {
       if (dateInput instanceof Date) return dateInput;
@@ -250,23 +250,39 @@ export default function ClaimsPage() {
         new Date(a.date).toLocaleDateString("en-CA") === formattedDate
     );
 
-    if (existingAppointment && typeof existingAppointment.id === 'number') {
+    if (existingAppointment && typeof existingAppointment.id === "number") {
       // Update appointment with only date
       updateAppointmentMutation.mutate({
         id: existingAppointment.id,
         appointment: minimalData,
       });
-    } else {
-      // Create new appointment with required fields + defaults
-      createAppointmentMutation.mutate({
-        ...minimalData,
-        patientId: appointmentData.patientId,
-        userId:user?.id,
-        title: "Scheduled Appointment", // default title
-        type: "checkup", // default type
-      } as InsertAppointment);
-      
+      return existingAppointment.id;
     }
+
+    return new Promise<number>((resolve, reject) => {
+      createAppointmentMutation.mutate(
+        {
+          ...minimalData,
+          patientId: appointmentData.patientId,
+          userId: user?.id,
+          title: "Scheduled Appointment",
+          type: "checkup",
+        },
+        {
+          onSuccess: (newAppointment) => {
+            resolve(newAppointment.id);
+          },
+          onError: (error) => {
+            toast({
+              title: "Error",
+              description: "Could not create appointment",
+              variant: "destructive",
+            });
+            reject(error);
+          },
+        }
+      );
+    });
   };
 
   const createClaimMutation = useMutation({
@@ -322,6 +338,15 @@ export default function ClaimsPage() {
       patientId: null,
       serviceDate: "",
     });
+
+    // Remove query parameters without reload
+    const url = new URL(window.location.href);
+    url.searchParams.delete("memberId");
+    url.searchParams.delete("dob");
+    url.searchParams.delete("name");
+
+    // Use history.replaceState to update the URL without reloading
+    window.history.replaceState({}, document.title, url.toString());
   };
 
   const prefillClaimForm = (patient: Patient) => {
@@ -376,7 +401,7 @@ export default function ClaimsPage() {
         });
       }
     }
-  }, [memberId, dob, patients]);
+  }, [memberId, dob]);
 
   function handleClaimSubmit(claimData: any) {
     createClaimMutation.mutate(claimData);
@@ -467,9 +492,7 @@ export default function ClaimsPage() {
                 onClick={() => {
                   if (patientsWithAppointments.length > 0) {
                     const firstPatient = patientsWithAppointments[0];
-                    handleNewClaim(
-                      Number(firstPatient?.patientId),
-                    );
+                    handleNewClaim(Number(firstPatient?.patientId));
                   } else {
                     toast({
                       title: "No patients available",
@@ -503,9 +526,7 @@ export default function ClaimsPage() {
                       <div
                         key={item.patientId}
                         className="py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-                        onClick={() =>
-                          handleNewClaim(item.patientId)
-                        }
+                        onClick={() => handleNewClaim(item.patientId)}
                       >
                         <div>
                           <h3 className="font-medium">{item.patientName}</h3>

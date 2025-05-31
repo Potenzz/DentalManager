@@ -255,19 +255,18 @@ export function ClaimForm({
   }, [patient]);
 
   useEffect(() => {
-  setForm((prevForm) => {
-    const updatedLines = prevForm.serviceLines.map((line) => ({
-      ...line,
-      procedureDate: serviceDate, // set all to current serviceDate string
-    }));
-    return {
-      ...prevForm,
-      serviceLines: updatedLines,
-      serviceDate, // keep form.serviceDate in sync as well
-    };
-  });
-}, [serviceDate]);
-
+    setForm((prevForm) => {
+      const updatedLines = prevForm.serviceLines.map((line) => ({
+        ...line,
+        procedureDate: serviceDate, // set all to current serviceDate string
+      }));
+      return {
+        ...prevForm,
+        serviceLines: updatedLines,
+        serviceDate, // keep form.serviceDate in sync as well
+      };
+    });
+  }, [serviceDate]);
 
   // Handle patient field changes (to make inputs controlled and editable)
   const updatePatientField = (field: keyof Patient, value: any) => {
@@ -293,18 +292,17 @@ export function ClaimForm({
   };
 
   const updateProcedureDate = (index: number, date: Date | undefined) => {
-  if (!date) return;
+    if (!date) return;
 
-  const formattedDate = format(date, "MM/dd/yyyy");
-  const updatedLines = [...form.serviceLines];
+    const formattedDate = format(date, "MM/dd/yyyy");
+    const updatedLines = [...form.serviceLines];
 
-  if (updatedLines[index]) {
-    updatedLines[index].procedureDate = formattedDate;
-  }
+    if (updatedLines[index]) {
+      updatedLines[index].procedureDate = formattedDate;
+    }
 
-  setForm({ ...form, serviceLines: updatedLines });
-};
-
+    setForm({ ...form, serviceLines: updatedLines });
+  };
 
   // FILE UPLOAD ZONE
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -335,7 +333,7 @@ export function ClaimForm({
   };
 
   // Delta MA Button Handler
-  const handleDeltaMASubmit = () => {
+  const handleDeltaMASubmit = async () => {
     const appointmentData = {
       patientId: patientId,
       date: convertToISODate(serviceDate),
@@ -343,7 +341,7 @@ export function ClaimForm({
     };
 
     // 1. Create or update appointment
-    onHandleAppointmentSubmit(appointmentData);
+    const appointmentId = await onHandleAppointmentSubmit(appointmentData);
 
     // 2. Update patient
     if (patient && typeof patient.id === "number") {
@@ -368,6 +366,7 @@ export function ClaimForm({
       staffId: Number(staff?.id),
       patientId: patient?.id,
       insuranceProvider: "Delta MA",
+      appointmentId: appointmentId!,
     });
 
     // 4. Close form
