@@ -90,6 +90,9 @@ model Claim {
   appointmentId     Int
   userId            Int
   staffId           Int
+  patientName       String
+  memberId          String        
+  dateOfBirth       DateTime      @db.Date
   remarks           String
   serviceDate       DateTime
   insuranceProvider String // e.g., "Delta MA"

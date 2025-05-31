@@ -279,8 +279,6 @@ export default function ClaimsPage() {
         title: "Claim submitted successfully",
         variant: "default",
       });
-      closeClaim();
-      // optionally refetch claims or appointments if needed
     },
     onError: (error: any) => {
       toast({

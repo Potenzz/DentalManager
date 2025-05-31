@@ -27,6 +27,7 @@ import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { MultipleFileUploadZone } from "../file-upload/multiple-file-upload-zone";
+import { useAuth } from "@/hooks/use-auth";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -70,18 +71,33 @@ const updateAppointmentSchema = (
 type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
 
 interface ServiceLine {
-  procedure_code: string;
-  procedure_date: string;
-  oralCavityArea: string;
-  toothNumber: string;
-  toothSurface: string;
-  billedAmount: string;
+  procedureCode: string;
+  procedureDate: string; // YYYY-MM-DD
+  oralCavityArea?: string;
+  toothNumber?: string;
+  toothSurface?: string;
+  billedAmount: number;
+}
+
+interface ClaimFormData {
+  patientId: number;
+  appointmentId: number;
+  userId: number;
+  staffId: number;
+  patientName: string;
+  memberId: string;
+  dateOfBirth: string;
+  remarks: string;
+  serviceDate: string; // YYYY-MM-DD
+  insuranceProvider: string;
+  status: string; // default "pending"
+  serviceLines: ServiceLine[];
 }
 
 interface ClaimFormProps {
-  patientId?: number;
+  patientId: number;
   extractedData?: Partial<Patient>;
-  onSubmit: (claimData: any) => void;
+  onSubmit: (data: ClaimFormData) => void;
   onHandleAppointmentSubmit: (
     appointmentData: InsertAppointment | UpdateAppointment
   ) => void;
@@ -105,9 +121,14 @@ export function ClaimForm({
   onClose,
 }: ClaimFormProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const [insuranceProvider, setInsuranceProvider] = useState(null)
-  // Query patient if patientId provided
+  // Patient state - initialize from extractedData or null (new patient)
+  const [patient, setPatient] = useState<Patient | null>(
+    extractedData ? ({ ...extractedData } as Patient) : null
+  );
+
+  // Query patient
   const {
     data: fetchedPatient,
     isLoading,
@@ -121,11 +142,6 @@ export function ClaimForm({
     },
     enabled: !!patientId,
   });
-
-  // Patient state - initialize from extractedData or null (new patient)
-  const [patient, setPatient] = useState<Patient | null>(
-    extractedData ? ({ ...extractedData } as Patient) : null
-  );
 
   // Sync fetched patient when available
   useEffect(() => {
@@ -175,56 +191,13 @@ export function ClaimForm({
     return `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
   }
 
-  // Remarks state
-  const [remarks, setRemarks] = useState<string>("");
-
-  // Service lines state with one empty default line
-  const [serviceLines, setServiceLines] = useState<ServiceLine[]>([]);
-  useEffect(() => {
-    if (serviceDate) {
-      setServiceLines([
-        {
-          procedure_code: "",
-          procedure_date: serviceDate,
-          oralCavityArea: "",
-          toothNumber: "",
-          toothSurface: "",
-          billedAmount: "",
-        },
-      ]);
-    }
-  }, [serviceDate]);
-
-  // Update a field in serviceLines at index
-  const updateServiceLine = (
-    index: number,
-    field: keyof ServiceLine,
-    value: string
-  ) => {
-    setServiceLines((prev) => {
-      const updated = [...prev];
-      if (updated[index]) {
-        updated[index][field] = value;
-      }
-      return updated;
-    });
-  };
-
-  const updateProcedureDate = (index: number, date: Date | undefined) => {
-    const formatted = formatServiceDate(date);
-    updateServiceLine(index, "procedure_date", formatted);
-  };
-
-  // Handle patient field changes (to make inputs controlled and editable)
-  const updatePatientField = (field: keyof Patient, value: any) => {
-    setPatient((prev) => (prev ? { ...prev, [field]: value } : null));
-  };
-
   // Update service date when calendar date changes
   const onServiceDateChange = (date: Date | undefined) => {
     if (date) {
+      const formattedDate = format(date, "MM/dd/yyyy");
       setServiceDateValue(date);
-      setServiceDate(format(date, "MM/dd/yy"));
+      setServiceDate(formattedDate);
+      setForm((prev) => ({ ...prev, serviceDate: formattedDate }));
     }
   };
 
@@ -240,6 +213,98 @@ export function ClaimForm({
     }
     return dob;
   };
+
+  // MAIN FORM INITIAL STATE
+  const [form, setForm] = useState<ClaimFormData>({
+    patientId: patientId || 0,
+    appointmentId: 0, //need to update
+    userId: Number(user?.id),
+    staffId: Number(staff?.id),
+    patientName: `${patient?.firstName} ${patient?.lastName}`.trim(),
+    memberId: patient?.insuranceId,
+    dateOfBirth: formatDOB(patient?.dateOfBirth),
+    remarks: "",
+    serviceDate: serviceDate,
+    insuranceProvider: "",
+    status: "pending",
+    serviceLines: [
+      {
+        procedureCode: "",
+        procedureDate: serviceDate,
+        oralCavityArea: "",
+        toothNumber: "",
+        toothSurface: "",
+        billedAmount: 0,
+      },
+    ],
+  });
+
+  // Sync patient data to form when patient updates
+  useEffect(() => {
+    if (patient) {
+      const fullName =
+        `${patient.firstName || ""} ${patient.lastName || ""}`.trim();
+      setForm((prev) => ({
+        ...prev,
+        patientName: fullName,
+        dateOfBirth: formatDOB(patient.dateOfBirth),
+        memberId: patient.insuranceId || "",
+        patientId: patient.id,
+      }));
+    }
+  }, [patient]);
+
+  useEffect(() => {
+  setForm((prevForm) => {
+    const updatedLines = prevForm.serviceLines.map((line) => ({
+      ...line,
+      procedureDate: serviceDate, // set all to current serviceDate string
+    }));
+    return {
+      ...prevForm,
+      serviceLines: updatedLines,
+      serviceDate, // keep form.serviceDate in sync as well
+    };
+  });
+}, [serviceDate]);
+
+
+  // Handle patient field changes (to make inputs controlled and editable)
+  const updatePatientField = (field: keyof Patient, value: any) => {
+    setPatient((prev) => (prev ? { ...prev, [field]: value } : null));
+  };
+
+  const updateServiceLine = (
+    index: number,
+    field: keyof ServiceLine,
+    value: any
+  ) => {
+    const updatedLines = [...form.serviceLines];
+
+    if (updatedLines[index]) {
+      if (field === "billedAmount") {
+        updatedLines[index][field] = parseFloat(value) || 0;
+      } else {
+        updatedLines[index][field] = value;
+      }
+    }
+
+    setForm({ ...form, serviceLines: updatedLines });
+  };
+
+  const updateProcedureDate = (index: number, date: Date | undefined) => {
+  if (!date) return;
+
+  const formattedDate = format(date, "MM/dd/yyyy");
+  const updatedLines = [...form.serviceLines];
+
+  if (updatedLines[index]) {
+    updatedLines[index].procedureDate = formattedDate;
+  }
+
+  setForm({ ...form, serviceLines: updatedLines });
+};
+
 
   // FILE UPLOAD ZONE
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -269,6 +334,7 @@ export function ClaimForm({
     setIsUploading(false);
   };
 
+  // Delta MA Button Handler
   const handleDeltaMASubmit = () => {
     const appointmentData = {
       patientId: patientId,
@@ -283,10 +349,10 @@ export function ClaimForm({
     if (patient && typeof patient.id === "number") {
       const { id, createdAt, userId, ...sanitizedFields } = patient;
       const updatedPatientFields = {
-        id, 
-        ... sanitizedFields,
+        id,
+        ...sanitizedFields,
         insuranceProvider: "Delta MA",
-      }
+      };
       onHandleUpdatePatient(updatedPatientFields);
     } else {
       toast({
@@ -297,6 +363,12 @@ export function ClaimForm({
     }
 
     // 3. Create Claim(if not)
+    onSubmit({
+      ...form,
+      staffId: Number(staff?.id),
+      patientId: patient?.id,
+      insuranceProvider: "Delta MA",
+    });
 
     // 4. Close form
     onClose();
@@ -321,21 +393,24 @@ export function ClaimForm({
                 <Label htmlFor="memberId">Member ID</Label>
                 <Input
                   id="memberId"
-                  value={patient?.insuranceId || ""}
+                  value={form.memberId}
                   onChange={(e) =>
-                    updatePatientField("insuranceId", e.target.value)
+                    setForm({ ...form, memberId: e.target.value })
                   }
-                  disabled={isLoading}
                 />
               </div>
               <div>
                 <Label htmlFor="dateOfBirth">Date Of Birth</Label>
                 <Input
                   id="dateOfBirth"
-                  value={formatDOB(patient?.dateOfBirth)}
-                  onChange={(e) =>
-                    updatePatientField("dateOfBirth", e.target.value)
-                  }
+                  value={form.dateOfBirth}
+                  onChange={(e) => {
+                    updatePatientField("dateOfBirth", e.target.value);
+                    setForm((prev) => ({
+                      ...prev,
+                      dateOfBirth: e.target.value,
+                    }));
+                  }}
                   disabled={isLoading}
                 />
               </div>
@@ -344,9 +419,14 @@ export function ClaimForm({
                 <Input
                   id="firstName"
                   value={patient?.firstName || ""}
-                  onChange={(e) =>
-                    updatePatientField("firstName", e.target.value)
-                  }
+                  onChange={(e) => {
+                    updatePatientField("firstName", e.target.value);
+                    setForm((prev) => ({
+                      ...prev,
+                      patientName:
+                        `${e.target.value} ${patient?.lastName || ""}`.trim(),
+                    }));
+                  }}
                   disabled={isLoading}
                 />
               </div>
@@ -355,9 +435,14 @@ export function ClaimForm({
                 <Input
                   id="lastName"
                   value={patient?.lastName || ""}
-                  onChange={(e) =>
-                    updatePatientField("lastName", e.target.value)
-                  }
+                  onChange={(e) => {
+                    updatePatientField("lastName", e.target.value);
+                    setForm((prev) => ({
+                      ...prev,
+                      patientName:
+                        `${patient?.firstName || ""} ${e.target.value}`.trim(),
+                    }));
+                  }}
                   disabled={isLoading}
                 />
               </div>
@@ -372,8 +457,8 @@ export function ClaimForm({
                 id="remarks"
                 className="flex-grow"
                 placeholder="Paste clinical notes here"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
+                value={form.remarks}
+                onChange={(e) => setForm({ ...form, remarks: e.target.value })}
               />
             </div>
 
@@ -393,7 +478,7 @@ export function ClaimForm({
                         className="w-[140px] justify-start text-left font-normal mr-4"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {serviceDate}
+                        {form.serviceDate}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -415,7 +500,13 @@ export function ClaimForm({
                       const selected = staffMembersRaw.find(
                         (member) => member.id === id
                       );
-                      if (selected) setStaff(selected);
+                      if (selected) {
+                        setStaff(selected);
+                        setForm((prev) => ({
+                          ...prev,
+                          staffId: Number(selected.id),
+                        }));
+                      }
                     }}
                   >
                     <SelectTrigger className="w-36">
@@ -445,13 +536,13 @@ export function ClaimForm({
               </div>
 
               {/* Dynamic Rows */}
-              {serviceLines.map((line, i) => (
+              {form.serviceLines.map((line, i) => (
                 <div key={i} className="grid grid-cols-6 gap-4 mb-2">
                   <Input
                     placeholder="eg. D0120"
-                    value={line.procedure_code}
+                    value={line.procedureCode}
                     onChange={(e) =>
-                      updateServiceLine(i, "procedure_code", e.target.value)
+                      updateServiceLine(i, "procedureCode", e.target.value)
                     }
                   />
 
@@ -463,13 +554,13 @@ export function ClaimForm({
                         className="w-full text-left font-normal"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {line.procedure_date || "Pick Date"}
+                        {line.procedureDate || "Pick Date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
-                        selected={new Date(line.procedure_date)}
+                        selected={new Date(line.procedureDate)}
                         onSelect={(date) => updateProcedureDate(i, date)}
                       />
                     </PopoverContent>
@@ -498,6 +589,7 @@ export function ClaimForm({
                   />
                   <Input
                     placeholder="$0.00"
+                    type="number"
                     value={line.billedAmount}
                     onChange={(e) =>
                       updateServiceLine(i, "billedAmount", e.target.value)
@@ -509,17 +601,20 @@ export function ClaimForm({
               <Button
                 variant="outline"
                 onClick={() =>
-                  setServiceLines([
-                    ...serviceLines,
-                    {
-                      procedure_code: "",
-                      procedure_date: serviceDate,
-                      oralCavityArea: "",
-                      toothNumber: "",
-                      toothSurface: "",
-                      billedAmount: "",
-                    },
-                  ])
+                  setForm((prev) => ({
+                    ...prev,
+                    serviceLines: [
+                      ...prev.serviceLines,
+                      {
+                        procedureCode: "",
+                        procedureDate: serviceDate,
+                        oralCavityArea: "",
+                        toothNumber: "",
+                        toothSurface: "",
+                        billedAmount: 0,
+                      },
+                    ],
+                  }))
                 }
               >
                 + Add Service Line
