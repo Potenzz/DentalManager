@@ -15,7 +15,7 @@ export function MultipleFileUploadZone({
   onFileUpload, 
   isUploading, 
   acceptedFileTypes = "application/pdf",
-  maxFiles = 10,
+  maxFiles = 5,
 }: FileUploadZoneProps) {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);

@@ -227,7 +227,8 @@ export const storage: IStorage = {
     try {
       await db.patient.delete({ where: { id } });
     } catch (err) {
-      throw new Error(`Patient with ID ${id} not found`);
+      console.error("Error deleting patient:", err);
+      throw new Error(`Failed to delete patient: ${err}`);
     }
   },
 

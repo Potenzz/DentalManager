@@ -91,6 +91,8 @@ interface ClaimFormData {
   serviceDate: string; // YYYY-MM-DD
   insuranceProvider: string;
   status: string; // default "pending"
+  massdhp_username?:string,
+  massdhp_password?:string,
   serviceLines: ServiceLine[];
 }
 
@@ -102,6 +104,7 @@ interface ClaimFormProps {
     appointmentData: InsertAppointment | UpdateAppointment
   ) => void;
   onHandleUpdatePatient: (patient: UpdatePatient & { id: number }) => void;
+  onHandleForSelenium: (data: ClaimFormData) => void;
   onClose: () => void;
 }
 
@@ -117,6 +120,7 @@ export function ClaimForm({
   extractedData,
   onHandleAppointmentSubmit,
   onHandleUpdatePatient,
+  onHandleForSelenium,
   onSubmit,
   onClose,
 }: ClaimFormProps) {
@@ -170,31 +174,23 @@ export function ClaimForm({
   // Service date state
   const [serviceDateValue, setServiceDateValue] = useState<Date>(new Date());
   const [serviceDate, setServiceDate] = useState<string>(
-    format(new Date(), "MM/dd/yyyy")
+      new Date().toLocaleDateString("en-CA") // "YYYY-MM-DD"
   );
-
-  const formatServiceDate = (date: Date | undefined): string => {
-    return date ? format(date, "MM/dd/yyyy") : "";
-  };
 
   useEffect(() => {
     if (extractedData?.serviceDate) {
       const parsed = new Date(extractedData.serviceDate);
+      const isoFormatted = parsed.toLocaleDateString("en-CA");
       setServiceDateValue(parsed);
-      setServiceDate(formatServiceDate(parsed));
+      setServiceDate(isoFormatted);
     }
   }, [extractedData]);
 
-  // used in submit button to send correct date.
-  function convertToISODate(mmddyyyy: string): string {
-    const [month, day, year] = mmddyyyy.split("/");
-    return `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
-  }
 
   // Update service date when calendar date changes
   const onServiceDateChange = (date: Date | undefined) => {
     if (date) {
-      const formattedDate = format(date, "MM/dd/yyyy");
+      const formattedDate = date.toLocaleDateString("en-CA"); // "YYYY-MM-DD"
       setServiceDateValue(date);
       setServiceDate(formattedDate);
       setForm((prev) => ({ ...prev, serviceDate: formattedDate }));
@@ -215,7 +211,7 @@ export function ClaimForm({
   };
 
   // MAIN FORM INITIAL STATE
-  const [form, setForm] = useState<ClaimFormData>({
+  const [form, setForm] = useState<ClaimFormData & { uploadedFiles: File[] }>({
     patientId: patientId || 0,
     appointmentId: 0, //need to update
     userId: Number(user?.id),
@@ -227,6 +223,8 @@ export function ClaimForm({
     serviceDate: serviceDate,
     insuranceProvider: "",
     status: "pending",
+    massdhp_username: "",
+    massdhp_password: "",
     serviceLines: [
       {
         procedureCode: "",
@@ -237,6 +235,8 @@ export function ClaimForm({
         billedAmount: 0,
       },
     ],
+
+    uploadedFiles: [],
   });
 
   // Sync patient data to form when patient updates
@@ -294,7 +294,7 @@ export function ClaimForm({
   const updateProcedureDate = (index: number, date: Date | undefined) => {
     if (!date) return;
 
-    const formattedDate = format(date, "MM/dd/yyyy");
+    const formattedDate = date.toLocaleDateString("en-CA");
     const updatedLines = [...form.serviceLines];
 
     if (updatedLines[index]) {
@@ -305,24 +305,26 @@ export function ClaimForm({
   };
 
   // FILE UPLOAD ZONE
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileUpload = (files: File[]) => {
     setIsUploading(true);
 
     const validFiles = files.filter((file) => file.type === "application/pdf");
-    if (validFiles.length > 10) {
+    if (validFiles.length > 5) {
       toast({
         title: "Too Many Files",
-        description: "You can only upload up to 10 PDFs.",
+        description: "You can only upload up to 5 PDFs.",
         variant: "destructive",
       });
       setIsUploading(false);
       return;
     }
 
-    setUploadedFiles(validFiles);
+    setForm((prev) => ({
+      ...prev,
+      uploadedFiles: validFiles,
+    }));
 
     toast({
       title: "Files Selected",
@@ -334,9 +336,15 @@ export function ClaimForm({
 
   // Delta MA Button Handler
   const handleDeltaMASubmit = async () => {
+
+    function convertToISODate(mmddyyyy: string): string {
+      const [month, day, year] = mmddyyyy.split("/");
+      return `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
+    }
+
     const appointmentData = {
       patientId: patientId,
-      date: convertToISODate(serviceDate),
+      date: serviceDate,
       staffId: staff?.id,
     };
 
@@ -361,14 +369,25 @@ export function ClaimForm({
     }
 
     // 3. Create Claim(if not)
+    const { uploadedFiles, massdhp_username, massdhp_password, ...formToCreateClaim } = form;
     onSubmit({
-      ...form,
+      ...formToCreateClaim,
       staffId: Number(staff?.id),
-      patientId: patient?.id,
+      patientId: patientId,
       insuranceProvider: "Delta MA",
       appointmentId: appointmentId!,
     });
 
+    // 4. sending form data to selenium service
+    onHandleForSelenium({
+    ...form,
+    staffId: Number(staff?.id),
+    patientId: patientId,
+    insuranceProvider: "Delta MA",
+    appointmentId: appointmentId!,
+    massdhp_username: "kqkgaox@yahoo.com",
+    massdhp_password: "Lex123456", //fetch this from db, by call
+  });
     // 4. Close form
     onClose();
   };
@@ -630,9 +649,9 @@ export function ClaimForm({
             {/* File Upload Section */}
             <div className="mt-4 bg-gray-100 p-4 rounded-md space-y-4">
               <p className="text-sm text-gray-500">
-                Only PDF files allowed. You can upload up to 10 files. File
-                types with 4+ character extensions like .DOCX, .PPTX, or .XLSX
-                are not allowed.
+                Only PDF files allowed. You can upload up to 5 files. File types
+                with 4+ character extensions like .DOCX, .PPTX, or .XLSX are not
+                allowed.
               </p>
 
               <div className="flex flex-wrap gap-4 items-center justify-between">
@@ -657,12 +676,12 @@ export function ClaimForm({
                 onFileUpload={handleFileUpload}
                 isUploading={isUploading}
                 acceptedFileTypes="application/pdf"
-                maxFiles={10}
+                maxFiles={5}
               />
 
-              {uploadedFiles.length > 0 && (
+              {form.uploadedFiles.length > 0 && (
                 <ul className="text-sm text-gray-700 list-disc ml-6">
-                  {uploadedFiles.map((file, index) => (
+                  {form.uploadedFiles.map((file, index) => (
                     <li key={index}>{file.name}</li>
                   ))}
                 </ul>

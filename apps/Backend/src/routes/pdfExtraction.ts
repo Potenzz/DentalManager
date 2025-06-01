@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 const router = Router();
 import  multer from "multer";
-import forwardToPythonService from "../services/pythonClient";
+import forwardToPdfService from "../services/PdfClient";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -12,7 +12,7 @@ router.post("/extract", upload.single("pdf"), async (req: Request, res: Response
   }
 
   try {
-    const result = await forwardToPythonService(req.file);
+    const result = await forwardToPdfService(req.file);
     res.json(result);
   } catch (err) {
     console.error(err);

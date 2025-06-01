@@ -3,6 +3,9 @@ import { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
 import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
+import multer from "multer";
+import forwardToSeleniumAgent from "../services/seleniumClient";
+
 
 const router = Router();
 
@@ -37,6 +40,26 @@ const ExtendedClaimSchema = (
 });
 
 // Routes
+const multerStorage = multer.memoryStorage(); // NO DISK
+const upload = multer({ storage: multerStorage });
+
+router.post("/selenium", upload.array("pdfs"), async (req: Request, res: Response): Promise<any> => {
+  if (!req.files || !req.body.data) {
+    return res.status(400).json({ error: "Missing files or claim data for selenium" });
+  }
+
+  try {
+    const claimData = JSON.parse(req.body.data);
+    const files = req.files as Express.Multer.File[];
+
+    const result = await forwardToSeleniumAgent(claimData, files);
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to forward to selenium agent" });
+  }
+});
 
 // Get all claims for the logged-in user
 router.get("/", async (req: Request, res: Response) => {

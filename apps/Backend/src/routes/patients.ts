@@ -200,18 +200,10 @@ router.delete(
           .json({ message: "Forbidden: Patient belongs to a different user" });
       }
 
-      const appointments = await storage.getAppointmentsByPatientId(patientId);
-      console.log(appointments)
-        if (appointments.length > 0) {
-          throw new Error(`Cannot delete patient with ID ${patientId} because they have appointments`);
-          }
       // Delete patient
       await storage.deletePatient(patientId);
       res.status(204).send();
     } catch (error:any) {
-      if (error.message.includes("have appointments")) {
-        return res.status(400).json({ message: error.message });
-      }
       console.error("Delete patient error:", error);
       res.status(500).json({ message: "Failed to delete patient" });
     }

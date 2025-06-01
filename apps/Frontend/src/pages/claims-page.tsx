@@ -10,8 +10,8 @@ import {
   PatientUncheckedCreateInputObjectSchema,
   AppointmentUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
-import { FileCheck, CheckCircle, Clock, AlertCircle } from "lucide-react";
-import { format } from "date-fns";
+import { FileCheck } from "lucide-react";
+import { parse, format } from "date-fns";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -209,30 +209,33 @@ export default function ClaimsPage() {
     },
   });
 
+  // Converts local date to exact UTC date with no offset issues
+  function parseLocalDate(dateInput: Date | string): Date {
+    if (dateInput instanceof Date) return dateInput;
+
+    const dateString = dateInput.split("T")[0] || dateInput;
+
+    const parts = dateString.split("-");
+    if (parts.length !== 3) {
+      throw new Error(`Invalid date format: ${dateString}`);
+    }
+
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    const day = Number(parts[2]);
+
+    if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+      throw new Error(`Invalid date parts in date string: ${dateString}`);
+    }
+
+    return new Date(year, month - 1, day); // month is 0-indexed
+  }
+
   const handleAppointmentSubmit = async (
     appointmentData: InsertAppointment | UpdateAppointment
   ): Promise<number> => {
-    // Converts local date to exact UTC date with no offset issues
-    function parseLocalDate(dateInput: Date | string): Date {
-      if (dateInput instanceof Date) return dateInput;
-
-      const parts = dateInput.split("-");
-      if (parts.length !== 3) {
-        throw new Error(`Invalid date format: ${dateInput}`);
-      }
-
-      const year = Number(parts[0]);
-      const month = Number(parts[1]);
-      const day = Number(parts[2]);
-
-      if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
-        throw new Error(`Invalid date parts in date string: ${dateInput}`);
-      }
-
-      return new Date(year, month - 1, day); // month is 0-indexed
-    }
-
     const rawDate = parseLocalDate(appointmentData.date);
+
     const formattedDate = rawDate.toLocaleDateString("en-CA"); // YYYY-MM-DD format
 
     // Prepare minimal data to update/create
@@ -354,12 +357,14 @@ export default function ClaimsPage() {
       (a) => a.patientId === patient.id
     );
 
+    const dateToUse = lastAppointment
+      ? parseLocalDate(lastAppointment.date)
+      : new Date();
+
     setClaimFormData((prev: any) => ({
       ...prev,
       patientId: patient.id,
-      serviceDate: lastAppointment
-        ? new Date(lastAppointment.date).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10),
+      serviceDate: dateToUse.toLocaleDateString("en-CA"), // consistent "YYYY-MM-DD"
     }));
   };
 
@@ -378,13 +383,15 @@ export default function ClaimsPage() {
         const [firstName, ...rest] = name.trim().split(" ");
         const lastName = rest.join(" ") || "";
 
-        const parsedDob = new Date(dob);
+        const parsedDob = parse(dob, "M/d/yyyy", new Date()); // robust for "4/17/1964", "12/1/1975", etc.
         const isValidDob = !isNaN(parsedDob.getTime());
 
         const newPatient: InsertPatient = {
           firstName,
           lastName,
-          dateOfBirth: isValidDob ? parsedDob : new Date(),
+          dateOfBirth: isValidDob
+            ? format(parsedDob, "yyyy-MM-dd")
+            : format(new Date(), "yyyy-MM-dd"),
           gender: "",
           phone: "",
           userId: user?.id ?? 1,
@@ -458,6 +465,42 @@ export default function ClaimsPage() {
       toast({
         title: "Error",
         description: "Cannot update patient: No patient or user found",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // handle selenium
+  const handleSelenium = async (data: any) => {
+    const formData = new FormData();
+
+    formData.append("data", JSON.stringify(data));
+
+    const uploadedFiles: File[] = data.uploadedFiles ?? [];
+
+    uploadedFiles.forEach((file: File) => {
+      formData.append("pdfs", file);
+    });
+
+    try {
+      const response = await apiRequest(
+        "POST",
+        "/api/claims/selenium",
+        formData
+      );
+      const result = await response.json();
+
+      toast({
+        title: "Selenium service notified",
+        description: "Your claim data was successfully sent to Selenium.",
+        variant: "default",
+      });
+
+      return result;
+    } catch (error: any) {
+      toast({
+        title: "Selenium service error",
+        description: error.message || "An error occurred.",
         variant: "destructive",
       });
     }
@@ -580,6 +623,7 @@ export default function ClaimsPage() {
           onSubmit={handleClaimSubmit}
           onHandleAppointmentSubmit={handleAppointmentSubmit}
           onHandleUpdatePatient={handleUpdatePatient}
+          onHandleForSelenium={handleSelenium}
         />
       )}
     </div>

@@ -1,6 +1,5 @@
 from selenium import webdriver
 from selenium.common import TimeoutException
-from selenium.common.exceptions import ElementNotInteractableException
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -13,6 +12,7 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
+# this file is just for testing selenium solely.
 procedure_codes = [
     {
         "procedure_code": "D0210", 
@@ -38,7 +38,7 @@ data = {
     "massdhp_username": os.getenv("MASSDHP_USERNAME"),
     "massdhp_password": os.getenv("MASSDHP_PASSWORD"),
     "memberId": os.getenv("memberId"),
-    "dob":os.getenv("dob"),
+    "dateOfBirth":os.getenv("dob"),
     "procedure_codes": procedure_codes,
     "pdfs" : pdfs,
     "missingTeethStatus": "Yes_missing", # can be Yes_missing , No_missing, or endentulous
@@ -111,7 +111,7 @@ class AutomationMassDHP:
 
             # Fill DOB parts
             try:
-                dob_parts = data["dob"].split("/")
+                dob_parts = data["dateOfBirth"].split("/")
                 month= dob_parts[0].zfill(2)   # "12"
                 day= dob_parts[1].zfill(2)   # "13"
                 year = dob_parts[2]          # "1965"
@@ -319,7 +319,6 @@ class AutomationMassDHP:
 
 
         input("should Close?") # here it sholud get confirmation from the frontend, 
-        
 
         self.driver.close()
 
