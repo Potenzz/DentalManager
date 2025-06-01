@@ -105,7 +105,6 @@ class AutomationMassDHP:
                 ))
                 if error_msg:
                     print("Error: Invalid Member ID or Date of Birth.")
-                    input("HERE?")
                     return  "ERROR: INVALID MEMBERID OR DOB"
             except TimeoutException:
                 pass
