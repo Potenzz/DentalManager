@@ -91,8 +91,8 @@ interface ClaimFormData {
   serviceDate: string; // YYYY-MM-DD
   insuranceProvider: string;
   status: string; // default "pending"
-  massdhp_username?:string,
-  massdhp_password?:string,
+  massdhp_username?: string;
+  massdhp_password?: string;
   serviceLines: ServiceLine[];
 }
 
@@ -174,7 +174,7 @@ export function ClaimForm({
   // Service date state
   const [serviceDateValue, setServiceDateValue] = useState<Date>(new Date());
   const [serviceDate, setServiceDate] = useState<string>(
-      new Date().toLocaleDateString("en-CA") // "YYYY-MM-DD"
+    new Date().toLocaleDateString("en-CA") // "YYYY-MM-DD"
   );
 
   useEffect(() => {
@@ -185,7 +185,6 @@ export function ClaimForm({
       setServiceDate(isoFormatted);
     }
   }, [extractedData]);
-
 
   // Update service date when calendar date changes
   const onServiceDateChange = (date: Date | undefined) => {
@@ -282,7 +281,9 @@ export function ClaimForm({
 
     if (updatedLines[index]) {
       if (field === "billedAmount") {
-        updatedLines[index][field] = parseFloat(value) || 0;
+         const num = typeof value === "string" ? parseFloat(value) : value;
+        const rounded = Math.round((isNaN(num) ? 0 : num) * 100) / 100;
+        updatedLines[index][field] = rounded;
       } else {
         updatedLines[index][field] = value;
       }
@@ -334,14 +335,8 @@ export function ClaimForm({
     setIsUploading(false);
   };
 
-  // Delta MA Button Handler
-  const handleDeltaMASubmit = async () => {
-
-    function convertToISODate(mmddyyyy: string): string {
-      const [month, day, year] = mmddyyyy.split("/");
-      return `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
-    }
-
+  // Mass Health Button Handler
+  const handleMHSubmit = async () => {
     const appointmentData = {
       patientId: patientId,
       date: serviceDate,
@@ -357,7 +352,7 @@ export function ClaimForm({
       const updatedPatientFields = {
         id,
         ...sanitizedFields,
-        insuranceProvider: "Delta MA",
+        insuranceProvider: "MassHealth",
       };
       onHandleUpdatePatient(updatedPatientFields);
     } else {
@@ -369,25 +364,30 @@ export function ClaimForm({
     }
 
     // 3. Create Claim(if not)
-    const { uploadedFiles, massdhp_username, massdhp_password, ...formToCreateClaim } = form;
+    const {
+      uploadedFiles,
+      massdhp_username,
+      massdhp_password,
+      ...formToCreateClaim
+    } = form;
     onSubmit({
       ...formToCreateClaim,
       staffId: Number(staff?.id),
       patientId: patientId,
-      insuranceProvider: "Delta MA",
+      insuranceProvider: "MassHealth",
       appointmentId: appointmentId!,
     });
 
     // 4. sending form data to selenium service
     onHandleForSelenium({
-    ...form,
-    staffId: Number(staff?.id),
-    patientId: patientId,
-    insuranceProvider: "Delta MA",
-    appointmentId: appointmentId!,
-    massdhp_username: "kqkgaox@yahoo.com",
-    massdhp_password: "Lex123456", //fetch this from db, by call
-  });
+      ...form,
+      staffId: Number(staff?.id),
+      patientId: patientId,
+      insuranceProvider: "Mass Health",
+      appointmentId: appointmentId!,
+      massdhp_username: "kqkgaox@yahoo.com",
+      massdhp_password: "Lex123456", //fetch this from db, by call
+    });
     // 4. Close form
     onClose();
   };
@@ -606,12 +606,22 @@ export function ClaimForm({
                     }
                   />
                   <Input
-                    placeholder="$0.00"
                     type="number"
-                    value={line.billedAmount}
-                    onChange={(e) =>
-                      updateServiceLine(i, "billedAmount", e.target.value)
-                    }
+                    step="0.01"
+                    placeholder="$0.00"
+                    value={line.billedAmount === 0 ? "" : line.billedAmount}
+                    onChange={(e) => {
+                      updateServiceLine(i, "billedAmount", e.target.value);
+                    }}
+                    onBlur={(e) => {
+                      const val = parseFloat(e.target.value);
+                      const rounded = Math.round(val * 100) / 100;
+                      updateServiceLine(
+                        i,
+                        "billedAmount",
+                        isNaN(rounded) ? 0 : rounded
+                      );
+                    }}
                   />
                 </div>
               ))}
@@ -697,12 +707,12 @@ export function ClaimForm({
                 <Button
                   className="w-32"
                   variant="outline"
-                  onClick={handleDeltaMASubmit}
+                  onClick={handleMHSubmit}
                 >
-                  Delta MA
+                  MH
                 </Button>
                 <Button className="w-32" variant="outline">
-                  MH
+                  Delta MA
                 </Button>
                 <Button className="w-32" variant="outline">
                   Others
