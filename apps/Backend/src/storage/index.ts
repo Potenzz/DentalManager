@@ -4,7 +4,8 @@ import {
   PatientUncheckedCreateInputObjectSchema,
   UserUncheckedCreateInputObjectSchema,
   StaffUncheckedCreateInputObjectSchema,
-  ClaimUncheckedCreateInputObjectSchema,         
+  ClaimUncheckedCreateInputObjectSchema,
+  InsuranceCredentialUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
 
@@ -95,7 +96,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 // staff types:
 type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
-// Claim typse: 
+// Claim typse:
 const insertClaimSchema = (
   ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
 ).omit({
@@ -118,6 +119,19 @@ type UpdateClaim = z.infer<typeof updateClaimSchema>;
 
 type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
 
+// InsuraneCreds types:
+type InsuranceCredential = z.infer<
+  typeof InsuranceCredentialUncheckedCreateInputObjectSchema
+>;
+
+const insertInsuranceCredentialSchema = (
+  InsuranceCredentialUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({ id: true });
+
+type InsertInsuranceCredential = z.infer<
+  typeof insertInsuranceCredentialSchema
+>;
+
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
@@ -135,7 +149,7 @@ export interface IStorage {
 
   // Appointment methods
   getAppointment(id: number): Promise<Appointment | undefined>;
-  getAllAppointments(): Promise<Appointment[]>; 
+  getAllAppointments(): Promise<Appointment[]>;
   getAppointmentsByUserId(userId: number): Promise<Appointment[]>;
   getAppointmentsByPatientId(patientId: number): Promise<Appointment[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
@@ -160,6 +174,17 @@ export interface IStorage {
   createClaim(claim: InsertClaim): Promise<Claim>;
   updateClaim(id: number, updates: UpdateClaim): Promise<Claim>;
   deleteClaim(id: number): Promise<void>;
+
+  // InsuranceCredential methods
+  getInsuranceCredentialsByUser(userId: number): Promise<InsuranceCredential[]>;
+  createInsuranceCredential(
+    data: InsertInsuranceCredential
+  ): Promise<InsuranceCredential>;
+  updateInsuranceCredential(
+    id: number,
+    updates: Partial<InsuranceCredential>
+  ): Promise<InsuranceCredential>;
+  deleteInsuranceCredential(id: number): Promise<void>;
 }
 
 export const storage: IStorage = {
@@ -355,5 +380,28 @@ export const storage: IStorage = {
     } catch (err) {
       throw new Error(`Claim with ID ${id} not found`);
     }
+  },
+
+  // Insurance Creds
+  async getInsuranceCredentialsByUser(userId: number) {
+    return await db.insuranceCredential.findMany({ where: { userId } });
+  },
+
+  async createInsuranceCredential(data: InsertInsuranceCredential) {
+    return await db.insuranceCredential.create({ data: data as InsuranceCredential });
+  },
+
+  async updateInsuranceCredential(
+    id: number,
+    updates: Partial<InsuranceCredential>
+  ) {
+    return await db.insuranceCredential.update({
+      where: { id },
+      data: updates,
+    });
+  },
+
+  async deleteInsuranceCredential(id: number) {
+    await db.insuranceCredential.delete({ where: { id } });
   },
 };

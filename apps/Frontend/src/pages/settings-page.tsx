@@ -10,6 +10,8 @@ import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StaffForm } from "@/components/staffs/staff-form";
 import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
+import { CredentialForm } from "@/components/settings/InsuranceCredForm";
+import { CredentialTable } from "@/components/settings/insuranceCredTable";
 
 // Correctly infer Staff type from zod schema
 type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
@@ -20,6 +22,7 @@ export default function SettingsPage() {
 
   // Modal and editing staff state
   const [modalOpen, setModalOpen] = useState(false);
+  const [credentialModalOpen, setCredentialModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
 
   const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
@@ -121,7 +124,7 @@ export default function SettingsPage() {
       return id;
     },
     onSuccess: () => {
-      setIsDeleteStaffOpen(false); 
+      setIsDeleteStaffOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/staffs/"] });
       toast({
         title: "Staff Removed",
@@ -217,6 +220,68 @@ export default function SettingsPage() {
       `Viewing staff member:\n${staff.name} (${staff.email || "No email"})`
     );
 
+  // MANAGE USER
+
+  const [usernameUser, setUsernameUser] = useState("");
+
+  //fetch user
+  const {
+    data: currentUser,
+    isLoading: isUserLoading,
+    isError: isUserError,
+    error: userError,
+  } = useQuery({
+    queryKey: ["/api/users/"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/users/");
+      if (!res.ok) throw new Error("Failed to fetch user");
+      return res.json();
+    },
+  });
+
+  // Populate fields after fetch
+  useEffect(() => {
+    if (currentUser) {
+      setUsernameUser(currentUser.username);
+    }
+  }, [currentUser]);
+
+  //update user mutation
+  const updateUserMutate = useMutation({
+    mutationFn: async (
+      updates: Partial<{ username: string; password: string }>
+    ) => {
+      if (!currentUser?.id) throw new Error("User not loaded");
+      const res = await apiRequest(
+        "PUT",
+        `/api/users/${currentUser.id}`,
+        updates
+      );
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || "Failed to update user");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/"] });
+      toast({
+        title: "Updated",
+        description: "Your profile has been updated.",
+        variant: "default",
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Error",
+        description: err?.message || "Failed to update user",
+        variant: "destructive",
+      });
+    },
+  });
+
+
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
       <Sidebar
@@ -270,6 +335,95 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+
+          <Card className="mt-6">
+            <CardContent className="space-y-4 py-6">
+              <h3 className="text-lg font-semibold">User Settings</h3>
+
+              {isUserLoading ? (
+                <p>Loading user...</p>
+              ) : isUserError ? (
+                <p className="text-red-500">{(userError as Error)?.message}</p>
+              ) : (
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    const password =
+                      formData.get("password")?.toString().trim() || undefined;
+
+                    updateUserMutate.mutate({
+                      username: usernameUser?.trim() || undefined,
+                      password: password || undefined,
+                    });
+                  }}
+                >
+                  <div>
+                    <label className="block text-sm font-medium">
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      name="username"
+                      value={usernameUser}
+                      onChange={(e) => setUsernameUser(e.target.value)}
+                      className="mt-1 p-2 border rounded w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      className="mt-1 p-2 border rounded w-full"
+                      placeholder="••••••••"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave blank to keep current password.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                    disabled={updateUserMutate.isPending}
+                  >
+                    {updateUserMutate.isPending ? "Saving..." : "Save Changes"}
+                  </button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+
+           {/* Credential Section */}
+          <div className="mt-8">
+            <button
+              onClick={() => setCredentialModalOpen(true)}
+              className="mb-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              Add Credential
+            </button>
+
+            <Card>
+              <CardContent>
+                <h3 className="text-lg font-semibold mb-4">Saved Credentials</h3>
+                <CredentialTable />
+              </CardContent>
+            </Card>
+          </div>
+            
+          {credentialModalOpen && currentUser?.id && (
+  <CredentialForm
+    userId={currentUser.id}
+    onClose={() => setCredentialModalOpen(false)}
+  />
+)}
+
+
         </main>
       </div>
     </div>

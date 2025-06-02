@@ -3,6 +3,9 @@ import type { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
 import { UserUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';  
+
 
 const router = Router();
 
@@ -64,6 +67,13 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
+// Function to hash password using bcrypt
+async function hashPassword(password: string) {
+  const saltRounds = 10;  // Salt rounds for bcrypt
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+  return hashedPassword;
+}
+
 // PUT: Update user
 router.put("/:id", async (req: Request, res: Response):Promise<any> => {
   try {
@@ -75,6 +85,15 @@ router.put("/:id", async (req: Request, res: Response):Promise<any> => {
 
 
     const updates = userUpdateSchema.parse(req.body);
+
+    // If password is provided and non-empty, hash it
+    if (updates.password && updates.password.trim() !== "") {
+      updates.password = await hashPassword(updates.password);
+    } else {
+      // Remove password field if empty, so it won't overwrite existing password with blank
+      delete updates.password;
+    }
+
     const updatedUser = await storage.updateUser(id, updates);
     if (!updatedUser) return res.status(404).send("User not found");
 
