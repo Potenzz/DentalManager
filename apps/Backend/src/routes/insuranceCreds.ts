@@ -39,12 +39,24 @@ router.post("/", async (req: Request, res: Response):Promise<any> => {
 
     const parseResult = insertInsuranceCredentialSchema.safeParse({ ...req.body, userId });
     if (!parseResult.success) {
-      return res.status(400).json({ error: parseResult.error.flatten() });
+      const flat = (parseResult as typeof parseResult & { error: z.ZodError<any> }).error.flatten();
+      const firstError =
+        Object.values(flat.fieldErrors)[0]?.[0] || "Invalid input";
+
+      return res.status(400).json({
+        message: firstError,
+        details: flat.fieldErrors,
+      });
     }
 
     const credential = await storage.createInsuranceCredential(parseResult.data);
     return res.status(201).json(credential);
-  } catch (err) {
+  } catch (err:any) {
+    if (err.code === "P2002") {
+    return res.status(400).json({
+      message: `Credential with this ${err.meta?.target?.join(", ")} already exists.`,
+    });
+  }
     return res.status(500).json({ error: "Failed to create credential", details: String(err) });
   }
 });

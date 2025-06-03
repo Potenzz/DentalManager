@@ -281,7 +281,6 @@ export default function SettingsPage() {
   });
 
 
-
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
       <Sidebar
@@ -336,6 +335,7 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* User Setting section */}
           <Card className="mt-6">
             <CardContent className="space-y-4 py-6">
               <h3 className="text-lg font-semibold">User Settings</h3>
@@ -399,31 +399,10 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-           {/* Credential Section */}
-          <div className="mt-8">
-            <button
-              onClick={() => setCredentialModalOpen(true)}
-              className="mb-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              Add Credential
-            </button>
-
-            <Card>
-              <CardContent>
-                <h3 className="text-lg font-semibold mb-4">Saved Credentials</h3>
-                <CredentialTable />
-              </CardContent>
-            </Card>
+          {/* Credential Section */}
+          <div className="mt-6">
+            <CredentialTable />
           </div>
-            
-          {credentialModalOpen && currentUser?.id && (
-  <CredentialForm
-    userId={currentUser.id}
-    onClose={() => setCredentialModalOpen(false)}
-  />
-)}
-
-
         </main>
       </div>
     </div>
