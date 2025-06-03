@@ -15,9 +15,22 @@ import os
 
 class AutomationMassDHP:      
     def __init__(self, data):
-        self.data = data
         self.headless = False
         self.driver = None
+
+        self.data = data
+        self.claim = data.get("claim", {})
+        self.pdfs = data.get("pdfs", [])
+
+        # Flatten values for convenience
+        self.memberId = self.claim.get("memberId", "")
+        self.dateOfBirth = self.claim.get("dateOfBirth", "")
+        self.remarks = self.claim.get("remarks", "")
+        self.massdhp_username = self.claim.get("massdhp_username", "")
+        self.massdhp_password = self.claim.get("massdhp_password", "")
+        self.serviceLines = self.claim.get("serviceLines", [])
+        self.missingTeethStatus = self.claim.get("missingTeethStatus", "")
+        self.missingTeeth = self.claim.get("missingTeeth", {})
 
     def config_driver(self):
         options = webdriver.ChromeOptions()
@@ -34,12 +47,12 @@ class AutomationMassDHP:
             # Enter email
             email_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@name='Email' and @type='text']")))
             email_field.clear()
-            email_field.send_keys(self.data["claim"]["massdhp_username"])
+            email_field.send_keys(self.massdhp_username)
 
             # Enter password
             password_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@name='Pass' and @type='password']")))
             password_field.clear()
-            password_field.send_keys(self.data["claim"]["massdhp_password"])
+            password_field.send_keys(self.massdhp_password)
 
             # Click login
             login_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='submit' and @value='Login']")))
@@ -66,11 +79,11 @@ class AutomationMassDHP:
             # Fill Member ID
             member_id_input = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="Text1"]')))
             member_id_input.clear()
-            member_id_input.send_keys(self.data["claim"]["memberId"])
+            member_id_input.send_keys(self.memberId)
 
             # Fill DOB parts
             try:
-                dob_parts = self.data["claim"]["dateOfBirth"].split("/")
+                dob_parts = self.dateOfBirth.split("/")
                 month= dob_parts[0].zfill(2)   # "12"
                 day= dob_parts[1].zfill(2)   # "13"
                 year = dob_parts[2]          # "1965"
@@ -124,17 +137,16 @@ class AutomationMassDHP:
 
         # 1 - Procedure Codes part
         try:
-            for proc in self.data["procedure_codes"]:
+            for proc in self.serviceLines:
                 # Wait for Procedure Code dropdown and select code
-
                 select_element = wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='Select3']")))
-                Select(select_element).select_by_value(proc['procedure_code'])
+                Select(select_element).select_by_value(proc['procedureCode'])
 
                 # Fill Procedure Date if present
-                if proc.get("procedure_date"):
+                if proc.get("procedureDate"):
                     try:
                         # Try to normalize date to MM/DD/YYYY format
-                        parsed_date = datetime.strptime(proc["procedure_date"], "%m/%d/%Y")
+                        parsed_date = datetime.strptime(proc["procedureDate"], "%Y-%m-%d")
                         formatted_date = parsed_date.strftime("%m/%d/%Y")
 
                         date_xpath = "//input[@name='ProcedureDate']"
@@ -168,10 +180,10 @@ class AutomationMassDHP:
 
 
                 # Fill Fees if present
-                if proc.get("fees"):
+                if proc.get("billedAmount"):
                     fees_xpath = "//input[@name='ProcedureFee']"
                     wait.until(EC.presence_of_element_located((By.XPATH, fees_xpath))).clear()
-                    self.driver.find_element(By.XPATH, fees_xpath).send_keys(proc["fees"])
+                    self.driver.find_element(By.XPATH, fees_xpath).send_keys(proc["billedAmount"])
 
                 # Click "Add Procedure" button
                 add_proc_xpath = "//input[@type='submit' and @value='Add Procedure']"
@@ -190,7 +202,8 @@ class AutomationMassDHP:
         # 2 - Upload PDFs: 
         try: 
             
-            pdfs_abs = [proc for proc in self.data.get("pdfs", [])]
+            pdfs_abs = [proc for proc in self.pdfs]
+        
 
             with tempfile.TemporaryDirectory() as tmp_dir:
                 for pdf_obj in pdfs_abs:
@@ -219,7 +232,7 @@ class AutomationMassDHP:
         # 3 - Indicate Missing Teeth Part
         try: 
             # Handle the missing teeth section based on the status
-            missing_status = self.data.get("missingTeethStatus")
+            missing_status = self.missingTeethStatus
             
             if missing_status == "No_missing":
                 missing_teeth_no = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='checkbox' and @name='PAU_Step3_Checkbox1']")))
@@ -230,7 +243,7 @@ class AutomationMassDHP:
                 missing_teeth_edentulous.click()
 
             elif missing_status == "Yes_missing":
-                missing_teeth_dict = self.data.get("missingTeeth", {})
+                missing_teeth_dict = self.missingTeeth
 
                 # For each tooth in the missing teeth dict, select the dropdown option
                 for tooth_name, value in missing_teeth_dict.items():
@@ -254,7 +267,7 @@ class AutomationMassDHP:
         try:
             textarea = wait.until(EC.presence_of_element_located((By.XPATH, "//textarea[@name='Remarks']")))
             textarea.clear()
-            textarea.send_keys(self.data["remarks"])
+            textarea.send_keys(self.remarks)
 
             # Wait for update button and click it
             update_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='submit' and @value='Update Remarks']")))
@@ -277,20 +290,20 @@ class AutomationMassDHP:
         time.sleep(3)
         value = self.login()
         if value.startswith("ERROR"):
-            self.driver.close()
+            # self.driver.close()
             return value
         
 
         time.sleep(5)
         value2 = self.step1()
         if value2.startswith("ERROR"):
-            self.driver.close()
+            # self.driver.close()
             return value2
 
         time.sleep(5)
         value3 = self.step2()
         if value3.startswith("ERROR"):
-            self.driver.close()
+            # self.driver.close()
             return value3
 
 
