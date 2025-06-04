@@ -90,9 +90,8 @@ interface ClaimFormData {
   remarks: string;
   serviceDate: string; // YYYY-MM-DD
   insuranceProvider: string;
+  insuranceSiteKey?:string;
   status: string; // default "pending"
-  massdhp_username?: string;
-  massdhp_password?: string;
   serviceLines: ServiceLine[];
 }
 
@@ -212,7 +211,7 @@ export function ClaimForm({
   // MAIN FORM INITIAL STATE
   const [form, setForm] = useState<ClaimFormData & { uploadedFiles: File[] }>({
     patientId: patientId || 0,
-    appointmentId: 0, //need to update
+    appointmentId: 0, 
     userId: Number(user?.id),
     staffId: Number(staff?.id),
     patientName: `${patient?.firstName} ${patient?.lastName}`.trim(),
@@ -221,9 +220,8 @@ export function ClaimForm({
     remarks: "",
     serviceDate: serviceDate,
     insuranceProvider: "",
+    insuranceSiteKey:"",
     status: "pending",
-    massdhp_username: "",
-    massdhp_password: "",
     serviceLines: [
       {
         procedureCode: "",
@@ -366,8 +364,7 @@ export function ClaimForm({
     // 3. Create Claim(if not)
     const {
       uploadedFiles,
-      massdhp_username,
-      massdhp_password,
+      insuranceSiteKey,
       ...formToCreateClaim
     } = form;
     onSubmit({
@@ -385,8 +382,7 @@ export function ClaimForm({
       patientId: patientId,
       insuranceProvider: "Mass Health",
       appointmentId: appointmentId!,
-      massdhp_username: "kqkgaox@yahoo.com",
-      massdhp_password: "Lex123456", //fetch this from db, by call
+      insuranceSiteKey:"MH",
     });
     // 4. Close form
     onClose();

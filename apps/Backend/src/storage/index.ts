@@ -185,6 +185,7 @@ export interface IStorage {
     updates: Partial<InsuranceCredential>
   ): Promise<InsuranceCredential>;
   deleteInsuranceCredential(id: number): Promise<void>;
+  getInsuranceCredentialByUserAndSiteKey(userId: number, siteKey: string): Promise<InsuranceCredential | null>;
 }
 
 export const storage: IStorage = {
@@ -404,4 +405,10 @@ export const storage: IStorage = {
   async deleteInsuranceCredential(id: number) {
     await db.insuranceCredential.delete({ where: { id } });
   },
+
+  async getInsuranceCredentialByUserAndSiteKey(userId: number, siteKey: string) {
+  return await db.insuranceCredential.findFirst({
+    where: { userId, siteKey },
+  });
+},
 };

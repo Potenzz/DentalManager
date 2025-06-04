@@ -48,11 +48,26 @@ router.post("/selenium", upload.array("pdfs"), async (req: Request, res: Respons
     return res.status(400).json({ error: "Missing files or claim data for selenium" });
   }
 
+  if (!req.user || !req.user.id) {
+  return res.status(401).json({ error: "Unauthorized: user info missing" });
+}
+
+
   try {
     const claimData = JSON.parse(req.body.data);
     const files = req.files as Express.Multer.File[];
 
-    const result = await forwardToSeleniumAgent(claimData, files);
+    const credentials = await storage.getInsuranceCredentialByUserAndSiteKey(req.user.id, claimData.insuranceSiteKey);
+    if (!credentials) {
+      return res.status(404).json({ error: "No insurance credentials found for this provider." });
+    }
+
+    const enrichedData = {
+      ...claimData,
+      massdhpUsername: credentials.username,
+      massdhpPassword: credentials.password,
+    };
+    const result = await forwardToSeleniumAgent(enrichedData, files);
 
     res.json({ success: true, data: result });
   } catch (err) {
