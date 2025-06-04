@@ -10,11 +10,12 @@ import {
   PatientUncheckedCreateInputObjectSchema,
   AppointmentUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
-import { FileCheck } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, FileCheck } from "lucide-react";
 import { parse, format } from "date-fns";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import RecentClaims from "@/components/claims/recent-claims";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -611,6 +612,9 @@ export default function ClaimsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Recent Claims Section */}
+          <RecentClaims />
         </main>
       </div>
 

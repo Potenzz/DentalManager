@@ -132,6 +132,19 @@ type InsertInsuranceCredential = z.infer<
   typeof insertInsuranceCredentialSchema
 >;
 
+type ClaimWithServiceLines = Claim & {
+  serviceLines: {
+    id: number;
+    claimId: number;
+    procedureCode: string;
+    procedureDate: Date;
+    oralCavityArea: string | null;
+    toothNumber: string | null;
+    toothSurface: string | null;
+    billedAmount: number;
+  }[];
+};
+
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
@@ -171,6 +184,15 @@ export interface IStorage {
   getClaimsByUserId(userId: number): Promise<Claim[]>;
   getClaimsByPatientId(patientId: number): Promise<Claim[]>;
   getClaimsByAppointmentId(appointmentId: number): Promise<Claim[]>;
+  getClaimsPaginated(
+    userId: number,
+    offset: number,
+    limit: number
+  ): Promise<Claim[]>;
+  countClaimsByUserId(userId: number): Promise<number>;
+  getClaimsMetadataByUser(
+    userId: number
+  ): Promise<{ id: number; createdAt: Date; status: string }[]>;
   createClaim(claim: InsertClaim): Promise<Claim>;
   updateClaim(id: number, updates: UpdateClaim): Promise<Claim>;
   deleteClaim(id: number): Promise<void>;
@@ -185,7 +207,10 @@ export interface IStorage {
     updates: Partial<InsuranceCredential>
   ): Promise<InsuranceCredential>;
   deleteInsuranceCredential(id: number): Promise<void>;
-  getInsuranceCredentialByUserAndSiteKey(userId: number, siteKey: string): Promise<InsuranceCredential | null>;
+  getInsuranceCredentialByUserAndSiteKey(
+    userId: number,
+    siteKey: string
+  ): Promise<InsuranceCredential | null>;
 }
 
 export const storage: IStorage = {
@@ -389,7 +414,9 @@ export const storage: IStorage = {
   },
 
   async createInsuranceCredential(data: InsertInsuranceCredential) {
-    return await db.insuranceCredential.create({ data: data as InsuranceCredential });
+    return await db.insuranceCredential.create({
+      data: data as InsuranceCredential,
+    });
   },
 
   async updateInsuranceCredential(
@@ -406,9 +433,44 @@ export const storage: IStorage = {
     await db.insuranceCredential.delete({ where: { id } });
   },
 
-  async getInsuranceCredentialByUserAndSiteKey(userId: number, siteKey: string) {
-  return await db.insuranceCredential.findFirst({
-    where: { userId, siteKey },
-  });
-},
+  async getInsuranceCredentialByUserAndSiteKey(
+    userId: number,
+    siteKey: string
+  ): Promise<InsuranceCredential | null> {
+    return await db.insuranceCredential.findFirst({
+      where: { userId, siteKey },
+    });
+  },
+
+  async getClaimsPaginated(
+    userId: number,
+    offset: number,
+    limit: number
+  ): Promise<ClaimWithServiceLines[]> {
+    return db.claim.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+      include: { serviceLines: true },
+    });
+  },
+
+  async countClaimsByUserId(userId: number): Promise<number> {
+    return db.claim.count({ where: { userId } });
+  },
+
+  async getClaimsMetadataByUser(
+    userId: number
+  ): Promise<{ id: number; createdAt: Date; status: string }[]> {
+    return db.claim.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        createdAt: true,
+        status: true,
+      },
+    });
+  },
 };

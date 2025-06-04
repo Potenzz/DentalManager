@@ -76,8 +76,43 @@ router.post("/selenium", upload.array("pdfs"), async (req: Request, res: Respons
   }
 });
 
-// Get all claims for the logged-in user
+// GET /api/claims?page=1&limit=5
 router.get("/", async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 5;
+  const offset = (page - 1) * limit;
+
+  try {
+    const [claims, total] = await Promise.all([
+      storage.getClaimsPaginated(userId, offset, limit),
+      storage.countClaimsByUserId(userId),
+    ]);
+
+    res.json({
+      data: claims,
+      page,
+      limit,
+      total,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to retrieve paginated claims" });
+  }
+});
+
+// GET /api/claims/recent
+router.get("/recent", async (req: Request, res: Response) => {
+  try {
+    const claims = await storage.getClaimsMetadataByUser(req.user!.id);
+    res.json(claims); // Just ID and createdAt
+  } catch (error) {
+    res.status(500).json({ message: "Failed to retrieve recent claims" });
+  }
+});
+
+
+// Get all claims for the logged-in user
+router.get("/all", async (req: Request, res: Response) => {
   try {
     const claims = await storage.getClaimsByUserId(req.user!.id);
     res.json(claims);
@@ -85,6 +120,7 @@ router.get("/", async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to retrieve claims" });
   }
 });
+
 
 // Get a single claim by ID
 router.get("/:id", async (req: Request, res: Response): Promise<any> => {
