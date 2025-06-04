@@ -599,7 +599,7 @@ export function ClaimForm({
                     }
                   />
                   <Input
-                    placeholder="eg. MOD"
+                    placeholder="eg. 'B', 'D', 'F', 'I', 'L', 'M', 'O'"
                     value={line.toothSurface}
                     onChange={(e) =>
                       updateServiceLine(i, "toothSurface", e.target.value)

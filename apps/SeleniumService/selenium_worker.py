@@ -201,13 +201,11 @@ class AutomationMassDHP:
 
         # 2 - Upload PDFs: 
         try: 
-            
             pdfs_abs = [proc for proc in self.pdfs]
-        
 
             with tempfile.TemporaryDirectory() as tmp_dir:
                 for pdf_obj in pdfs_abs:
-                    base64_data = pdf_obj["buffer"]
+                    base64_data = pdf_obj["bufferBase64"]
                     file_name = pdf_obj.get("originalname", "tempfile.pdf")
 
                     # Full path with original filename inside temp dir
@@ -232,7 +230,7 @@ class AutomationMassDHP:
         # 3 - Indicate Missing Teeth Part
         try: 
             # Handle the missing teeth section based on the status
-            missing_status = self.missingTeethStatus
+            missing_status = self.missingTeethStatus.strip() if self.missingTeethStatus else "No_missing"
             
             if missing_status == "No_missing":
                 missing_teeth_no = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='checkbox' and @name='PAU_Step3_Checkbox1']")))
@@ -265,15 +263,16 @@ class AutomationMassDHP:
         
         # 4 - Update Remarks
         try:
-            textarea = wait.until(EC.presence_of_element_located((By.XPATH, "//textarea[@name='Remarks']")))
-            textarea.clear()
-            textarea.send_keys(self.remarks)
+            if self.remarks.strip():  
+                textarea = wait.until(EC.presence_of_element_located((By.XPATH, "//textarea[@name='Remarks']")))
+                textarea.clear()
+                textarea.send_keys(self.remarks)
 
-            # Wait for update button and click it
-            update_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='submit' and @value='Update Remarks']")))
-            update_button.click()
-            
-            time.sleep(3)
+                # Wait for update button and click it
+                update_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='submit' and @value='Update Remarks']")))
+                update_button.click()
+                
+                time.sleep(3)
             
         except Exception as e: 
             print(f"Error while filling remarks: {e}")

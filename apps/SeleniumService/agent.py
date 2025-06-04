@@ -15,8 +15,6 @@ app.add_middleware(
 @app.post("/run")
 async def run_bot(request: Request):
     data = await request.json()
-    print(data)
-    input("waiting")
     try:
         bot = AutomationMassDHP(data)
         result = bot.main_workflow("https://providers.massdhp.com/providers_login.asp")
