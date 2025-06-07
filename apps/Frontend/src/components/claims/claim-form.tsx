@@ -90,7 +90,7 @@ interface ClaimFormData {
   remarks: string;
   serviceDate: string; // YYYY-MM-DD
   insuranceProvider: string;
-  insuranceSiteKey?:string;
+  insuranceSiteKey?: string;
   status: string; // default "pending"
   serviceLines: ServiceLine[];
 }
@@ -211,7 +211,7 @@ export function ClaimForm({
   // MAIN FORM INITIAL STATE
   const [form, setForm] = useState<ClaimFormData & { uploadedFiles: File[] }>({
     patientId: patientId || 0,
-    appointmentId: 0, 
+    appointmentId: 0,
     userId: Number(user?.id),
     staffId: Number(staff?.id),
     patientName: `${patient?.firstName} ${patient?.lastName}`.trim(),
@@ -220,19 +220,16 @@ export function ClaimForm({
     remarks: "",
     serviceDate: serviceDate,
     insuranceProvider: "",
-    insuranceSiteKey:"",
+    insuranceSiteKey: "",
     status: "pending",
-    serviceLines: [
-      {
-        procedureCode: "",
-        procedureDate: serviceDate,
-        oralCavityArea: "",
-        toothNumber: "",
-        toothSurface: "",
-        billedAmount: 0,
-      },
-    ],
-
+    serviceLines: Array.from({ length: 10 }, () => ({
+      procedureCode: "",
+      procedureDate: serviceDate,
+      oralCavityArea: "",
+      toothNumber: "",
+      toothSurface: "",
+      billedAmount: 0,
+    })),
     uploadedFiles: [],
   });
 
@@ -279,7 +276,7 @@ export function ClaimForm({
 
     if (updatedLines[index]) {
       if (field === "billedAmount") {
-         const num = typeof value === "string" ? parseFloat(value) : value;
+        const num = typeof value === "string" ? parseFloat(value) : value;
         const rounded = Math.round((isNaN(num) ? 0 : num) * 100) / 100;
         updatedLines[index][field] = rounded;
       } else {
@@ -362,13 +359,15 @@ export function ClaimForm({
     }
 
     // 3. Create Claim(if not)
-    const {
-      uploadedFiles,
-      insuranceSiteKey,
-      ...formToCreateClaim
-    } = form;
+    // Filter out empty service lines (empty procedureCode)
+  const filteredServiceLines = form.serviceLines.filter(
+    (line) => line.procedureCode.trim() !== ""
+  );
+
+    const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
     onSubmit({
       ...formToCreateClaim,
+      serviceLines: filteredServiceLines,
       staffId: Number(staff?.id),
       patientId: patientId,
       insuranceProvider: "MassHealth",
@@ -378,11 +377,12 @@ export function ClaimForm({
     // 4. sending form data to selenium service
     onHandleForSelenium({
       ...form,
+      serviceLines: filteredServiceLines,      
       staffId: Number(staff?.id),
       patientId: patientId,
       insuranceProvider: "Mass Health",
       appointmentId: appointmentId!,
-      insuranceSiteKey:"MH",
+      insuranceSiteKey: "MH",
     });
     // 4. Close form
     onClose();

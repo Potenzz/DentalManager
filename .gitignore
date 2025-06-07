@@ -37,3 +37,6 @@ dist/
 
 # env
 *.env
+
+#temp
+1.html
