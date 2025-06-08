@@ -124,11 +124,12 @@ model ServiceLine {
 model InsuranceCredential {
   id       Int    @id @default(autoincrement())
   userId   Int
-  siteKey  String @unique // Unique key for site (e.g. "github", "slack")
+  siteKey  String
   username String
   password String
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@unique([userId, siteKey]) 
 }
