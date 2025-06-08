@@ -5,6 +5,12 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_BACKEND ?? "";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem("token");
+      window.location.href = "/auth"; // 👈 Redirect on invalid/expired token
+      return;
+    }
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -16,7 +22,8 @@ export async function apiRequest(
 ): Promise<Response> {
   const token = localStorage.getItem("token");
 
-  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const isFormData =
+    typeof FormData !== "undefined" && data instanceof FormData;
 
   const headers: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -27,7 +34,7 @@ export async function apiRequest(
   const res = await fetch(`${API_BASE_URL}${url}`, {
     method,
     headers,
-    body: isFormData ? data as FormData : JSON.stringify(data),
+    body: isFormData ? (data as FormData) : JSON.stringify(data),
     credentials: "include",
   });
 
