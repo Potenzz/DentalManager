@@ -28,7 +28,7 @@ async def start_workflow(request: Request):
 @app.post("/fetch-pdf")
 async def fetch_pdf():
     try:
-        bot = AutomationMassHealth().get_last_instance()
+        bot = AutomationMassHealth.get_last_instance()
         if not bot:
             return {"status": "error", "message": "No running automation session"}
         
