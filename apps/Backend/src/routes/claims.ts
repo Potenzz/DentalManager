@@ -5,6 +5,8 @@ import { z } from "zod";
 import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import multer from "multer";
 import { forwardToSeleniumAgent, forwardToSeleniumAgent2 } from "../services/seleniumClient";
+import path from "path";
+import fs from "fs";
 
 const router = Router();
 
@@ -92,14 +94,38 @@ router.post(
       return res.status(401).json({ error: "Unauthorized: user info missing" });
     }
 
-    try {
+    try{
       const result = await forwardToSeleniumAgent2();
-      res.json({ success: true, data: result });
+
+      if (result.status !== "success") {
+        return res.status(400).json({ error: result.message || "Failed to fetch PDF" });
+      }
+
+      const base64Data = result.pdf_base64;
+      const buffer = Buffer.from(base64Data, "base64");
+
+      const pdfUrl = result.pdf_url;
+      const filename = path.basename(new URL(pdfUrl).pathname);
+
+      const tempDir = path.join(__dirname, "..", "..", "temp");
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const filePath = path.join(tempDir, filename);
+      fs.writeFileSync(filePath, buffer);
+
+      return res.json({
+        success: true,
+        pdfPath: `/temp/${filename}`,
+        pdfUrl: pdfUrl,
+        fileName: filename,
+      });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to forward to selenium agent 2" });
-    }
+      console.error("Error in /selenium/fetchpdf:", err);
+      return res.status(500).json({ error: "Failed to forward to selenium agent 2" });
   }
+}
 );
 
 // GET /api/claims?page=1&limit=5
