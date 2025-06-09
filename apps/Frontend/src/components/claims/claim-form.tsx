@@ -360,9 +360,9 @@ export function ClaimForm({
 
     // 3. Create Claim(if not)
     // Filter out empty service lines (empty procedureCode)
-  const filteredServiceLines = form.serviceLines.filter(
-    (line) => line.procedureCode.trim() !== ""
-  );
+    const filteredServiceLines = form.serviceLines.filter(
+      (line) => line.procedureCode.trim() !== ""
+    );
 
     const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
     onSubmit({
@@ -377,7 +377,7 @@ export function ClaimForm({
     // 4. sending form data to selenium service
     onHandleForSelenium({
       ...form,
-      serviceLines: filteredServiceLines,      
+      serviceLines: filteredServiceLines,
       staffId: Number(staff?.id),
       patientId: patientId,
       insuranceProvider: "Mass Health",

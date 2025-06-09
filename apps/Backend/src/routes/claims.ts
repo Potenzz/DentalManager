@@ -4,8 +4,7 @@ import { storage } from "../storage";
 import { z } from "zod";
 import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import multer from "multer";
-import forwardToSeleniumAgent from "../services/seleniumClient";
-
+import { forwardToSeleniumAgent, forwardToSeleniumAgent2 } from "../services/seleniumClient";
 
 const router = Router();
 
@@ -43,38 +42,65 @@ const ExtendedClaimSchema = (
 const multerStorage = multer.memoryStorage(); // NO DISK
 const upload = multer({ storage: multerStorage });
 
-router.post("/selenium", upload.array("pdfs"), async (req: Request, res: Response): Promise<any> => {
-  if (!req.files || !req.body.data) {
-    return res.status(400).json({ error: "Missing files or claim data for selenium" });
-  }
-
-  if (!req.user || !req.user.id) {
-  return res.status(401).json({ error: "Unauthorized: user info missing" });
-}
-
-
-  try {
-    const claimData = JSON.parse(req.body.data);
-    const files = req.files as Express.Multer.File[];
-
-    const credentials = await storage.getInsuranceCredentialByUserAndSiteKey(req.user.id, claimData.insuranceSiteKey);
-    if (!credentials) {
-      return res.status(404).json({ error: "No insurance credentials found for this provider." });
+router.post(
+  "/selenium",
+  upload.array("pdfs"),
+  async (req: Request, res: Response): Promise<any> => {
+    if (!req.files || !req.body.data) {
+      return res
+        .status(400)
+        .json({ error: "Missing files or claim data for selenium" });
     }
 
-    const enrichedData = {
-      ...claimData,
-      massdhpUsername: credentials.username,
-      massdhpPassword: credentials.password,
-    };
-    const result = await forwardToSeleniumAgent(enrichedData, files);
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized: user info missing" });
+    }
 
-    res.json({ success: true, data: result });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to forward to selenium agent" });
+    try {
+      const claimData = JSON.parse(req.body.data);
+      const files = req.files as Express.Multer.File[];
+
+      const credentials = await storage.getInsuranceCredentialByUserAndSiteKey(
+        req.user.id,
+        claimData.insuranceSiteKey
+      );
+      if (!credentials) {
+        return res
+          .status(404)
+          .json({ error: "No insurance credentials found for this provider." });
+      }
+
+      const enrichedData = {
+        ...claimData,
+        massdhpUsername: credentials.username,
+        massdhpPassword: credentials.password,
+      };
+      const result = await forwardToSeleniumAgent(enrichedData, files);
+
+      res.json({ success: true, data: result });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to forward to selenium agent" });
+    }
   }
-});
+);
+
+router.post(
+  "/selenium/fetchpdf",
+  async (req: Request, res: Response): Promise<any> => {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized: user info missing" });
+    }
+
+    try {
+      const result = await forwardToSeleniumAgent2();
+      res.json({ success: true, data: result });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to forward to selenium agent 2" });
+    }
+  }
+);
 
 // GET /api/claims?page=1&limit=5
 router.get("/", async (req: Request, res: Response) => {
@@ -110,7 +136,6 @@ router.get("/recent", async (req: Request, res: Response) => {
   }
 });
 
-
 // Get all claims for the logged-in user
 router.get("/all", async (req: Request, res: Response) => {
   try {
@@ -120,7 +145,6 @@ router.get("/all", async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to retrieve claims" });
   }
 });
-
 
 // Get a single claim by ID
 router.get("/:id", async (req: Request, res: Response): Promise<any> => {

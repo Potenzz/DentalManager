@@ -11,12 +11,16 @@ from datetime import datetime
 import tempfile
 import base64
 import os
+import requests
+import json
 
+class AutomationMassHealth:    
+    last_instance = None  
 
-class AutomationMassDHP:      
     def __init__(self, data):
         self.headless = False
         self.driver = None
+        AutomationMassHealth.last_instance = self
 
         self.data = data
         self.claim = data.get("claim", {})
@@ -31,6 +35,10 @@ class AutomationMassDHP:
         self.serviceLines = self.claim.get("serviceLines", [])
         self.missingTeethStatus = self.claim.get("missingTeethStatus", "")
         self.missingTeeth = self.claim.get("missingTeeth", {})
+    
+    @staticmethod
+    def get_last_instance():
+        return AutomationMassHealth.last_instance
 
     def config_driver(self):
         options = webdriver.ChromeOptions()
@@ -279,35 +287,98 @@ class AutomationMassDHP:
             return "ERROR:REMARKS FAILED"
 
         return "Success"
+    
+
+    def reach_to_pdf(self):
+        wait = WebDriverWait(self.driver, 30)
+
+        try:
+            print("Waiting for PDF link to appear on success page...")
+            pdf_link_element = wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//a[contains(@href, '.pdf')]"))
+            )
+            print("PDF link found. Clicking it...")
+
+            # Click the PDF link
+            pdf_link_element.click()
+            time.sleep(5)
+
+            existing_windows = self.driver.window_handles
+
+            # Wait for the new tab
+            WebDriverWait(self.driver, 90).until(
+                lambda d: len(d.window_handles) > len(existing_windows)
+            )
+
+            print("Switching to PDF tab...")
+            self.driver.switch_to.window(self.driver.window_handles[1])
 
 
-    def main_workflow(self, url):
+            time.sleep(2)
+            current_url = self.driver.current_url
+            print(f"Switched to PDF tab. Current URL: {current_url}")
+
+
+             # Get full PDF URL in case it's a relative path
+            pdf_url = pdf_link_element.get_attribute("href")
+            if not pdf_url.startswith("http"):
+                base_url = self.driver.current_url.split("/providers")[0]
+                pdf_url = f"{base_url}/{pdf_url}"
+
+            # Get cookies from Selenium session, saving just for my referece while testing. in prod just use below one line
+            # cookies = {c['name']: c['value'] for c in self.driver.get_cookies()} 
+            # 1. Get raw Selenium cookies (list of dicts)
+            raw_cookies = self.driver.get_cookies()
+            with open("raw_cookies.txt", "w") as f:
+                json.dump(raw_cookies, f, indent=2)
+
+            formatted_cookies = {c['name']: c['value'] for c in raw_cookies}
+            with open("formatted_cookies.txt", "w") as f:
+                for k, v in formatted_cookies.items():
+                    f.write(f"{k}={v}\n")
+
+            # Use requests to download the file using session cookies
+            print("Downloading PDF content via requests...")
+            pdf_response = requests.get(pdf_url, cookies=formatted_cookies)
+
+            if pdf_response.status_code == 200:
+                print("PDF successfully fetched (bytes length):")
+                return {
+                "status": "success",
+                "pdf_bytes": base64.b64encode(pdf_response.content).decode(),
+            }
+            else:
+                print("Failed to fetch PDF. Status:", pdf_response.status_code, pdf_response)
+                return {
+                "status": "error",
+                "message": pdf_response,
+            }
+
+        except Exception as e:
+            print(f"ERROR: {str(e)}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+        
+    def main_workflow_upto_step2(self, url):
         self.config_driver()
         print("Reaching Site :", url)
         self.driver.maximize_window()
         self.driver.get(url)
         time.sleep(3)
-        value = self.login()
-        if value.startswith("ERROR"):
-            # self.driver.close()
-            return value
-        
 
-        time.sleep(5)
-        value2 = self.step1()
-        if value2.startswith("ERROR"):
-            # self.driver.close()
-            return value2
+        if self.login().startswith("ERROR"):
+            return {"status": "error", "message": "Login failed"}
 
-        time.sleep(5)
-        value3 = self.step2()
-        if value3.startswith("ERROR"):
-            # self.driver.close()
-            return value3
+        if self.step1().startswith("ERROR"):
+            return {"status": "error", "message": "Step1 failed"}
 
+        if self.step2().startswith("ERROR"):
+            return {"status": "error", "message": "Step2 failed"}
 
-        input("should Close?") # here it sholud get confirmation from the frontend, 
-        
-        self.driver.close()
-
-        return {"status": "success", "message": "Successfully submitted the form."}
+        print("Waiting for user to manually submit form in browser...")
+        return {
+            "status": "waiting_for_user",
+            "message": "Automation paused. Please submit the form manually in browser."
+        }

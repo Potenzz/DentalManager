@@ -16,6 +16,7 @@ import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import RecentClaims from "@/components/claims/recent-claims";
+import { Button } from "@/components/ui/button";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -68,6 +69,7 @@ type UpdatePatient = z.infer<typeof updatePatientSchema>;
 export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClaimFormOpen, setIsClaimFormOpen] = useState(false);
+  const [isMhPopupOpen, setIsMhPopupOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<number | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -209,6 +211,29 @@ export default function ClaimsPage() {
       });
     },
   });
+
+  // selenium pdf download handler
+  const handleSeleniumPopup = async (actionType: string) => {
+    try {
+      const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
+        action: actionType,
+      });
+      const result = await res.json();
+
+      toast({
+        title: "Success",
+        description: "MH action completed.",
+      });
+
+      setIsMhPopupOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   // Converts local date to exact UTC date with no offset issues
   function parseLocalDate(dateInput: Date | string): Date {
@@ -496,7 +521,7 @@ export default function ClaimsPage() {
         description: "Your claim data was successfully sent to Selenium.",
         variant: "default",
       });
-
+      setIsMhPopupOpen(true);
       return result;
     } catch (error: any) {
       toast({
@@ -629,6 +654,31 @@ export default function ClaimsPage() {
           onHandleUpdatePatient={handleUpdatePatient}
           onHandleForSelenium={handleSelenium}
         />
+      )}
+
+      {isMhPopupOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4">Selenium Handler</h2>
+
+            <div className="flex justify-between space-x-4">
+              <Button
+                className="flex-1"
+                onClick={() => handleSeleniumPopup("submit")}
+              >
+                Download the PDF.
+              </Button>
+
+              <Button
+                className="flex-1"
+                variant="secondary"
+                onClick={() => setIsMhPopupOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

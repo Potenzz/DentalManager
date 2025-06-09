@@ -19,7 +19,7 @@ async def start_workflow(request: Request):
     data = await request.json()
     try:
         bot = AutomationMassHealth(data)
-        result = bot.main_workflow_upto_step2("https://providers.massdhp.com/providers_login.asp")
+        result = bot.main_workflow_upto_step2("https://abc.com/providers_login.asp")
         return result
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -29,18 +29,11 @@ async def start_workflow(request: Request):
 async def fetch_pdf():
     try:
         bot = AutomationMassHealth().get_last_instance()
-        if not bot:
-            return {"status": "error", "message": "No running automation session"}
-        
         pdf_data = bot.reach_to_pdf()
-        if pdf_data.get("status") != "success":
-            return {"status": "error", "message": pdf_data.get("message")}
 
-        return {
-            "status": "success",
-            "pdf_url": pdf_data["pdf_url"],
-            "pdf_base64": pdf_data["pdf_bytes"]
-        }
+        if not pdf_data:
+            return {"status": "error", "message": "Failed to fetch PDF"}
+        return {"status": "success", "pdf_data": pdf_data}
     except Exception as e:
         return {"status": "error", "message": str(e)}
     

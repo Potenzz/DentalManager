@@ -8,7 +8,7 @@ export interface SeleniumPayload {
   }[];
 }
 
-export default async function forwardToSeleniumAgent(
+export async function forwardToSeleniumAgent(
   claimData: any,
   files: Express.Multer.File[]
 ): Promise<any> {
@@ -20,6 +20,13 @@ export default async function forwardToSeleniumAgent(
     })),
   };
 
-  const response = await axios.post("http://localhost:5002/run", payload);
+  const response = await axios.post("http://localhost:5002/start-workflow", payload);
+  return response.data;
+}
+
+export async function forwardToSeleniumAgent2(
+): Promise<any> {
+
+  const response = await axios.post("http://localhost:5002/fetch-pdf");
   return response.data;
 }
