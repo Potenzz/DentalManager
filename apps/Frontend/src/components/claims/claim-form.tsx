@@ -11,7 +11,7 @@ import {
 import { format, parse } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { X, Calendar as CalendarIcon } from "lucide-react";
+import { X, Calendar as CalendarIcon, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -28,6 +28,13 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { MultipleFileUploadZone } from "../file-upload/multiple-file-upload-zone";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import procedureCodes from "../../assets/data/procedureCodes.json";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -540,8 +547,9 @@ export function ClaimForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-6 gap-4 mb-2 font-medium text-sm text-gray-700">
+              <div className="grid grid-cols-7 gap-4 mb-2 font-medium text-sm text-gray-700">
                 <span>Procedure Code</span>
+                <span>Abbreviation</span>
                 <span>Procedure Date</span>
                 <span>Oral Cavity Area</span>
                 <span>Tooth Number</span>
@@ -551,7 +559,7 @@ export function ClaimForm({
 
               {/* Dynamic Rows */}
               {form.serviceLines.map((line, i) => (
-                <div key={i} className="grid grid-cols-6 gap-4 mb-2">
+                <div key={i} className="grid grid-cols-7 gap-1 mb-2">
                   <Input
                     placeholder="eg. D0120"
                     value={line.procedureCode}
@@ -559,6 +567,35 @@ export function ClaimForm({
                       updateServiceLine(i, "procedureCode", e.target.value)
                     }
                   />
+
+                  <div className="flex items-center justify-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm">
+                          {line.procedureCode &&
+                          line.procedureCode.trim() !== ""
+                            ? (() => {
+                                const normalizedCode = line.procedureCode
+                                  .toUpperCase()
+                                  .trim();
+                                const procedureInfo = procedureCodes.find(
+                                  (p) =>
+                                    p["Procedure Code"].toUpperCase().trim() ===
+                                    normalizedCode
+                                );
+                                return procedureInfo
+                                  ? procedureInfo.Description ||
+                                      "No description available"
+                                  : "Enter a valid procedure code";
+                              })()
+                            : "Enter a procedure code"}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
 
                   {/* Date Picker */}
                   <Popover>
