@@ -7,6 +7,7 @@ import multer from "multer";
 import { forwardToSeleniumAgent, forwardToSeleniumAgent2 } from "../services/seleniumClient";
 import path from "path";
 import fs from "fs";
+import axios from "axios";
 
 const router = Router();
 
@@ -101,9 +102,6 @@ router.post(
         return res.status(400).json({ error: result.message || "Failed to fetch PDF" });
       }
 
-      const base64Data = result.pdf_base64;
-      const buffer = Buffer.from(base64Data, "base64");
-
       const pdfUrl = result.pdf_url;
       const filename = path.basename(new URL(pdfUrl).pathname);
 
@@ -113,12 +111,15 @@ router.post(
       }
 
       const filePath = path.join(tempDir, filename);
-      fs.writeFileSync(filePath, buffer);
+
+      // Download the PDF directly using axios
+      const pdfResponse = await axios.get(pdfUrl, { responseType: "arraybuffer" });
+      fs.writeFileSync(filePath, pdfResponse.data);
 
       return res.json({
         success: true,
         pdfPath: `/temp/${filename}`,
-        pdfUrl: pdfUrl,
+        pdfUrl,
         fileName: filename,
       });
     } catch (err) {

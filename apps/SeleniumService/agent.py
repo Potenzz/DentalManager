@@ -32,14 +32,14 @@ async def fetch_pdf():
         if not bot:
             return {"status": "error", "message": "No running automation session"}
         
-        pdf_data = bot.reach_to_pdf()
-        if pdf_data.get("status") != "success":
-            return {"status": "error", "message": pdf_data.get("message")}
+        result = bot.reach_to_pdf()
+
+        if result.get("status") != "success":
+            return {"status": "error", "message": result.get("message")}
 
         return {
             "status": "success",
-            "pdf_url": pdf_data["pdf_url"],
-            "pdf_base64": pdf_data["pdf_bytes"]
+            "pdf_url": result["pdf_url"]
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}

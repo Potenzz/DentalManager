@@ -297,61 +297,21 @@ class AutomationMassHealth:
             pdf_link_element = wait.until(
                 EC.element_to_be_clickable((By.XPATH, "//a[contains(@href, '.pdf')]"))
             )
-            print("PDF link found. Clicking it...")
+            print("PDF link found.")
 
-            # Click the PDF link
-            pdf_link_element.click()
             time.sleep(5)
 
-            existing_windows = self.driver.window_handles
+            pdf_relative_url = pdf_link_element.get_attribute("href")
 
-            # Wait for the new tab
-            WebDriverWait(self.driver, 90).until(
-                lambda d: len(d.window_handles) > len(existing_windows)
-            )
-
-            print("Switching to PDF tab...")
-            self.driver.switch_to.window(self.driver.window_handles[1])
-
-
-            time.sleep(2)
-            current_url = self.driver.current_url
-            print(f"Switched to PDF tab. Current URL: {current_url}")
-
-
-             # Get full PDF URL in case it's a relative path
-            pdf_url = pdf_link_element.get_attribute("href")
-            if not pdf_url.startswith("http"):
-                base_url = self.driver.current_url.split("/providers")[0]
-                pdf_url = f"{base_url}/{pdf_url}"
-
-            # Get cookies from Selenium session, saving just for my referece while testing. in prod just use below one line
-            # cookies = {c['name']: c['value'] for c in self.driver.get_cookies()} 
-            # 1. Get raw Selenium cookies (list of dicts)
-            raw_cookies = self.driver.get_cookies()
-            with open("raw_cookies.txt", "w") as f:
-                json.dump(raw_cookies, f, indent=2)
-
-            formatted_cookies = {c['name']: c['value'] for c in raw_cookies}
-            with open("formatted_cookies.txt", "w") as f:
-                for k, v in formatted_cookies.items():
-                    f.write(f"{k}={v}\n")
-
-            # Use requests to download the file using session cookies
-            print("Downloading PDF content via requests...")
-            pdf_response = requests.get(pdf_url, cookies=formatted_cookies)
-
-            if pdf_response.status_code == 200:
-                print("PDF successfully fetched (bytes length):")
-                return {
-                "status": "success",
-                "pdf_bytes": base64.b64encode(pdf_response.content).decode(),
-            }
+            if not pdf_relative_url.startswith("http"):
+                full_pdf_url = f"https://providers.massdhp.com{pdf_relative_url}"
             else:
-                print("Failed to fetch PDF. Status:", pdf_response.status_code, pdf_response)
-                return {
-                "status": "error",
-                "message": pdf_response,
+                full_pdf_url = pdf_relative_url
+            
+            print("FULL PDF LINK: ",full_pdf_url)
+            return {
+                "status": "success",
+                "pdf_url": full_pdf_url
             }
 
         except Exception as e:
