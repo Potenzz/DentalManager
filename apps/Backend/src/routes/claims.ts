@@ -132,9 +132,8 @@ router.post(
 // GET /api/claims?page=1&limit=5
 router.get("/", async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const page = parseInt(req.query.page as string) || 1;
+  const offset = parseInt(req.query.offset as string) || 0;
   const limit = parseInt(req.query.limit as string) || 5;
-  const offset = (page - 1) * limit;
 
   try {
     const [claims, total] = await Promise.all([
@@ -144,7 +143,7 @@ router.get("/", async (req: Request, res: Response) => {
 
     res.json({
       data: claims,
-      page,
+      page: Math.floor(offset / limit) + 1,
       limit,
       total,
     });

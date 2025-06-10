@@ -408,6 +408,38 @@ export const storage: IStorage = {
     }
   },
 
+  async getClaimsPaginated(
+    userId: number,
+    offset: number,
+    limit: number
+  ): Promise<ClaimWithServiceLines[]> {
+    return db.claim.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+      include: { serviceLines: true },
+    });
+  },
+
+  async countClaimsByUserId(userId: number): Promise<number> {
+    return db.claim.count({ where: { userId } });
+  },
+
+  async getClaimsMetadataByUser(
+    userId: number
+  ): Promise<{ id: number; createdAt: Date; status: string }[]> {
+    return db.claim.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        createdAt: true,
+        status: true,
+      },
+    });
+  },
+
   // Insurance Creds
   async getInsuranceCredentialsByUser(userId: number) {
     return await db.insuranceCredential.findMany({ where: { userId } });
@@ -442,35 +474,5 @@ export const storage: IStorage = {
     });
   },
 
-  async getClaimsPaginated(
-    userId: number,
-    offset: number,
-    limit: number
-  ): Promise<ClaimWithServiceLines[]> {
-    return db.claim.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      skip: offset,
-      take: limit,
-      include: { serviceLines: true },
-    });
-  },
-
-  async countClaimsByUserId(userId: number): Promise<number> {
-    return db.claim.count({ where: { userId } });
-  },
-
-  async getClaimsMetadataByUser(
-    userId: number
-  ): Promise<{ id: number; createdAt: Date; status: string }[]> {
-    return db.claim.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        createdAt: true,
-        status: true,
-      },
-    });
-  },
+  
 };
