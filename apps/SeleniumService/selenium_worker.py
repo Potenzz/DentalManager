@@ -180,11 +180,13 @@ class AutomationMassHealth:
 
                 # Fill Tooth Surface if present
                 if proc.get("toothSurface"):
-                    surface = proc["toothSurface"]
-                    checkbox_xpath = f"//input[@type='checkbox' and @name='TS_{surface}']"
-                    checkbox = wait.until(EC.element_to_be_clickable((By.XPATH, checkbox_xpath)))
-                    if not checkbox.is_selected():
-                        checkbox.click()
+                    surfaces = proc["toothSurface"].split(",")  
+                    for surface in surfaces:
+                        surface = surface.strip()
+                        checkbox_xpath = f"//input[@type='checkbox' and @name='TS_{surface}']"
+                        checkbox = wait.until(EC.element_to_be_clickable((By.XPATH, checkbox_xpath)))
+                        if not checkbox.is_selected():
+                            checkbox.click()
 
 
                 # Fill Fees if present
