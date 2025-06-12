@@ -322,6 +322,12 @@ class AutomationMassHealth:
                 "status": "error",
                 "message": str(e),
             }
+
+        finally:
+            if self.driver:
+                self.driver.quit()
+            AutomationMassHealth.last_instance = None
+
         
     def main_workflow_upto_step2(self, url):
         self.config_driver()
