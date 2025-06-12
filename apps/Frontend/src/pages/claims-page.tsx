@@ -451,21 +451,26 @@ export default function ClaimsPage() {
   };
 
   // Get unique patients with appointments
-  const patientsWithAppointments = appointments.reduce(
-    (acc, appointment) => {
-      if (!acc.some((item) => item.patientId === appointment.patientId)) {
-        const patient = patients.find((p) => p.id === appointment.patientId);
-        if (patient) {
-          acc.push({
-            patientId: patient.id,
-            patientName: `${patient.firstName} ${patient.lastName}`,
-            appointmentId: Number(appointment.id),
-            insuranceProvider: patient.insuranceProvider || "N/A",
-            insuranceId: patient.insuranceId || "N/A",
-            lastAppointment: String(appointment.date),
-          });
-        }
+  const patientsWithAppointments = patients.reduce(
+    (acc, patient) => {
+      const patientAppointments = appointments
+        .filter((appt) => appt.patientId === patient.id)
+        .sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        ); // Sort descending by date
+
+      if (patientAppointments.length > 0) {
+        const latestAppointment = patientAppointments[0];
+        acc.push({
+          patientId: patient.id,
+          patientName: `${patient.firstName} ${patient.lastName}`,
+          appointmentId: latestAppointment!.id,
+          insuranceProvider: patient.insuranceProvider || "N/A",
+          insuranceId: patient.insuranceId || "N/A",
+          lastAppointment: String(latestAppointment!.date),
+        });
       }
+
       return acc;
     },
     [] as Array<{
@@ -591,7 +596,7 @@ export default function ClaimsPage() {
                   </div>
                 ) : patientsWithAppointments.length > 0 ? (
                   <div className="divide-y">
-                    {patientsWithAppointments.map((item) => (
+                    {patientsWithAppointments.map((item: typeof patientsWithAppointments[number]) => (
                       <div
                         key={item.patientId}
                         className="py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
