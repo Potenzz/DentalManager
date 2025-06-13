@@ -52,6 +52,7 @@ model Patient {
   user              User          @relation(fields: [userId], references: [id])
   appointments      Appointment[]
   claims            Claim[]
+  pdfs              ClaimPdf[]
 }
 
 model Appointment {
@@ -107,6 +108,7 @@ model Claim {
   staff       Staff?      @relation("ClaimStaff", fields: [staffId], references: [id])
 
   serviceLines ServiceLine[]
+  pdf          ClaimPdf[]
 }
 
 model ServiceLine {
@@ -130,6 +132,21 @@ model InsuranceCredential {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, siteKey])
   @@index([userId])
-  @@unique([userId, siteKey]) 
+}
+
+model ClaimPdf {
+  id         Int      @id @default(autoincrement())
+  patientId  Int
+  claimId    Int?
+  filename   String
+  pdfData    Bytes
+  uploadedAt DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  claim   Claim?  @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([claimId])
 }

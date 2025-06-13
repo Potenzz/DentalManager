@@ -6,7 +6,6 @@ import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import multer from "multer";
 import { forwardToSeleniumAgent, forwardToSeleniumAgent2 } from "../services/seleniumClient";
 import path from "path";
-import fs from "fs";
 import axios from "axios";
 
 const router = Router();
@@ -96,6 +95,14 @@ router.post(
     }
 
     try{
+      const { patientId, claimId } = req.body; // ✅ Extract patientId from the body
+
+      if (!patientId ||  !claimId) {
+        return res.status(400).json({ error: "Missing patientId or claimId" });
+      }
+      const parsedPatientId = parseInt(patientId);
+      const parsedClaimId = parseInt(claimId);
+
       const result = await forwardToSeleniumAgent2();
 
       if (result.status !== "success") {
@@ -104,17 +111,14 @@ router.post(
 
       const pdfUrl = result.pdf_url;
       const filename = path.basename(new URL(pdfUrl).pathname);
-
-      const tempDir = path.join(__dirname, "..", "..", "temp");
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-
-      const filePath = path.join(tempDir, filename);
-
-      // Download the PDF directly using axios
       const pdfResponse = await axios.get(pdfUrl, { responseType: "arraybuffer" });
-      fs.writeFileSync(filePath, pdfResponse.data);
+
+      await storage.createClaimPdf(
+        parsedPatientId,
+        parsedClaimId,
+        filename,
+        pdfResponse.data 
+      );
 
       return res.json({
         success: true,

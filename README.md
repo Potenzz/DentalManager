@@ -30,6 +30,11 @@ npm run db:generate
 npm run db:migrate
 ```
 
+- Generate the db types: 
+```sh
+npm run db:generate
+```
+
 - seed the db if: 
 ```sh
 npm run db:seed

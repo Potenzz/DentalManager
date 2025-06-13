@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   PatientUncheckedCreateInputObjectSchema,
   AppointmentUncheckedCreateInputObjectSchema,
+  ClaimUncheckedCreateInputObjectSchema
 } from "@repo/db/usedSchemas";
 import { AlertCircle, CheckCircle, Clock, FileCheck } from "lucide-react";
 import { parse, format } from "date-fns";
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
+type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
 
 const insertAppointmentSchema = (
   AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -77,6 +79,7 @@ export default function ClaimsPage() {
     patientId: null,
     serviceDate: "",
   });
+  const [claimRes, setClaimRes] = useState<Claim | null>(null);
 
   // Fetch patients
   const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
@@ -215,8 +218,13 @@ export default function ClaimsPage() {
   // selenium pdf download handler
   const handleSeleniumPopup = async (actionType: string) => {
     try {
+       if (!claimRes?.id || !selectedPatient) {
+          throw new Error("Missing claim or patient selection");
+        }
       const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
         action: actionType,
+        patientId:selectedPatient,
+        claimId:claimRes.id
       });
       const result = await res.json();
 
@@ -319,7 +327,8 @@ export default function ClaimsPage() {
       const res = await apiRequest("POST", "/api/claims/", claimData);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setClaimRes(data);
       toast({
         title: "Claim submitted successfully",
         variant: "default",
