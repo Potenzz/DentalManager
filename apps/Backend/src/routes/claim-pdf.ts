@@ -3,65 +3,105 @@ import { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
 import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
+import multer from "multer";
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 
+router.post("/claim-pdf/upload", upload.single("file"), async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { patientId, claimId } = req.body;
+    const file = req.file;
 
-router.post("/claim-pdf/upload", upload.single("file"), async (req: Request, res: Response) => {
-  const { patientId, claimId } = req.body;
-  const file = req.file;
+    if (!patientId || !claimId) {
+      return res.status(400).json({ error: "Missing patientId, or claimId" });
+    }
 
-  if (!file || !patientId) return res.status(400).json({ error: "Missing file or patientId" });
+    if (!file){
+      return res.status(400).json({ error: "Missing file" });
+    }
 
-  const created = await storage.createClaimPdf({
-    filename: file.originalname,
-    patientId: parseInt(patientId),
-    claimId: claimId ? parseInt(claimId) : undefined,
-    pdfData: file.buffer,
-  });
+    const created = await storage.createClaimPdf(
+      parseInt(patientId),
+      parseInt(claimId),
+      file.originalname,
+      file.buffer
+    );
 
-  res.json(created);
+    res.json(created);
+  } catch (err) {
+    console.error("Error uploading claim PDF:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-router.get("/claim-pdf/recent", async (req: Request, res: Response) => {
-  const limit = parseInt(req.query.limit as string) || 5;
-  const offset = parseInt(req.query.offset as string) || 0;
+router.get("/claim-pdf/recent", async (req: Request, res: Response): Promise<any> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 5;
+    const offset = parseInt(req.query.offset as string) || 0;
 
-  const recent = await storage.getRecentClaimPdfs(limit, offset);
-  res.json(recent);
+    const recent = await storage.getRecentClaimPdfs(limit, offset);
+    res.json(recent);
+  } catch (err) {
+    console.error("Error fetching recent PDFs:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-router.get("/claim-pdf/:id", async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
-  const pdf = await storage.getClaimPdfById(id);
+router.get("/claim-pdf/:id", async (req: Request, res: Response): Promise<any> => {
+  try {
+    const idParam = req.params.id;
+    if (!idParam) return res.status(400).json({ error: "Missing ID" });
 
-  if (!pdf) return res.status(404).json({ error: "PDF not found" });
+    const id = parseInt(idParam);
+    const pdf = await storage.getClaimPdfById(id);
 
-  res.setHeader("Content-Type", "application/pdf");
-  res.send(pdf.pdfData);
+    if (!pdf) return res.status(404).json({ error: "PDF not found" });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf.pdfData);
+  } catch (err) {
+    console.error("Error fetching PDF by ID:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-router.delete("/claim-pdf/:id", async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
-  const success = await storage.deleteClaimPdf(id);
+router.delete("/claim-pdf/:id", async (req: Request, res: Response): Promise<any> => {
+  try {
+    const idParam = req.params.id;
+    if (!idParam) return res.status(400).json({ error: "Missing ID" });
 
-  res.json({ success });
+    const id = parseInt(idParam);
+    const success = await storage.deleteClaimPdf(id);
+
+    res.json({ success });
+  } catch (err) {
+    console.error("Error deleting PDF:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-router.put("/claim-pdf/:id", upload.single("file"), async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
-  const file = req.file;
-  const claimId = req.body.claimId ? parseInt(req.body.claimId) : undefined;
+router.put("/claim-pdf/:id", upload.single("file"), async (req: Request, res: Response): Promise<any> => {
+  try {
+    const idParam = req.params.id;
+    if (!idParam) return res.status(400).json({ error: "Missing ID" });
 
-  const updated = await storage.updateClaimPdf(id, {
-    claimId,
-    filename: file?.originalname,
-    pdfData: file?.buffer,
-  });
+    const id = parseInt(idParam);
+    const file = req.file;
 
-  if (!updated) return res.status(404).json({ error: "PDF not found or update failed" });
+    const updated = await storage.updateClaimPdf(id, {
+      filename: file?.originalname,
+      pdfData: file?.buffer,
+    });
 
-  res.json(updated);
+    if (!updated) return res.status(404).json({ error: "PDF not found or update failed" });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Error updating PDF:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

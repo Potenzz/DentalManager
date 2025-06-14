@@ -7,6 +7,7 @@ import multer from "multer";
 import { forwardToSeleniumAgent, forwardToSeleniumAgent2 } from "../services/seleniumClient";
 import path from "path";
 import axios from "axios";
+import fs from "fs";
 
 const router = Router();
 
@@ -95,7 +96,7 @@ router.post(
     }
 
     try{
-      const { patientId, claimId } = req.body; // ✅ Extract patientId from the body
+      const { patientId, claimId } = req.body; 
 
       if (!patientId ||  !claimId) {
         return res.status(400).json({ error: "Missing patientId or claimId" });
@@ -113,6 +114,15 @@ router.post(
       const filename = path.basename(new URL(pdfUrl).pathname);
       const pdfResponse = await axios.get(pdfUrl, { responseType: "arraybuffer" });
 
+      // Temp savving the pdf incase, creatClaimPdf failed: 
+      const tempDir = path.join(__dirname, "..", "..", "temp");
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      const filePath = path.join(tempDir, filename);
+      fs.writeFileSync(filePath, pdfResponse.data);
+
+      // saving at postgres db
       await storage.createClaimPdf(
         parsedPatientId,
         parsedClaimId,
