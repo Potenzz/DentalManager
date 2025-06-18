@@ -21,9 +21,6 @@ npm run setup:env
 ```
 
 3. Generate Prisma, and its Types.
-```sh
-npm run db:generate
-```
 
 - Migrate the db: 
 ```sh
@@ -33,11 +30,6 @@ npm run db:migrate
 - Generate the db types: 
 ```sh
 npm run db:generate
-```
-
-- seed the db if: 
-```sh
-npm run db:seed
 ```
 
 

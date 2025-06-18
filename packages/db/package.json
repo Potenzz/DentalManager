@@ -16,7 +16,7 @@
     "./usedSchemas" : "./usedSchemas/index.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.7.0",
+    "@prisma/client": "^6.10.0",
     "prisma-zod-generator": "^0.8.13"
   },
   "devDependencies": {
