@@ -429,7 +429,7 @@ export function AppointmentForm({
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-4">
                     <Calendar
                       mode="single"
                       selected={field.value}
@@ -438,10 +438,9 @@ export function AppointmentForm({
                           field.onChange(date); 
                         }
                       }}
-                      disabled={(date) =>
+                      disabled={(date: Date) =>
                         date < new Date(new Date().setHours(0, 0, 0, 0))
                       }
-                      initialFocus
                     />
                   </PopoverContent>
                 </Popover>

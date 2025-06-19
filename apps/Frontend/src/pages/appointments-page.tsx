@@ -872,7 +872,6 @@ export default function AppointmentsPage() {
                       onSelect={(date) => {
                         if (date) setSelectedDate(date);
                       }}
-                      className="rounded-md border"
                     />
                   </CardContent>
                 </Card>

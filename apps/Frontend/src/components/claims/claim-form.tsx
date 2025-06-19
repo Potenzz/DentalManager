@@ -507,7 +507,6 @@ export function ClaimForm({
                         mode="single"
                         selected={serviceDateValue}
                         onSelect={onServiceDateChange}
-                        initialFocus
                       />
                     </PopoverContent>
                   </Popover>
