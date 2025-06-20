@@ -57,9 +57,6 @@ const updatePatientSchema = (
 
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
 
-
-
-
 // Get all appointments
 router.get("/all", async (req: Request, res: Response): Promise<any> => {
   try {
@@ -104,6 +101,74 @@ router.get(
   }
 );
 
+// Get all appointments for a specific patient
+router.get(
+  "/:patientId/appointments",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const rawPatientId = req.params.patientId;
+      if (!rawPatientId) {
+        return res.status(400).json({ message: "Patient ID is required" });
+      }
+
+      const patientId = parseInt(rawPatientId);
+      if (isNaN(patientId)) {
+        return res.status(400).json({ message: "Invalid patient ID" });
+      }
+
+      const patient = await storage.getPatient(patientId);
+      if (!patient)
+        return res.status(404).json({ message: "Patient not found" });
+      if (patient.userId !== req.user!.id)
+        return res.status(403).json({ message: "Forbidden" });
+
+      const appointments = await storage.getAppointmentsByPatientId(patientId);
+      res.json(appointments);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get patient appointments" });
+    }
+  }
+);
+
+// Get appointments on a specific date
+router.get(
+  "/appointments/on/:date",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const rawDate = req.params.date;
+      if (!rawDate) {
+        return res.status(400).json({ message: "Date parameter is required" });
+      }
+
+      const date = new Date(rawDate);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ message: "Invalid date format" });
+      }
+
+      const all = await storage.getAppointmentsOn(date);
+      const appointments = all.filter((a) => a.userId === req.user!.id);
+
+      res.json(appointments);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get appointments on date" });
+    }
+  }
+);
+
+// Get recent appointments (paginated)
+router.get("/appointments/recent", async (req: Request, res: Response) => {
+  try {
+    const limit = Math.max(1, parseInt(req.query.limit as string) || 10);
+    const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+
+    const all = await storage.getRecentAppointments(limit, offset);
+    const filtered = all.filter((a) => a.userId === req.user!.id);
+
+    res.json({ data: filtered, limit, offset });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to get recent appointments" });
+  }
+});
 
 // Create a new appointment
 router.post(
@@ -195,7 +260,6 @@ router.put(
         return res.status(400).json({ message: "Appointment ID is required" });
       }
       const appointmentId = parseInt(appointmentIdParam);
-
 
       // Check if appointment exists and belongs to user
       const existingAppointment = await storage.getAppointment(appointmentId);
