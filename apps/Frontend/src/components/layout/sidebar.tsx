@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Calendar, Settings, FileCheck, ClipboardCheck, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Settings, FileCheck, ClipboardCheck, CreditCard, FolderOpen } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -41,6 +41,11 @@ export function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps) {
       name: "Payments",
       path: "/payments",
       icon: <CreditCard className="h-5 w-5" />,
+    },
+    {
+      name: "Documents",
+      path: "/documents",
+      icon: <FolderOpen className="h-5 w-5" />,
     },
     {
       name: "Settings",

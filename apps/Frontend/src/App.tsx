@@ -16,7 +16,7 @@ const SettingsPage = lazy(() => import("./pages/settings-page"));
 const ClaimsPage = lazy(() => import("./pages/claims-page"));
 const PreAuthorizationsPage = lazy(() => import("./pages/preauthorizations-page"));
 const PaymentsPage = lazy(() => import("./pages/payments-page"));
-const ClaimsPdfPage = lazy(() => import("./pages/claims-pdf-page"));
+const DocumentPage = lazy(() => import("./pages/documents-page"));
 const NotFound = lazy(() => import("./pages/not-found"));
 
 function Router() {
@@ -29,7 +29,7 @@ function Router() {
       <ProtectedRoute path="/claims" component={() => <ClaimsPage />} />
       <ProtectedRoute path="/preauthorizations" component={() => <PreAuthorizationsPage />} />
       <ProtectedRoute path="/payments" component={() => <PaymentsPage />} />
-      <ProtectedRoute path="/claimspdf" component={() => <ClaimsPdfPage/>}/>
+      <ProtectedRoute path="/documents" component={() => <DocumentPage/>}/>
       <Route path="/auth" component={() => <AuthPage />} />
       <Route component={() => <NotFound />} />
     </Switch>
