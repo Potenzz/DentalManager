@@ -1,8 +1,6 @@
 import { Router } from "express";
 import { Request, Response } from "express";
 import { storage } from "../storage";
-import { z } from "zod";
-import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import multer from "multer";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -57,9 +55,17 @@ router.get("/claim-pdf/:id", async (req: Request, res: Response): Promise<any> =
     const id = parseInt(idParam);
     const pdf = await storage.getClaimPdfById(id);
 
-    if (!pdf) return res.status(404).json({ error: "PDF not found" });
+    if (!pdf || !pdf.pdfData) return res.status(404).json({ error: "PDF not found" });
 
+    // Fix bad objectified Buffer
+    if (!Buffer.isBuffer(pdf.pdfData)) {
+      pdf.pdfData = Buffer.from(Object.values(pdf.pdfData));
+    }
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+  "Content-Disposition",
+  `attachment; filename="${pdf.filename}"; filename*=UTF-8''${encodeURIComponent(pdf.filename)}`
+);
     res.send(pdf.pdfData);
   } catch (err) {
     console.error("Error fetching PDF by ID:", err);

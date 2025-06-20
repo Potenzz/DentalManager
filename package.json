@@ -31,8 +31,11 @@
     "packages/*"
   ],
   "dependencies": {
+    "@react-pdf-viewer/core": "^3.12.0",
+    "@react-pdf-viewer/default-layout": "^3.12.0",
     "dotenv": "^16.5.0",
     "dotenv-cli": "^8.0.0",
+    "pdfjs-dist": "^3.11.174",
     "shx": "^0.4.0"
   }
 }

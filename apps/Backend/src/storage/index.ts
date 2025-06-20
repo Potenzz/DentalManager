@@ -6,7 +6,7 @@ import {
   StaffUncheckedCreateInputObjectSchema,
   ClaimUncheckedCreateInputObjectSchema,
   InsuranceCredentialUncheckedCreateInputObjectSchema,
-  ClaimPdfUncheckedCreateInputObjectSchema
+  ClaimPdfUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
 
@@ -146,7 +146,7 @@ type ClaimWithServiceLines = Claim & {
   }[];
 };
 
-// claim types: 
+// claim types:
 type ClaimPdf = z.infer<typeof ClaimPdfUncheckedCreateInputObjectSchema>;
 
 export interface ClaimPdfMetadata {
@@ -166,6 +166,7 @@ export interface IStorage {
   // Patient methods
   getPatient(id: number): Promise<Patient | undefined>;
   getPatientsByUserId(userId: number): Promise<Patient[]>;
+  getRecentPatients(limit: number, offset: number): Promise<Patient[]>;
   createPatient(patient: InsertPatient): Promise<Patient>;
   updatePatient(id: number, patient: UpdatePatient): Promise<Patient>;
   deletePatient(id: number): Promise<void>;
@@ -175,6 +176,8 @@ export interface IStorage {
   getAllAppointments(): Promise<Appointment[]>;
   getAppointmentsByUserId(userId: number): Promise<Appointment[]>;
   getAppointmentsByPatientId(patientId: number): Promise<Appointment[]>;
+  getRecentAppointments(limit: number, offset: number): Promise<Appointment[]>;
+  getAppointmentsOn(date: Date): Promise<Appointment[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   updateAppointment(
     id: number,
@@ -234,7 +237,10 @@ export interface IStorage {
 
   getAllClaimPdfs(): Promise<ClaimPdfMetadata[]>;
 
-  getRecentClaimPdfs(limit: number, offset: number): Promise<ClaimPdfMetadata[]>;
+  getRecentClaimPdfs(
+    limit: number,
+    offset: number
+  ): Promise<ClaimPdfMetadata[]>;
 
   deleteClaimPdf(id: number): Promise<boolean>;
 
@@ -290,6 +296,14 @@ export const storage: IStorage = {
     return await db.patient.findMany({ where: { userId } });
   },
 
+  async getRecentPatients(limit: number, offset: number): Promise<Patient[]> {
+    return db.patient.findMany({
+      skip: offset,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    });
+  },
+
   async createPatient(patient: InsertPatient): Promise<Patient> {
     return await db.patient.create({ data: patient as Patient });
   },
@@ -330,6 +344,35 @@ export const storage: IStorage = {
 
   async getAppointmentsByPatientId(patientId: number): Promise<Appointment[]> {
     return await db.appointment.findMany({ where: { patientId } });
+  },
+
+  async getAppointmentsOn(date: Date): Promise<Appointment[]> {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    return db.appointment.findMany({
+      where: {
+        date: {
+          gte: start,
+          lte: end,
+        },
+      },
+      orderBy: { date: "asc" },
+    });
+  },
+
+  async getRecentAppointments(
+    limit: number,
+    offset: number
+  ): Promise<Appointment[]> {
+    return db.appointment.findMany({
+      skip: offset,
+      take: limit,
+      orderBy: { date: "desc" }
+    });
   },
 
   async createAppointment(
@@ -534,7 +577,10 @@ export const storage: IStorage = {
     });
   },
 
-  async getRecentClaimPdfs(limit: number, offset: number): Promise<ClaimPdfMetadata[]> {
+  async getRecentClaimPdfs(
+    limit: number,
+    offset: number
+  ): Promise<ClaimPdfMetadata[]> {
     return db.claimPdf.findMany({
       skip: offset,
       take: limit,
@@ -543,6 +589,7 @@ export const storage: IStorage = {
         id: true,
         filename: true,
         uploadedAt: true,
+        patient:true,
       },
     });
   },
@@ -561,7 +608,10 @@ export const storage: IStorage = {
     updates: Partial<Pick<ClaimPdf, "filename" | "pdfData">>
   ): Promise<ClaimPdf | undefined> {
     try {
-      const updated = await db.claimPdf.update({ where: { id }, data: updates });
+      const updated = await db.claimPdf.update({
+        where: { id },
+        data: updates,
+      });
       return updated;
     } catch {
       return undefined;
