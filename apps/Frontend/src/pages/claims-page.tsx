@@ -624,9 +624,7 @@ export default function ClaimsPage() {
                             <span className="mx-2">•</span>
                             <span>
                               Last Visit:{" "}
-                              {new Date(
-                                item.lastAppointment
-                              ).toLocaleDateString()}
+                              {parseLocalDate(item.lastAppointment).toLocaleDateString("en-CA")}
                             </span>
                           </div>
                         </div>
