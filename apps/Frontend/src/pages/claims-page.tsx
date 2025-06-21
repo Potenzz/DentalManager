@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   PatientUncheckedCreateInputObjectSchema,
   AppointmentUncheckedCreateInputObjectSchema,
-  ClaimUncheckedCreateInputObjectSchema
+  ClaimUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { AlertCircle, CheckCircle, Clock, FileCheck } from "lucide-react";
 import { parse, format } from "date-fns";
@@ -218,13 +218,13 @@ export default function ClaimsPage() {
   // selenium pdf download handler
   const handleSeleniumPopup = async (actionType: string) => {
     try {
-       if (!claimRes?.id || !selectedPatient) {
-          throw new Error("Missing claim or patient selection");
-        }
+      if (!claimRes?.id || !selectedPatient) {
+        throw new Error("Missing claim or patient selection");
+      }
       const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
         action: actionType,
-        patientId:selectedPatient,
-        claimId:claimRes.id
+        patientId: selectedPatient,
+        claimId: claimRes.id,
       });
       const result = await res.json();
 
@@ -388,9 +388,11 @@ export default function ClaimsPage() {
   };
 
   const prefillClaimForm = (patient: Patient) => {
-    const lastAppointment = appointments.find(
-      (a) => a.patientId === patient.id
-    );
+    const patientAppointments = appointments
+      .filter((a) => a.patientId === patient.id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const lastAppointment = patientAppointments[0]; // most recent
 
     const dateToUse = lastAppointment
       ? parseLocalDate(lastAppointment.date)
@@ -605,34 +607,38 @@ export default function ClaimsPage() {
                   </div>
                 ) : patientsWithAppointments.length > 0 ? (
                   <div className="divide-y">
-                    {patientsWithAppointments.map((item: typeof patientsWithAppointments[number]) => (
-                      <div
-                        key={item.patientId}
-                        className="py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleNewClaim(item.patientId)}
-                      >
-                        <div>
-                          <h3 className="font-medium">{item.patientName}</h3>
-                          <div className="text-sm text-gray-500">
-                            <span>
-                              Insurance:{" "}
-                              {getDisplayProvider(item.insuranceProvider)}
-                            </span>
+                    {patientsWithAppointments.map(
+                      (item: (typeof patientsWithAppointments)[number]) => (
+                        <div
+                          key={item.patientId}
+                          className="py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleNewClaim(item.patientId)}
+                        >
+                          <div>
+                            <h3 className="font-medium">{item.patientName}</h3>
+                            <div className="text-sm text-gray-500">
+                              <span>
+                                Insurance:{" "}
+                                {getDisplayProvider(item.insuranceProvider)}
+                              </span>
 
-                            <span className="mx-2">•</span>
-                            <span>ID: {item.insuranceId}</span>
-                            <span className="mx-2">•</span>
-                            <span>
-                              Last Visit:{" "}
-                              {parseLocalDate(item.lastAppointment).toLocaleDateString("en-CA")}
-                            </span>
+                              <span className="mx-2">•</span>
+                              <span>ID: {item.insuranceId}</span>
+                              <span className="mx-2">•</span>
+                              <span>
+                                Last Visit:{" "}
+                                {parseLocalDate(
+                                  item.lastAppointment
+                                ).toLocaleDateString("en-CA")}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-primary">
+                            <FileCheck className="h-5 w-5" />
                           </div>
                         </div>
-                        <div className="text-primary">
-                          <FileCheck className="h-5 w-5" />
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-8">

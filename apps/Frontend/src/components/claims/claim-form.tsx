@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import procedureCodes from "../../assets/data/procedureCodes.json";
+import exp from "constants";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -178,14 +179,32 @@ export function ClaimForm({
   }, [staffMembersRaw, staff]);
 
   // Service date state
+  function parseLocalDate(dateInput: Date | string): Date {
+    if (dateInput instanceof Date) return dateInput;
+
+    const parts = dateInput.split("-");
+    if (parts.length !== 3) {
+      throw new Error(`Invalid date format: ${dateInput}`);
+    }
+
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    const day = Number(parts[2]);
+
+    if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+      throw new Error(`Invalid date parts in date string: ${dateInput}`);
+    }
+
+    return new Date(year, month - 1, day); // month is 0-indexed
+  }
+
   const [serviceDateValue, setServiceDateValue] = useState<Date>(new Date());
   const [serviceDate, setServiceDate] = useState<string>(
     new Date().toLocaleDateString("en-CA") // "YYYY-MM-DD"
   );
-
   useEffect(() => {
     if (extractedData?.serviceDate) {
-      const parsed = new Date(extractedData.serviceDate);
+      const parsed = parseLocalDate(extractedData.serviceDate);
       const isoFormatted = parsed.toLocaleDateString("en-CA");
       setServiceDateValue(parsed);
       setServiceDate(isoFormatted);
