@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 const router = Router();
 import  multer from "multer";
-import forwardToPdfService from "../services/PdfClient";
+import forwardToPdfService from "../services/pdfClient";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
