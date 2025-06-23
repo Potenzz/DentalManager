@@ -218,8 +218,11 @@ export default function ClaimsPage() {
   // selenium pdf download handler
   const handleSeleniumPopup = async (actionType: string) => {
     try {
-      if (!claimRes?.id || !selectedPatient) {
-        throw new Error("Missing claim or patient selection");
+      if (!claimRes?.id) {
+        throw new Error("Missing claimId");        
+      }
+      if (!selectedPatient) {
+        throw new Error("Missing patientId");
       }
       const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
         action: actionType,
@@ -234,6 +237,7 @@ export default function ClaimsPage() {
       });
 
       setIsMhPopupOpen(false);
+      setSelectedPatient(null);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -371,7 +375,6 @@ export default function ClaimsPage() {
 
   const closeClaim = () => {
     setIsClaimFormOpen(false);
-    setSelectedPatient(null);
     setClaimFormData({
       patientId: null,
       serviceDate: "",
