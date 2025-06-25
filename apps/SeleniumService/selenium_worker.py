@@ -24,7 +24,7 @@ class AutomationMassHealth:
 
         self.data = data
         self.claim = data.get("claim", {})
-        self.pdfs = data.get("pdfs", [])
+        self.upload_files = data.get("pdfs", []) + data.get("images", [])
 
         # Flatten values for convenience
         self.memberId = self.claim.get("memberId", "")
@@ -211,12 +211,14 @@ class AutomationMassHealth:
 
         # 2 - Upload PDFs: 
         try: 
-            pdfs_abs = [proc for proc in self.pdfs]
-
             with tempfile.TemporaryDirectory() as tmp_dir:
-                for pdf_obj in pdfs_abs:
-                    base64_data = pdf_obj["bufferBase64"]
-                    file_name = pdf_obj.get("originalname", "tempfile.pdf")
+                 for file_obj in self.upload_files:
+                    base64_data = file_obj["bufferBase64"]
+                    file_name = file_obj.get("originalname", "tempfile.bin")
+
+                    # Ensure valid extension fallback if missing
+                    if not any(file_name.lower().endswith(ext) for ext in [".pdf", ".jpg", ".jpeg", ".png", ".webp"]):
+                        file_name += ".bin"
 
                     # Full path with original filename inside temp dir
                     tmp_file_path = os.path.join(tmp_dir, file_name)

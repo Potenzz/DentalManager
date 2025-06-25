@@ -4,7 +4,10 @@ import { storage } from "../storage";
 import { z } from "zod";
 import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import multer from "multer";
-import { forwardToSeleniumAgent, forwardToSeleniumAgent2 } from "../services/seleniumClient";
+import {
+  forwardToSeleniumAgent,
+  forwardToSeleniumAgent2,
+} from "../services/seleniumClient";
 import path from "path";
 import axios from "axios";
 import fs from "fs";
@@ -43,11 +46,30 @@ const ExtendedClaimSchema = (
 
 // Routes
 const multerStorage = multer.memoryStorage(); // NO DISK
-const upload = multer({ storage: multerStorage });
+const upload = multer({
+  storage: multerStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit per file
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Unsupported file type"));
+    }
+  },
+});
 
 router.post(
   "/selenium",
-  upload.array("pdfs"),
+  upload.fields([
+    { name: "pdfs", maxCount: 10 },
+    { name: "images", maxCount: 10 },
+  ]),
   async (req: Request, res: Response): Promise<any> => {
     if (!req.files || !req.body.data) {
       return res
@@ -61,7 +83,10 @@ router.post(
 
     try {
       const claimData = JSON.parse(req.body.data);
-      const files = req.files as Express.Multer.File[];
+      const pdfs =
+        (req.files as Record<string, Express.Multer.File[]>).pdfs ?? [];
+      const images =
+        (req.files as Record<string, Express.Multer.File[]>).images ?? [];
 
       const credentials = await storage.getInsuranceCredentialByUserAndSiteKey(
         req.user.id,
@@ -78,7 +103,11 @@ router.post(
         massdhpUsername: credentials.username,
         massdhpPassword: credentials.password,
       };
-      const result = await forwardToSeleniumAgent(enrichedData, files);
+
+      const result = await forwardToSeleniumAgent(enrichedData, [
+        ...pdfs,
+        ...images,
+      ]);
 
       res.json({ success: true, data: result });
     } catch (err) {
@@ -95,10 +124,10 @@ router.post(
       return res.status(401).json({ error: "Unauthorized: user info missing" });
     }
 
-    try{
-      const { patientId, claimId } = req.body; 
+    try {
+      const { patientId, claimId } = req.body;
 
-      if (!patientId ||  !claimId) {
+      if (!patientId || !claimId) {
         return res.status(400).json({ error: "Missing patientId or claimId" });
       }
       const parsedPatientId = parseInt(patientId);
@@ -107,14 +136,18 @@ router.post(
       const result = await forwardToSeleniumAgent2();
 
       if (result.status !== "success") {
-        return res.status(400).json({ error: result.message || "Failed to fetch PDF" });
+        return res
+          .status(400)
+          .json({ error: result.message || "Failed to fetch PDF" });
       }
 
       const pdfUrl = result.pdf_url;
       const filename = path.basename(new URL(pdfUrl).pathname);
-      const pdfResponse = await axios.get(pdfUrl, { responseType: "arraybuffer" });
+      const pdfResponse = await axios.get(pdfUrl, {
+        responseType: "arraybuffer",
+      });
 
-      // Temp savving the pdf incase, creatClaimPdf failed: 
+      // Temp savving the pdf incase, creatClaimPdf failed:
       const tempDir = path.join(__dirname, "..", "..", "temp");
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
@@ -127,7 +160,7 @@ router.post(
         parsedPatientId,
         parsedClaimId,
         filename,
-        pdfResponse.data 
+        pdfResponse.data
       );
 
       return res.json({
@@ -138,9 +171,11 @@ router.post(
       });
     } catch (err) {
       console.error("Error in /selenium/fetchpdf:", err);
-      return res.status(500).json({ error: "Failed to forward to selenium agent 2" });
+      return res
+        .status(500)
+        .json({ error: "Failed to forward to selenium agent 2" });
+    }
   }
-}
 );
 
 // GET /api/claims?page=1&limit=5

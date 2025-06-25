@@ -219,7 +219,7 @@ export default function ClaimsPage() {
   const handleSeleniumPopup = async (actionType: string) => {
     try {
       if (!claimRes?.id) {
-        throw new Error("Missing claimId");        
+        throw new Error("Missing claimId");
       }
       if (!selectedPatient) {
         throw new Error("Missing patientId");
@@ -518,13 +518,16 @@ export default function ClaimsPage() {
   // handle selenium
   const handleSelenium = async (data: any) => {
     const formData = new FormData();
-
     formData.append("data", JSON.stringify(data));
 
     const uploadedFiles: File[] = data.uploadedFiles ?? [];
 
     uploadedFiles.forEach((file: File) => {
-      formData.append("pdfs", file);
+      if (file.type === "application/pdf") {
+        formData.append("pdfs", file);
+      } else if (file.type.startsWith("image/")) {
+        formData.append("images", file);
+      }
     });
 
     try {
@@ -537,7 +540,8 @@ export default function ClaimsPage() {
 
       toast({
         title: "Selenium service notified",
-        description: "Your claim data was successfully sent to Selenium.",
+        description:
+          "Your claim data was successfully sent to Selenium, Wait for its response.",
         variant: "default",
       });
       setIsMhPopupOpen(true);

@@ -1,8 +1,8 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Upload, File, X, FilePlus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import React, { useState, useRef, useCallback } from "react";
+import { Upload, File, X, FilePlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface FileUploadZoneProps {
   onFileUpload: (files: File[]) => void;
@@ -11,43 +11,25 @@ interface FileUploadZoneProps {
   maxFiles?: number;
 }
 
-export function MultipleFileUploadZone({ 
-  onFileUpload, 
-  isUploading, 
-  acceptedFileTypes = "application/pdf",
-  maxFiles = 5,
+export function MultipleFileUploadZone({
+  onFileUpload,
+  isUploading,
+  acceptedFileTypes = "application/pdf,image/jpeg,image/jpg,image/png,image/webp",
+  maxFiles = 10,
 }: FileUploadZoneProps) {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragging) {
-      setIsDragging(true);
-    }
-  }, [isDragging]);
+  const allowedTypes = acceptedFileTypes.split(",").map((type) => type.trim());
 
   const validateFile = (file: File) => {
-    if (!file.type.match(acceptedFileTypes)) {
+    if (!allowedTypes.includes(file.type)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a PDF file.",
-        variant: "destructive"
+        description: "Only PDF and image files are allowed.",
+        variant: "destructive",
       });
       return false;
     }
@@ -55,8 +37,8 @@ export function MultipleFileUploadZone({
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "File size should be less than 5MB.",
-        variant: "destructive"
+        description: "File size must be less than 5MB.",
+        variant: "destructive",
       });
       return false;
     }
@@ -84,16 +66,45 @@ export function MultipleFileUploadZone({
     onFileUpload(updatedFiles);
   };
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    handleFiles(e.dataTransfer.files);
-  }, [uploadedFiles]);
+  }, []);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    handleFiles(e.target.files);
-  }, [uploadedFiles]);
+  const handleDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isDragging) {
+        setIsDragging(true);
+      }
+    },
+    [isDragging]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      handleFiles(e.dataTransfer.files);
+    },
+    [uploadedFiles]
+  );
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      handleFiles(e.target.files);
+    },
+    [uploadedFiles]
+  );
 
   const handleBrowseClick = () => {
     if (fileInputRef.current) {
@@ -118,11 +129,13 @@ export function MultipleFileUploadZone({
         accept={acceptedFileTypes}
         multiple
       />
-      
+
       <div
         className={cn(
           "border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-center transition-colors",
-          isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25",
+          isDragging
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/25",
           isUploading && "opacity-50 cursor-not-allowed"
         )}
         onDragEnter={handleDragEnter}
@@ -141,12 +154,17 @@ export function MultipleFileUploadZone({
           </div>
         ) : uploadedFiles.length > 0 ? (
           <div className="flex flex-col items-center gap-4 w-full">
-            <p className="font-medium text-primary">{uploadedFiles.length} file(s) uploaded</p>
+            <p className="font-medium text-primary">
+              {uploadedFiles.length} file(s) uploaded
+            </p>
             <ul className="w-full text-left space-y-2">
               {uploadedFiles.map((file, index) => (
-                <li key={index} className="flex justify-between items-center border-b pb-1">
+                <li
+                  key={index}
+                  className="flex justify-between items-center border-b pb-1"
+                >
                   <span className="text-sm">{file.name}</span>
-                  <button 
+                  <button
                     className="ml-2 p-1 text-muted-foreground hover:text-red-500"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -163,16 +181,26 @@ export function MultipleFileUploadZone({
           <div className="flex flex-col items-center gap-4">
             <FilePlus className="h-12 w-12 text-primary/70" />
             <div>
-              <p className="font-medium text-primary">Drag and drop PDF files here</p>
-              <p className="text-sm text-muted-foreground mt-1">Or click to browse files</p>
+              <p className="font-medium text-primary">
+                Drag and drop PDF or Image files here
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Or click to browse files
+              </p>
             </div>
-            <Button type="button" variant="secondary" onClick={(e) => {
-              e.stopPropagation();
-              handleBrowseClick();
-            }}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBrowseClick();
+              }}
+            >
               Browse files
             </Button>
-            <p className="text-xs text-muted-foreground">Up to {maxFiles} PDF files, 5MB each</p>
+            <p className="text-xs text-muted-foreground">
+              Allowed types: PDF, JPG, PNG — Max {maxFiles} files, 5MB each
+            </p>
           </div>
         )}
       </div>

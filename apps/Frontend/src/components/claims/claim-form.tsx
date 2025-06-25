@@ -172,12 +172,14 @@ export function ClaimForm({
       },
     });
   useEffect(() => {
-  if (staffMembersRaw.length > 0 && !staff) {
-    const kaiGao = staffMembersRaw.find((member) => member.name === "Kai Gao");
-    const defaultStaff = kaiGao || staffMembersRaw[0];
-    if (defaultStaff) setStaff(defaultStaff);
-  }
-}, [staffMembersRaw, staff]);
+    if (staffMembersRaw.length > 0 && !staff) {
+      const kaiGao = staffMembersRaw.find(
+        (member) => member.name === "Kai Gao"
+      );
+      const defaultStaff = kaiGao || staffMembersRaw[0];
+      if (defaultStaff) setStaff(defaultStaff);
+    }
+  }, [staffMembersRaw, staff]);
 
   // Service date state
   function parseLocalDate(dateInput: Date | string): Date {
@@ -333,11 +335,30 @@ export function ClaimForm({
   const handleFileUpload = (files: File[]) => {
     setIsUploading(true);
 
-    const validFiles = files.filter((file) => file.type === "application/pdf");
-    if (validFiles.length > 5) {
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+
+    const validFiles = files.filter((file) => allowedTypes.includes(file.type));
+
+    if (validFiles.length > 10) {
       toast({
         title: "Too Many Files",
-        description: "You can only upload up to 5 PDFs.",
+        description: "You can only upload up to 10 files (PDFs or images).",
+        variant: "destructive",
+      });
+      setIsUploading(false);
+      return;
+    }
+
+    if (validFiles.length === 0) {
+      toast({
+        title: "Invalid File Type",
+        description: "Only PDF and image files are allowed.",
         variant: "destructive",
       });
       setIsUploading(false);
@@ -351,7 +372,7 @@ export function ClaimForm({
 
     toast({
       title: "Files Selected",
-      description: `${validFiles.length} PDF file(s) ready for processing.`,
+      description: `${validFiles.length} file(s) ready for processing.`,
     });
 
     setIsUploading(false);
@@ -711,34 +732,15 @@ export function ClaimForm({
             {/* File Upload Section */}
             <div className="mt-4 bg-gray-100 p-4 rounded-md space-y-4">
               <p className="text-sm text-gray-500">
-                Only PDF files allowed. You can upload up to 5 files. File types
-                with 4+ character extensions like .DOCX, .PPTX, or .XLSX are not
-                allowed.
+                You can upload up to 10 files. Allowed types: PDF, JPG, PNG,
+                WEBP.
               </p>
-
-              <div className="flex flex-wrap gap-4 items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Label>Select Field:</Label>
-                  <Select defaultValue="supportData">
-                    <SelectTrigger className="w-60">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="supportData">
-                        Support Data for Claim
-                      </SelectItem>
-                      <SelectItem value="xrays">X-Ray Images</SelectItem>
-                      <SelectItem value="photos">Clinical Photos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
               <MultipleFileUploadZone
                 onFileUpload={handleFileUpload}
                 isUploading={isUploading}
-                acceptedFileTypes="application/pdf"
-                maxFiles={5}
+                acceptedFileTypes="application/pdf,image/jpeg,image/jpg,image/png,image/webp"
+                maxFiles={10}
               />
 
               {form.uploadedFiles.length > 0 && (
