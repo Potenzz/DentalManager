@@ -172,11 +172,12 @@ export function ClaimForm({
       },
     });
   useEffect(() => {
-    if (staffMembersRaw.length > 0 && !staff) {
-      const firstStaff = staffMembersRaw[0];
-      if (firstStaff) setStaff(firstStaff);
-    }
-  }, [staffMembersRaw, staff]);
+  if (staffMembersRaw.length > 0 && !staff) {
+    const kaiGao = staffMembersRaw.find((member) => member.name === "Kai Gao");
+    const defaultStaff = kaiGao || staffMembersRaw[0];
+    if (defaultStaff) setStaff(defaultStaff);
+  }
+}, [staffMembersRaw, staff]);
 
   // Service date state
   function parseLocalDate(dateInput: Date | string): Date {
