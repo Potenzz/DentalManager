@@ -2,6 +2,7 @@
   "name": "seleniumservice",
   "private": true,
   "scripts": {
-    "postinstall": "pip install -r requirements.txt"
+    "postinstall": "pip install -r requirements.txt",
+    "dev": "python agent.py"
   }
 }

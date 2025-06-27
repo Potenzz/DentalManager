@@ -18,6 +18,12 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import RecentClaims from "@/components/claims/recent-claims";
 import { Button } from "@/components/ui/button";
+import { useDispatch } from "react-redux";
+import {
+  setTaskStatus,
+  clearTaskStatus,
+} from "@/redux/slices/seleniumTaskSlice";
+import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -71,8 +77,8 @@ type UpdatePatient = z.infer<typeof updatePatientSchema>;
 export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClaimFormOpen, setIsClaimFormOpen] = useState(false);
-  const [isMhPopupOpen, setIsMhPopupOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<number | null>(null);
+  const dispatch = useDispatch();
   const { toast } = useToast();
   const { user } = useAuth();
   const [claimFormData, setClaimFormData] = useState<any>({
@@ -215,38 +221,6 @@ export default function ClaimsPage() {
     },
   });
 
-  // selenium pdf download handler
-  const handleSeleniumPopup = async (actionType: string) => {
-    try {
-      if (!claimRes?.id) {
-        throw new Error("Missing claimId");
-      }
-      if (!selectedPatient) {
-        throw new Error("Missing patientId");
-      }
-      const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
-        action: actionType,
-        patientId: selectedPatient,
-        claimId: claimRes.id,
-      });
-      const result = await res.json();
-
-      toast({
-        title: "Success",
-        description: "MH action completed.",
-      });
-
-      setIsMhPopupOpen(false);
-      setSelectedPatient(null);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   // Converts local date to exact UTC date with no offset issues
   function parseLocalDate(dateInput: Date | string): Date {
     if (dateInput instanceof Date) return dateInput;
@@ -332,6 +306,7 @@ export default function ClaimsPage() {
       return res.json();
     },
     onSuccess: (data) => {
+      console.log(data)
       setClaimRes(data);
       toast({
         title: "Claim submitted successfully",
@@ -519,7 +494,6 @@ export default function ClaimsPage() {
   const handleSelenium = async (data: any) => {
     const formData = new FormData();
     formData.append("data", JSON.stringify(data));
-
     const uploadedFiles: File[] = data.uploadedFiles ?? [];
 
     uploadedFiles.forEach((file: File) => {
@@ -531,25 +505,101 @@ export default function ClaimsPage() {
     });
 
     try {
+      dispatch(
+        setTaskStatus({
+          status: "pending",
+          message: "Submitting claim to Selenium...",
+        })
+      );
       const response = await apiRequest(
         "POST",
         "/api/claims/selenium",
         formData
       );
-      const result = await response.json();
+      const result1 = await response.json();
+      if (result1.error) throw new Error(result1.error);
+
+      dispatch(
+        setTaskStatus({
+          status: "pending",
+          message: "Submitted to Selenium. Awaiting PDF...",
+        })
+      );
 
       toast({
         title: "Selenium service notified",
         description:
-          "Your claim data was successfully sent to Selenium, Wait for its response.",
+          "Your claim data was successfully sent to Selenium, Waitinig for its response.",
         variant: "default",
       });
-      setIsMhPopupOpen(true);
-      return result;
+
+      // const result2 = await handleSeleniumPdfDownload(result1);
+      // return result2;
     } catch (error: any) {
+      dispatch(
+        setTaskStatus({
+          status: "error",
+          message: error.message || "Selenium submission failed",
+        })
+      );
       toast({
         title: "Selenium service error",
         description: error.message || "An error occurred.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // selenium pdf download handler
+  const handleSeleniumPdfDownload = async (data: any) => {
+    try {
+      if (!claimRes?.id) {
+        throw new Error("Missing claimId2s");
+      }
+      if (!selectedPatient) {
+        throw new Error("Missing patientId");
+      }
+
+      dispatch(
+        setTaskStatus({
+          status: "pending",
+          message: "Downloading PDF from Selenium...",
+        })
+      );
+
+      const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
+        patientId: selectedPatient,
+        claimId: claimRes.id,
+        pdf_url: data["pdf_url"],
+      });
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+
+      dispatch(
+        setTaskStatus({
+          status: "success",
+          message: "Claim submitted & PDF downloaded successfully.",
+        })
+      );
+
+      toast({
+        title: "Success",
+        description: "Claim Submitted and Pdf Downloaded completed.",
+      });
+
+      setSelectedPatient(null);
+
+      return result;
+    } catch (error: any) {
+      dispatch(
+        setTaskStatus({
+          status: "error",
+          message: error.message || "Failed to download PDF",
+        })
+      );
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch PDF",
         variant: "destructive",
       });
     }
@@ -564,6 +614,8 @@ export default function ClaimsPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
+
+        <SeleniumTaskBanner />
 
         <main className="flex-1 overflow-y-auto p-4">
           {/* Header */}
@@ -679,31 +731,6 @@ export default function ClaimsPage() {
           onHandleUpdatePatient={handleUpdatePatient}
           onHandleForSelenium={handleSelenium}
         />
-      )}
-
-      {isMhPopupOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-semibold mb-4">Selenium Handler</h2>
-
-            <div className="flex justify-between space-x-4">
-              <Button
-                className="flex-1"
-                onClick={() => handleSeleniumPopup("submit")}
-              >
-                Download the PDF.
-              </Button>
-
-              <Button
-                className="flex-1"
-                variant="secondary"
-                onClick={() => setIsMhPopupOpen(false)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

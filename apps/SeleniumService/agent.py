@@ -19,31 +19,14 @@ async def start_workflow(request: Request):
     data = await request.json()
     try:
         bot = AutomationMassHealth(data)
-        result = bot.main_workflow_upto_step2("https://providers.massdhp.com/providers_login.asp")
-        return result
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-# Endpoint: Step 2 — Extract the PDF content after manual submission
-@app.post("/fetch-pdf")
-async def fetch_pdf():
-    try:
-        bot = AutomationMassHealth.get_last_instance()
-        if not bot:
-            return {"status": "error", "message": "No running automation session"}
-        
-        result = bot.reach_to_pdf()
+        result = bot.main_workflow("https://providers.massdhp.com/providers_login.asp")
 
         if result.get("status") != "success":
             return {"status": "error", "message": result.get("message")}
-
-        return {
-            "status": "success",
-            "pdf_url": result["pdf_url"]
-        }
+        
+        return result
     except Exception as e:
         return {"status": "error", "message": str(e)}
-    
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5002)

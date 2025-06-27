@@ -11,16 +11,11 @@ from datetime import datetime
 import tempfile
 import base64
 import os
-import requests
-import json
 
 class AutomationMassHealth:    
-    last_instance = None  
-
     def __init__(self, data):
         self.headless = False
         self.driver = None
-        AutomationMassHealth.last_instance = self
 
         self.data = data
         self.claim = data.get("claim", {})
@@ -36,11 +31,9 @@ class AutomationMassHealth:
         self.missingTeethStatus = self.claim.get("missingTeethStatus", "")
         self.missingTeeth = self.claim.get("missingTeeth", {})
     
-    @staticmethod
-    def get_last_instance():
-        return AutomationMassHealth.last_instance
 
     def config_driver(self):
+        print("caled config")
         options = webdriver.ChromeOptions()
         if self.headless:
             options.add_argument("--headless")
@@ -289,13 +282,23 @@ class AutomationMassHealth:
         except Exception as e: 
             print(f"Error while filling remarks: {e}")
             return "ERROR:REMARKS FAILED"
+        
+        # 5 - close buton
+        try:
+            close_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='submit' and @value='Submit Request']")))
+            close_button.click()
+            
+            time.sleep(3)
+            
+        except Exception as e: 
+            print(f"Error while Closing: {e}")
+            return "ERROR:CLOSE FAILED"
 
         return "Success"
     
 
     def reach_to_pdf(self):
-        wait = WebDriverWait(self.driver, 30)
-
+        wait = WebDriverWait(self.driver, 90)
         try:
             print("Waiting for PDF link to appear on success page...")
             pdf_link_element = wait.until(
@@ -313,10 +316,7 @@ class AutomationMassHealth:
                 full_pdf_url = pdf_relative_url
             
             print("FULL PDF LINK: ",full_pdf_url)
-            return {
-                "status": "success",
-                "pdf_url": full_pdf_url
-            }
+            return full_pdf_url
 
         except Exception as e:
             print(f"ERROR: {str(e)}")
@@ -328,27 +328,37 @@ class AutomationMassHealth:
         finally:
             if self.driver:
                 self.driver.quit()
-            AutomationMassHealth.last_instance = None
 
-        
-    def main_workflow_upto_step2(self, url):
-        self.config_driver()
-        print("Reaching Site :", url)
-        self.driver.maximize_window()
-        self.driver.get(url)
-        time.sleep(3)
+    def main_workflow(self, url):
+        try: 
+            self.config_driver()
+            print("Reaching Site :", url)
+            self.driver.maximize_window()
+            self.driver.get(url)
+            time.sleep(3)
 
-        if self.login().startswith("ERROR"):
-            return {"status": "error", "message": "Login failed"}
+            login_result = self.login()
+            if login_result.startswith("ERROR"):
+                return {"status": "error", "message": login_result}
 
-        if self.step1().startswith("ERROR"):
-            return {"status": "error", "message": "Step1 failed"}
+            step1_result = self.step1()
+            if step1_result.startswith("ERROR"):
+                return {"status": "error", "message": step1_result}
 
-        if self.step2().startswith("ERROR"):
-            return {"status": "error", "message": "Step2 failed"}
+            step2_result = self.step2()
+            if step2_result.startswith("ERROR"):
+                return {"status": "error", "message": step2_result}
+            
+            reachToPdf_result = self.reach_to_pdf()
+            if reachToPdf_result.startswith("ERROR"):
+                return {"status": "error", "message": reachToPdf_result}
 
-        print("Waiting for user to manually submit form in browser...")
-        return {
-            "status": "waiting_for_user",
-            "message": "Automation paused. Please submit the form manually in browser."
-        }
+            return {
+                    "status": "success",
+                    "pdf_url": reachToPdf_result
+                }
+        except Exception as e: 
+            return {
+                "status": "error",
+                "message": e
+            }

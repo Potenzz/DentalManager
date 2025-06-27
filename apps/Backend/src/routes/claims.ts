@@ -4,10 +4,7 @@ import { storage } from "../storage";
 import { z } from "zod";
 import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import multer from "multer";
-import {
-  forwardToSeleniumAgent,
-  forwardToSeleniumAgent2,
-} from "../services/seleniumClient";
+import { forwardToSeleniumAgent } from "../services/seleniumClient";
 import path from "path";
 import axios from "axios";
 import fs from "fs";
@@ -110,9 +107,11 @@ router.post(
       ]);
 
       res.json({ success: true, data: result });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      res.status(500).json({ error: "Failed to forward to selenium agent" });
+      return res.status(500).json({
+        error: err.message || "Failed to forward to selenium agent",
+      });
     }
   }
 );
@@ -120,30 +119,34 @@ router.post(
 router.post(
   "/selenium/fetchpdf",
   async (req: Request, res: Response): Promise<any> => {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: "Unauthorized: user info missing" });
+    function sendError(res: Response, message: string, status = 400) {
+      console.error("Error:", message);
+      return res.status(status).json({ error: message });
     }
 
     try {
-      const { patientId, claimId } = req.body;
-
-      if (!patientId || !claimId) {
-        return res.status(400).json({ error: "Missing patientId or claimId" });
+      if (!req.user || !req.user.id) {
+        return sendError(res, "Unauthorized: user info missing", 401);
       }
+
+      const { patientId, claimId, pdf_url } = req.body;
+
+      if (!pdf_url) {
+        return sendError(res, "Missing pdf_url");
+      }
+
+      if (!patientId) {
+        return sendError(res, "Missing Patient Id");
+      }
+      if (!claimId) {
+        return sendError(res, "Missing Claim Id");
+      }
+
       const parsedPatientId = parseInt(patientId);
       const parsedClaimId = parseInt(claimId);
 
-      const result = await forwardToSeleniumAgent2();
-
-      if (result.status !== "success") {
-        return res
-          .status(400)
-          .json({ error: result.message || "Failed to fetch PDF" });
-      }
-
-      const pdfUrl = result.pdf_url;
-      const filename = path.basename(new URL(pdfUrl).pathname);
-      const pdfResponse = await axios.get(pdfUrl, {
+      const filename = path.basename(new URL(pdf_url).pathname);
+      const pdfResponse = await axios.get(pdf_url, {
         responseType: "arraybuffer",
       });
 
@@ -166,14 +169,12 @@ router.post(
       return res.json({
         success: true,
         pdfPath: `/temp/${filename}`,
-        pdfUrl,
+        pdf_url,
         fileName: filename,
       });
     } catch (err) {
       console.error("Error in /selenium/fetchpdf:", err);
-      return res
-        .status(500)
-        .json({ error: "Failed to forward to selenium agent 2" });
+      return sendError(res, "Failed to Fetch and Download the pdf", 500);
     }
   }
 );
