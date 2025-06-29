@@ -33,7 +33,6 @@ class AutomationMassHealth:
     
 
     def config_driver(self):
-        print("caled config")
         options = webdriver.ChromeOptions()
         if self.headless:
             options.add_argument("--headless")
