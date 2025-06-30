@@ -533,8 +533,8 @@ export default function ClaimsPage() {
         variant: "default",
       });
 
-      // const result2 = await handleSeleniumPdfDownload(result1);
-      // return result2;
+      const result2 = await handleSeleniumPdfDownload(result1);
+      return result2;
     } catch (error: any) {
       dispatch(
         setTaskStatus({
