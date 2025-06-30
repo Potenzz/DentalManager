@@ -39,19 +39,11 @@ npm run dev
 ```
 
 
-5. Or if want to run specfic app (either Backend or Frontend). 
+5. Now you need to run the selnium service as well. 
 ```sh 
-cd apps/Backend 
-npm run dev
+cd apps/SeleniumService
+python3 agent.py
 ```
-
-or 
-
-```sh
-cd apps/Frontend
-npm run dev
-```
-
 
 
 
