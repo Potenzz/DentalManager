@@ -39,7 +39,7 @@ npm run dev
 ```
 
 
-5. Now you need to run the selnium service as well. 
+5. Now you need to run the selnium service as well in new terminal. 
 ```sh 
 cd apps/SeleniumService
 python3 agent.py
