@@ -287,8 +287,20 @@ class AutomationMassHealth:
             close_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='submit' and @value='Submit Request']")))
             close_button.click()
             
-            time.sleep(3)
-            
+            time.sleep(1)
+
+            # Switch to alert and accept it
+            try:
+                wait.until(EC.alert_is_present())
+
+                alert = self.driver.switch_to.alert
+                alert.accept()
+                print("Alert accepted.")
+            except TimeoutException:
+                print("No alert appeared after clicking the button.")
+                
+            time.sleep(1)
+
         except Exception as e: 
             print(f"Error while Closing: {e}")
             return "ERROR:CLOSE FAILED"
