@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format, parse } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { X, Calendar as CalendarIcon, HelpCircle } from "lucide-react";
@@ -22,6 +21,7 @@ import {
 import {
   PatientUncheckedCreateInputObjectSchema,
   AppointmentUncheckedCreateInputObjectSchema,
+  ClaimUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
@@ -35,7 +35,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import procedureCodes from "../../assets/data/procedureCodes.json";
-import exp from "constants";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -78,6 +77,9 @@ const updateAppointmentSchema = (
   .partial();
 type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
 
+type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
+
+
 interface ServiceLine {
   procedureCode: string;
   procedureDate: string; // YYYY-MM-DD
@@ -101,12 +103,13 @@ interface ClaimFormData {
   insuranceSiteKey?: string;
   status: string; // default "pending"
   serviceLines: ServiceLine[];
+  claimId?: number;
 }
 
 interface ClaimFormProps {
   patientId: number;
   extractedData?: Partial<Patient>;
-  onSubmit: (data: ClaimFormData) => void;
+  onSubmit: (data: ClaimFormData) => Promise<Claim>;
   onHandleAppointmentSubmit: (
     appointmentData: InsertAppointment | UpdateAppointment
   ) => void;
@@ -413,14 +416,14 @@ export function ClaimForm({
     );
 
     const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
-    onSubmit({
-      ...formToCreateClaim,
-      serviceLines: filteredServiceLines,
-      staffId: Number(staff?.id),
-      patientId: patientId,
-      insuranceProvider: "MassHealth",
-      appointmentId: appointmentId!,
-    });
+    const createdClaim = await onSubmit({
+    ...formToCreateClaim,
+    serviceLines: filteredServiceLines,
+    staffId: Number(staff?.id),
+    patientId: patientId,
+    insuranceProvider: "MassHealth",
+    appointmentId: appointmentId!,
+  });
 
     // 4. sending form data to selenium service
     onHandleForSelenium({
@@ -431,6 +434,7 @@ export function ClaimForm({
       insuranceProvider: "Mass Health",
       appointmentId: appointmentId!,
       insuranceSiteKey: "MH",
+      claimId: createdClaim.id,
     });
     // 4. Close form
     onClose();

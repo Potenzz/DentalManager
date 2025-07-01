@@ -85,7 +85,6 @@ export default function ClaimsPage() {
     patientId: null,
     serviceDate: "",
   });
-  const [claimRes, setClaimRes] = useState<Claim | null>(null);
 
   // Fetch patients
   const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
@@ -305,11 +304,9 @@ export default function ClaimsPage() {
       const res = await apiRequest("POST", "/api/claims/", claimData);
       return res.json();
     },
-    onSuccess: (data) => {
-      console.log(data)
-      setClaimRes(data);
+    onSuccess: () => {
       toast({
-        title: "Claim submitted successfully",
+        title: "Claim created successfully",
         variant: "default",
       });
     },
@@ -321,6 +318,12 @@ export default function ClaimsPage() {
       });
     },
   });
+
+  function handleClaimSubmit(claimData: any): Promise<Claim> {
+    return createClaimMutation.mutateAsync(claimData).then((data) => {
+      return data;
+    });
+  }
 
   const [location] = useLocation(); // gets path, e.g. "/claims"
 
@@ -425,9 +428,6 @@ export default function ClaimsPage() {
     }
   }, [memberId, dob]);
 
-  function handleClaimSubmit(claimData: any) {
-    createClaimMutation.mutate(claimData);
-  }
 
   const getDisplayProvider = (provider: string) => {
     const insuranceMap: Record<string, string> = {
@@ -553,8 +553,8 @@ export default function ClaimsPage() {
   // selenium pdf download handler
   const handleSeleniumPdfDownload = async (data: any) => {
     try {
-      if (!claimRes?.id) {
-        throw new Error("Missing claimId2s");
+      if (!data.claimId) {
+        throw new Error("Missing claimId in handleSeleniumPdfDownload");
       }
       if (!selectedPatient) {
         throw new Error("Missing patientId");
@@ -569,8 +569,8 @@ export default function ClaimsPage() {
 
       const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
         patientId: selectedPatient,
-        claimId: claimRes.id,
-        pdf_url: data["pdf_url"],
+        claimId: data.claimId,
+        pdf_url: data.pdf_url,
       });
       const result = await res.json();
       if (result.error) throw new Error(result.error);
