@@ -106,7 +106,7 @@ router.post(
         ...images,
       ]);
 
-      res.json({ success: true, data: result });
+      res.json(result);
     } catch (err: any) {
       console.error(err);
       return res.status(500).json({
