@@ -106,7 +106,10 @@ router.post(
         ...images,
       ]);
 
-      res.json(result);
+      res.json({
+        ...result,
+        claimId: claimData.claimId,
+      });
     } catch (err: any) {
       console.error(err);
       return res.status(500).json({
