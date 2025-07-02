@@ -58,7 +58,6 @@ class AutomationMassHealth:
             login_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='submit' and @value='Login']")))
             login_button.click()
 
-            print("Login submitted successfully.")
             return "Success"
 
         except Exception as e: 
@@ -123,7 +122,6 @@ class AutomationMassHealth:
                 pass
 
             return "Success"
-
 
         except Exception as e: 
             print(f"Error while step1 i.e Cheking the MemberId and DOB in: {e}")
@@ -192,10 +190,6 @@ class AutomationMassHealth:
                 wait.until(EC.element_to_be_clickable((By.XPATH, add_proc_xpath))).click()
 
                 time.sleep(1)
-
-
-            print("Procedure codes submitted successfully.")
-            
 
         except Exception as e: 
             print(f"Error while filling Procedure Codes: {e}")
@@ -295,7 +289,6 @@ class AutomationMassHealth:
 
                 alert = self.driver.switch_to.alert
                 alert.accept()
-                print("Alert accepted.")
             except TimeoutException:
                 print("No alert appeared after clicking the button.")
                 
@@ -311,14 +304,10 @@ class AutomationMassHealth:
     def reach_to_pdf(self):
         wait = WebDriverWait(self.driver, 90)
         try:
-            print("Waiting for PDF link to appear on success page...")
             pdf_link_element = wait.until(
                 EC.element_to_be_clickable((By.XPATH, "//a[contains(@href, '.pdf')]"))
             )
-            print("PDF link found.")
-
             time.sleep(5)
-
             pdf_relative_url = pdf_link_element.get_attribute("href")
 
             if not pdf_relative_url.startswith("http"):

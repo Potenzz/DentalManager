@@ -153,14 +153,6 @@ router.post(
         responseType: "arraybuffer",
       });
 
-      // Temp savving the pdf incase, creatClaimPdf failed:
-      const tempDir = path.join(__dirname, "..", "..", "temp");
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-      const filePath = path.join(tempDir, filename);
-      fs.writeFileSync(filePath, pdfResponse.data);
-
       // saving at postgres db
       await storage.createClaimPdf(
         parsedPatientId,
