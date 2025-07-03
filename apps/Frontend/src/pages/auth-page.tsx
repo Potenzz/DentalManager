@@ -2,9 +2,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { UserUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -17,9 +16,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent } from "@/components/ui/card";
-import { BriefcaseMedical, CheckCircle, Torus } from "lucide-react";
+import { Card} from "@/components/ui/card";
+import { CheckCircle, Torus } from "lucide-react";
 import { CheckedState } from "@radix-ui/react-checkbox";
+import LoadingScreen from "@/components/ui/LoadingScreen";
+import { useLocation } from "wouter";
 
 const insertUserSchema = (
   UserUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -53,7 +54,8 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<string>("login");
-  const { user, loginMutation, registerMutation } = useAuth();
+  const { isLoading, user, loginMutation, registerMutation } = useAuth();
+  const [, navigate] = useLocation();
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -75,10 +77,7 @@ export default function AuthPage() {
   });
 
   const onLoginSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate({
-      username: data.username,
-      password: data.password,
-    });
+    loginMutation.mutate({ username: data.username, password: data.password });
   };
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
@@ -88,10 +87,15 @@ export default function AuthPage() {
     });
   };
 
-  // Redirect if already logged in
-  if (user) {
-    return <Redirect to="/" />;
+  if (isLoading) {
+    return <LoadingScreen />;
   }
+
+  useEffect(() => {
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -173,12 +177,15 @@ export default function AuthPage() {
                         </div>
                       )}
                     />
-                    <a
-                      href="#"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // do something if needed
+                      }}
                       className="text-sm font-medium text-primary hover:text-primary/80"
                     >
                       Forgot password?
-                    </a>
+                    </button>
                   </div>
 
                   <Button

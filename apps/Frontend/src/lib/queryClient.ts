@@ -8,7 +8,10 @@ async function throwIfResNotOk(res: Response) {
 
     if (res.status === 401 || res.status === 403) {
       localStorage.removeItem("token");
-      window.location.href = "/auth"; // 👈 Redirect on invalid/expired token
+      if (!window.location.pathname.startsWith("/auth")) {
+        window.location.href = "/auth";
+        throw new Error(`${res.status}: Unauthorized`);
+      }
       return;
     }
     throw new Error(`${res.status}: ${text}`);

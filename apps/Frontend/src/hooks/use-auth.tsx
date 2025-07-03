@@ -55,15 +55,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
 
-      const data = await res.json();
-      localStorage.setItem("token", data.token);
+      const contentType = res.headers.get("content-type") || "";
+      const isJson = contentType.includes("application/json");
+      const data = isJson ? await res.json() : {};
 
-      return data;
+      if (!res.ok) {
+        throw new Error(data?.error || "Login failed. Please try again.");
+      }
+      if (!data?.token || !data?.user) {
+        throw new Error("Invalid response from server");
+      }
+
+      localStorage.setItem("token", data.token);
+      return data.user;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/users/"], user);
     },
     onError: (error: Error) => {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
         description: error.message,
@@ -75,14 +85,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
       const res = await apiRequest("POST", "/api/auth/register", credentials);
-      const data = await res.json();
+
+      const contentType = res.headers.get("content-type") || "";
+      const isJson = contentType.includes("application/json");
+      const data = isJson ? await res.json() : {};
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Registration failed.");
+      }
+
+      if (!data?.token || !data?.user) {
+        throw new Error("Invalid response from server");
+      }
+
       localStorage.setItem("token", data.token);
-      return data;
+      return data.user;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/users/"], user);
     },
     onError: (error: Error) => {
+      console.error("Registration error:", error);
       toast({
         title: "Registration failed",
         description: error.message,
@@ -93,7 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      // Remove token from localStorage when logging out
       localStorage.removeItem("token");
       await apiRequest("POST", "/api/auth/logout");
     },
