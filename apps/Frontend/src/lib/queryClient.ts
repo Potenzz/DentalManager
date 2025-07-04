@@ -4,7 +4,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_BACKEND ?? "";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
 
     if (res.status === 401 || res.status === 403) {
       localStorage.removeItem("token");
@@ -14,7 +13,7 @@ async function throwIfResNotOk(res: Response) {
       }
       return;
     }
-    throw new Error(`${res.status}: ${text}`);
+    throw new Error(`${res.status}: ${res.statusText}`);
   }
 }
 

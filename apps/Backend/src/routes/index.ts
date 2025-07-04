@@ -6,7 +6,7 @@ import staffRoutes from './staffs'
 import pdfExtractionRoutes from './pdfExtraction';
 import claimsRoutes from './claims';
 import insuranceCredsRoutes from './insuranceCreds';
-import documentRoutes from './documenets';
+import documentRoutes from './documents';
 
 const router = Router();
 
