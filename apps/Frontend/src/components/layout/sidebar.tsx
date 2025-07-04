@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, Calendar, Settings, FileCheck, ClipboardCheck, CreditCard, FolderOpen } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Settings, FileCheck, Shield, CreditCard, FolderOpen } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -28,14 +28,14 @@ export function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps) {
       icon: <Users className="h-5 w-5" />,
     },
     {
+      name: "Insurance Eligibility",
+      path: "/insurance-eligibility",
+      icon: <Shield className="h-5 w-5" />,
+    },
+    {
       name: "Claims",
       path: "/claims",
       icon: <FileCheck className="h-5 w-5" />,
-    },
-    {
-      name: "Pre-authorizations",
-      path: "/preauthorizations",
-      icon: <ClipboardCheck className="h-5 w-5" />,
     },
     {
       name: "Payments",

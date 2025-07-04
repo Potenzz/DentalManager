@@ -16,10 +16,8 @@ const AppointmentsPage = lazy(() => import("./pages/appointments-page"));
 const PatientsPage = lazy(() => import("./pages/patients-page"));
 const SettingsPage = lazy(() => import("./pages/settings-page"));
 const ClaimsPage = lazy(() => import("./pages/claims-page"));
-const PreAuthorizationsPage = lazy(
-  () => import("./pages/preauthorizations-page")
-);
 const PaymentsPage = lazy(() => import("./pages/payments-page"));
+const InsuranceEligibilityPage = lazy(()=> import("./pages/insurance-eligibility-page"))
 const DocumentPage = lazy(() => import("./pages/documents-page"));
 const NotFound = lazy(() => import("./pages/not-found"));
 
@@ -34,10 +32,7 @@ function Router() {
       <ProtectedRoute path="/patients" component={() => <PatientsPage />} />
       <ProtectedRoute path="/settings" component={() => <SettingsPage />} />
       <ProtectedRoute path="/claims" component={() => <ClaimsPage />} />
-      <ProtectedRoute
-        path="/preauthorizations"
-        component={() => <PreAuthorizationsPage />}
-      />
+      <ProtectedRoute path="/insurance-eligibility" component={()=><InsuranceEligibilityPage/>}/>
       <ProtectedRoute path="/payments" component={() => <PaymentsPage />} />
       <ProtectedRoute path="/documents" component={() => <DocumentPage />} />
       <Route path="/auth" component={() => <AuthPage />} />
