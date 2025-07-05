@@ -16,7 +16,6 @@ import { AppointmentsByDay } from "@/components/analytics/appointments-by-day";
 import { NewPatients } from "@/components/analytics/new-patients";
 import { AppointmentUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-
 import {
   Users,
   Calendar,
@@ -26,15 +25,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Link } from "wouter";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { z } from "zod";
-import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -72,17 +63,6 @@ const insertPatientSchema = (
 });
 type InsertPatient = z.infer<typeof insertPatientSchema>;
 
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
@@ -93,8 +73,6 @@ type AddPatientModalRef = {
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
-  const [isViewPatientOpen, setIsViewPatientOpen] = useState(false);
-  const [isDeletePatientOpen, setIsDeletePatientOpen] = useState(false);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(
     undefined
@@ -160,60 +138,6 @@ export default function Dashboard() {
     },
   });
 
-  // Update patient mutation
-  const updatePatientMutation = useMutation({
-    mutationFn: async ({
-      id,
-      patient,
-    }: {
-      id: number;
-      patient: UpdatePatient;
-    }) => {
-      const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
-      return res.json();
-    },
-    onSuccess: () => {
-      setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
-      toast({
-        title: "Success",
-        description: "Patient updated successfully!",
-        variant: "default",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to update patient: ${error.message}`,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deletePatientMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/patients/${id}`);
-      return;
-    },
-    onSuccess: () => {
-      setIsDeletePatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
-      toast({
-        title: "Success",
-        description: "Patient deleted successfully!",
-        variant: "default",
-      });
-    },
-    onError: (error) => {
-      console.log(error);
-      toast({
-        title: "Error",
-        description: `Failed to delete patient: ${error.message}`,
-        variant: "destructive",
-      });
-    },
-  });
-
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
@@ -227,54 +151,9 @@ export default function Dashboard() {
     }
   };
 
-  const handleUpdatePatient = (patient: UpdatePatient & { id?: number }) => {
-    if (currentPatient && user) {
-      const { id, ...sanitizedPatient } = patient;
-      updatePatientMutation.mutate({
-        id: currentPatient.id,
-        patient: sanitizedPatient,
-      });
-    } else {
-      console.error("No current patient or user found for update");
-      toast({
-        title: "Error",
-        description: "Cannot update patient: No patient or user found",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleEditPatient = (patient: Patient) => {
-    setCurrentPatient(patient);
-    setIsAddPatientOpen(true);
-  };
-
-  const handleViewPatient = (patient: Patient) => {
-    setCurrentPatient(patient);
-    setIsViewPatientOpen(true);
-  };
-
-  const handleDeletePatient = (patient: Patient) => {
-    setCurrentPatient(patient);
-    setIsDeletePatientOpen(true);
-  };
-
-  const handleConfirmDeletePatient = async () => {
-    if (currentPatient) {
-      deletePatientMutation.mutate(currentPatient.id);
-    } else {
-      toast({
-        title: "Error",
-        description: "No patient selected for deletion.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const isLoading =
     isLoadingPatients ||
-    addPatientMutation.isPending ||
-    updatePatientMutation.isPending;
+    addPatientMutation.isPending;
 
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
@@ -570,17 +449,9 @@ export default function Dashboard() {
 
             {/* Patient Table */}
             <PatientTable
-              patients={filteredPatients}
-              onEdit={handleEditPatient}
-              onView={handleViewPatient}
-              onDelete={handleDeletePatient}
-            />
-
-            <DeleteConfirmationDialog
-              isOpen={isDeletePatientOpen}
-              onConfirm={handleConfirmDeletePatient}
-              onCancel={() => setIsDeletePatientOpen(false)}
-              entityName={currentPatient?.name}
+              allowDelete={true}
+              allowEdit={true}
+              allowView={true}
             />
           </div>
         </main>
@@ -591,186 +462,10 @@ export default function Dashboard() {
         ref={addPatientModalRef}
         open={isAddPatientOpen}
         onOpenChange={setIsAddPatientOpen}
-        onSubmit={currentPatient ? handleUpdatePatient : handleAddPatient}
+        onSubmit={handleAddPatient}
         isLoading={isLoading}
         patient={currentPatient}
       />
-
-      {/* View Patient Modal */}
-      <Dialog open={isViewPatientOpen} onOpenChange={setIsViewPatientOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Patient Details</DialogTitle>
-            <DialogDescription>
-              Complete information about the patient.
-            </DialogDescription>
-          </DialogHeader>
-
-          {currentPatient && (
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="h-16 w-16 rounded-full bg-primary text-white flex items-center justify-center text-xl font-medium">
-                  {currentPatient.firstName.charAt(0)}
-                  {currentPatient.lastName.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold">
-                    {currentPatient.firstName} {currentPatient.lastName}
-                  </h3>
-                  <p className="text-gray-500">
-                    Patient ID: {currentPatient.id.toString().padStart(4, "0")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                <div>
-                  <h4 className="font-medium text-gray-900">
-                    Personal Information
-                  </h4>
-                  <div className="mt-2 space-y-2">
-                    <p>
-                      {currentPatient.dateOfBirth ? (
-                        (() => {
-                          const dobDate = parseISO(currentPatient.dateOfBirth);
-                          return isValid(dobDate) ? (
-                            <span>
-                              <span className="text-gray-500">
-                                Date of Birth:
-                              </span>{" "}
-                              {format(dobDate, "PPP")}
-                            </span>
-                          ) : (
-                            <span className="text-gray-500">
-                              Date of Birth: N/A
-                            </span>
-                          );
-                        })()
-                      ) : (
-                        <span className="text-gray-500">
-                          Date of Birth: N/A
-                        </span>
-                      )}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Gender:</span>{" "}
-                      {currentPatient.gender.charAt(0).toUpperCase() +
-                        currentPatient.gender.slice(1)}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Status:</span>{" "}
-                      <span
-                        className={`${
-                          currentPatient.status === "active"
-                            ? "text-green-600"
-                            : "text-amber-600"
-                        } font-medium`}
-                      >
-                        {currentPatient.status.charAt(0).toUpperCase() +
-                          currentPatient.status.slice(1)}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900">
-                    Contact Information
-                  </h4>
-                  <div className="mt-2 space-y-2">
-                    <p>
-                      <span className="text-gray-500">Phone:</span>{" "}
-                      {currentPatient.phone}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Email:</span>{" "}
-                      {currentPatient.email || "N/A"}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Address:</span>{" "}
-                      {currentPatient.address ? (
-                        <>
-                          {currentPatient.address}
-                          {currentPatient.city && `, ${currentPatient.city}`}
-                          {currentPatient.zipCode &&
-                            ` ${currentPatient.zipCode}`}
-                        </>
-                      ) : (
-                        "N/A"
-                      )}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900">Insurance</h4>
-                  <div className="mt-2 space-y-2">
-                    <p>
-                      <span className="text-gray-500">Provider:</span>{" "}
-                      {currentPatient.insuranceProvider
-                        ? currentPatient.insuranceProvider === "delta"
-                          ? "Delta Dental"
-                          : currentPatient.insuranceProvider === "metlife"
-                            ? "MetLife"
-                            : currentPatient.insuranceProvider === "cigna"
-                              ? "Cigna"
-                              : currentPatient.insuranceProvider === "aetna"
-                                ? "Aetna"
-                                : currentPatient.insuranceProvider
-                        : "N/A"}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">ID:</span>{" "}
-                      {currentPatient.insuranceId || "N/A"}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Group Number:</span>{" "}
-                      {currentPatient.groupNumber || "N/A"}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Policy Holder:</span>{" "}
-                      {currentPatient.policyHolder || "Self"}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900">
-                    Medical Information
-                  </h4>
-                  <div className="mt-2 space-y-2">
-                    <p>
-                      <span className="text-gray-500">Allergies:</span>{" "}
-                      {currentPatient.allergies || "None reported"}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Medical Conditions:</span>{" "}
-                      {currentPatient.medicalConditions || "None reported"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsViewPatientOpen(false)}
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={() => {
-                    setIsViewPatientOpen(false);
-                    handleEditPatient(currentPatient);
-                  }}
-                >
-                  Edit Patient
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Add/Edit Appointment Modal */}
       <AddAppointmentModal

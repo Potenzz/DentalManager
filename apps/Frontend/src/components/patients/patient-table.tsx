@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -7,14 +7,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Delete, Edit, Eye, MoreVertical } from "lucide-react";
+import { Delete, Edit, Eye } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,56 +20,224 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-import {z} from "zod";
+import { z } from "zod";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import LoadingScreen from "../ui/LoadingScreen";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { AddPatientModal } from "./add-patient-modal";
+import { DeleteConfirmationDialog } from "../ui/deleteDialog";
+import { useAuth } from "@/hooks/use-auth";
 
-const PatientSchema = (PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>).omit({
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
   appointments: true,
 });
 type Patient = z.infer<typeof PatientSchema>;
 
 
-interface PatientTableProps {
+const updatePatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
+
+type UpdatePatient = z.infer<typeof updatePatientSchema>;
+
+
+interface PatientApiResponse {
   patients: Patient[];
-  onEdit: (patient: Patient) => void;
-  onView: (patient: Patient) => void;
-  onDelete: (patient: Patient) => void;
+  totalCount: number;
 }
 
-export function PatientTable({ patients, onEdit, onView, onDelete }: PatientTableProps) {
+interface PatientTableProps {
+  allowEdit?: boolean;
+  allowView?: boolean;
+  allowDelete?: boolean;
+}
+
+export function PatientTable({
+  allowEdit,
+  allowView,
+  allowDelete,
+}: PatientTableProps) {
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+
+  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
+  const [isViewPatientOpen, setIsViewPatientOpen] = useState(false);
+  const [isDeletePatientOpen, setIsDeletePatientOpen] = useState(false);
+  const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(
+    undefined
+  );
+
   const [currentPage, setCurrentPage] = useState(1);
   const patientsPerPage = 5;
+  const offset = (currentPage - 1) * patientsPerPage;
+
+  const {
+    data: patientsData,
+    isLoading,
+    isError,
+  } = useQuery<PatientApiResponse>({
+    queryKey: ["patients", currentPage],
+    queryFn: async () => {
+      const res = await apiRequest(
+        "GET",
+        `/api/patients/recent?limit=${patientsPerPage}&offset=${offset}`
+      );
+      return res.json();
+    },
+    placeholderData: {
+      patients: [],
+      totalCount: 0,
+    },
+  });
+
+    // Update patient mutation
+    const updatePatientMutation = useMutation({
+      mutationFn: async ({
+        id,
+        patient,
+      }: {
+        id: number;
+        patient: UpdatePatient;
+      }) => {
+        const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
+        return res.json();
+      },
+      onSuccess: () => {
+        setIsAddPatientOpen(false);
+        queryClient.invalidateQueries({ queryKey: ["patients", currentPage] });
+        toast({
+          title: "Success",
+          description: "Patient updated successfully!",
+          variant: "default",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: `Failed to update patient: ${error.message}`,
+          variant: "destructive",
+        });
+      },
+    });
   
-  // Get current patients
-  const indexOfLastPatient = currentPage * patientsPerPage;
-  const indexOfFirstPatient = indexOfLastPatient - patientsPerPage;
-  const currentPatients = patients.slice(indexOfFirstPatient, indexOfLastPatient);
-  const totalPages = Math.ceil(patients.length / patientsPerPage);
+    const deletePatientMutation = useMutation({
+      mutationFn: async (id: number) => {
+        const res = await apiRequest("DELETE", `/api/patients/${id}`);
+        return;
+      },
+      onSuccess: () => {
+        setIsDeletePatientOpen(false);
+        queryClient.invalidateQueries({ queryKey: ["patients", currentPage] });
+        toast({
+          title: "Success",
+          description: "Patient deleted successfully!",
+          variant: "default",
+        });
+      },
+      onError: (error) => {
+        console.log(error);
+        toast({
+          title: "Error",
+          description: `Failed to delete patient: ${error.message}`,
+          variant: "destructive",
+        });
+      },
+    });
+  
+    const handleUpdatePatient = (patient: UpdatePatient & { id?: number }) => {
+      if (currentPatient && user) {
+        const { id, ...sanitizedPatient } = patient;
+        updatePatientMutation.mutate({
+          id: currentPatient.id,
+          patient: sanitizedPatient,
+        });
+      } else {
+        console.error("No current patient or user found for update");
+        toast({
+          title: "Error",
+          description: "Cannot update patient: No patient or user found",
+          variant: "destructive",
+        });
+      }
+    };
+  
+  const handleEditPatient = (patient: Patient) => {
+    setCurrentPatient(patient);
+    setIsAddPatientOpen(true);
+  };
+
+  const handleViewPatient = (patient: Patient) => {
+    setCurrentPatient(patient);
+    setIsViewPatientOpen(true);
+  };
+
+  const handleDeletePatient = (patient: Patient) => {
+    setCurrentPatient(patient);
+    setIsDeletePatientOpen(true);
+  };
+
+  const handleConfirmDeletePatient = async () => {
+    if (currentPatient) {
+      deletePatientMutation.mutate(currentPatient.id);
+    } else {
+      toast({
+        title: "Error",
+        description: "No patient selected for deletion.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const totalPages = useMemo(
+    () => Math.ceil((patientsData?.totalCount || 0) / patientsPerPage),
+    [patientsData]
+  );
+  const startItem = offset + 1;
+  const endItem = Math.min(
+    offset + patientsPerPage,
+    patientsData?.totalCount || 0
+  );
 
   const getInitials = (firstName: string, lastName: string) => {
     return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
   };
 
   const getAvatarColor = (id: number) => {
-  const colorClasses = [
-    "bg-blue-500",
-    "bg-teal-500",
-    "bg-amber-500",
-    "bg-rose-500",
-    "bg-indigo-500",
-    "bg-green-500",
-    "bg-purple-500",
-  ];
-
-  // This returns a literal string from above — not a generated string
-  return colorClasses[id % colorClasses.length];
-};
+    const colorClasses = [
+      "bg-blue-500",
+      "bg-teal-500",
+      "bg-amber-500",
+      "bg-rose-500",
+      "bg-indigo-500",
+      "bg-green-500",
+      "bg-purple-500",
+    ];
+    return colorClasses[id % colorClasses.length];
+  };
 
   const formatDate = (dateString: string | Date) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
+    return new Intl.DateTimeFormat("en-US", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     }).format(date);
   };
 
@@ -94,29 +256,52 @@ export function PatientTable({ patients, onEdit, onView, onDelete }: PatientTabl
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentPatients.length === 0 ? (
+            {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No patients found. Add your first patient to get started.
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  <LoadingScreen />
+                </TableCell>
+              </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-8 text-red-500"
+                >
+                  Error loading patients.
+                </TableCell>
+              </TableRow>
+            ) : patientsData?.patients.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  No patients found.
                 </TableCell>
               </TableRow>
             ) : (
-              currentPatients.map((patient) => (
+              patientsData?.patients.map((patient) => (
                 <TableRow key={patient.id} className="hover:bg-gray-50">
                   <TableCell>
                     <div className="flex items-center">
-                      <Avatar className={`h-10 w-10 ${getAvatarColor(patient.id)}`}>
+                      <Avatar
+                        className={`h-10 w-10 ${getAvatarColor(patient.id)}`}
+                      >
                         <AvatarFallback className="text-white">
                           {getInitials(patient.firstName, patient.lastName)}
                         </AvatarFallback>
                       </Avatar>
-                      
+
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
                           {patient.firstName} {patient.lastName}
                         </div>
                         <div className="text-sm text-gray-500">
-                          PID-{patient.id.toString().padStart(4, '0')}
+                          PID-{patient.id.toString().padStart(4, "0")}
                         </div>
                       </div>
                     </div>
@@ -135,21 +320,7 @@ export function PatientTable({ patients, onEdit, onView, onDelete }: PatientTabl
                   </TableCell>
                   <TableCell>
                     <div className="text-sm text-gray-900">
-                      {patient.insuranceProvider ? (
-                        patient.insuranceProvider === 'delta'
-                          ? 'Delta Dental'
-                          : patient.insuranceProvider === 'metlife'
-                          ? 'MetLife'
-                          : patient.insuranceProvider === 'cigna'
-                          ? 'Cigna'
-                          : patient.insuranceProvider === 'aetna'
-                          ? 'Aetna'
-                          : patient.insuranceProvider === 'none'
-                          ? 'No Insurance'
-                          : patient.insuranceProvider
-                      ) : (
-                        'Not specified'
-                      )}
+                      {patient.insuranceProvider ?? "Not specified"}
                     </div>
                     {patient.insuranceId && (
                       <div className="text-sm text-gray-500">
@@ -159,7 +330,9 @@ export function PatientTable({ patients, onEdit, onView, onDelete }: PatientTabl
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={patient.status === 'active' ? 'success' : 'warning'}
+                      variant={
+                        patient.status === "active" ? "success" : "warning"
+                      }
                       className="capitalize"
                     >
                       {patient.status}
@@ -167,33 +340,43 @@ export function PatientTable({ patients, onEdit, onView, onDelete }: PatientTabl
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-2">
-                      <Button
-                        onClick={() =>
-                          onDelete(patient)
-                        }
-                        className="text-red-600 hover:text-red-900"
-                        aria-label="Delete Staff"
-                        variant="ghost"
-                        size="icon"
-                      >
-                        <Delete/>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onEdit(patient)}
-                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onView(patient)}
-                        className="text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      {allowDelete && (
+                        <Button
+                          onClick={() => {
+                            handleDeletePatient(patient);
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                          aria-label="Delete Staff"
+                          variant="ghost"
+                          size="icon"
+                        >
+                          <Delete />
+                        </Button>
+                      )}
+                      {allowEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            handleEditPatient(patient);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {allowView && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            handleViewPatient(patient);
+                          }}
+                          className="text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -202,33 +385,205 @@ export function PatientTable({ patients, onEdit, onView, onDelete }: PatientTabl
           </TableBody>
         </Table>
       </div>
-      
-      {patients.length > patientsPerPage && (
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
-          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">{indexOfFirstPatient + 1}</span> to{" "}
-                <span className="font-medium">
-                  {Math.min(indexOfLastPatient, patients.length)}
-                </span>{" "}
-                of <span className="font-medium">{patients.length}</span> results
-              </p>
+
+      {/* View Patient Modal */}
+      <Dialog open={isViewPatientOpen} onOpenChange={setIsViewPatientOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Patient Details</DialogTitle>
+            <DialogDescription>
+              Complete information about the patient.
+            </DialogDescription>
+          </DialogHeader>
+
+          {currentPatient && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="h-16 w-16 rounded-full bg-primary text-white flex items-center justify-center text-xl font-medium">
+                  {currentPatient.firstName.charAt(0)}
+                  {currentPatient.lastName.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    {currentPatient.firstName} {currentPatient.lastName}
+                  </h3>
+                  <p className="text-gray-500">
+                    Patient ID: {currentPatient.id.toString().padStart(4, "0")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    Personal Information
+                  </h4>
+                  <div className="mt-2 space-y-2">
+                    <p>
+                      <span className="text-gray-500">Date of Birth:</span>{" "}
+                      {new Date(
+                        currentPatient.dateOfBirth
+                      ).toLocaleDateString()}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Gender:</span>{" "}
+                      {currentPatient.gender.charAt(0).toUpperCase() +
+                        currentPatient.gender.slice(1)}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Status:</span>{" "}
+                      <span
+                        className={`${
+                          currentPatient.status === "active"
+                            ? "text-green-600"
+                            : "text-amber-600"
+                        } font-medium`}
+                      >
+                        {currentPatient.status.charAt(0).toUpperCase() +
+                          currentPatient.status.slice(1)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    Contact Information
+                  </h4>
+                  <div className="mt-2 space-y-2">
+                    <p>
+                      <span className="text-gray-500">Phone:</span>{" "}
+                      {currentPatient.phone}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Email:</span>{" "}
+                      {currentPatient.email || "N/A"}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Address:</span>{" "}
+                      {currentPatient.address ? (
+                        <>
+                          {currentPatient.address}
+                          {currentPatient.city && `, ${currentPatient.city}`}
+                          {currentPatient.zipCode &&
+                            ` ${currentPatient.zipCode}`}
+                        </>
+                      ) : (
+                        "N/A"
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900">Insurance</h4>
+                  <div className="mt-2 space-y-2">
+                    <p>
+                      <span className="text-gray-500">Provider:</span>{" "}
+                      {currentPatient.insuranceProvider
+                        ? currentPatient.insuranceProvider === "delta"
+                          ? "Delta Dental"
+                          : currentPatient.insuranceProvider === "metlife"
+                            ? "MetLife"
+                            : currentPatient.insuranceProvider === "cigna"
+                              ? "Cigna"
+                              : currentPatient.insuranceProvider === "aetna"
+                                ? "Aetna"
+                                : currentPatient.insuranceProvider
+                        : "N/A"}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">ID:</span>{" "}
+                      {currentPatient.insuranceId || "N/A"}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Group Number:</span>{" "}
+                      {currentPatient.groupNumber || "N/A"}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Policy Holder:</span>{" "}
+                      {currentPatient.policyHolder || "Self"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    Medical Information
+                  </h4>
+                  <div className="mt-2 space-y-2">
+                    <p>
+                      <span className="text-gray-500">Allergies:</span>{" "}
+                      {currentPatient.allergies || "None reported"}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Medical Conditions:</span>{" "}
+                      {currentPatient.medicalConditions || "None reported"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsViewPatientOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsViewPatientOpen(false);
+                    handleEditPatient(currentPatient);
+                  }}
+                >
+                  Edit Patient
+                </Button>
+              </div>
             </div>
-            
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Patient Modal */}
+      <AddPatientModal
+        open={isAddPatientOpen}
+        onOpenChange={setIsAddPatientOpen}
+        onSubmit={handleUpdatePatient}
+        isLoading={isLoading}
+        patient={currentPatient}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={isDeletePatientOpen}
+        onConfirm={handleConfirmDeletePatient}
+        onCancel={() => setIsDeletePatientOpen(false)}
+        entityName={currentPatient?.name}
+      />
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="bg-white px-4 py-3 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground mb-2 sm:mb-0 whitespace-nowrap">
+              Showing {startItem}–{endItem} of {patientsData?.totalCount || 0}{" "}
+              results
+            </div>
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious 
-                    href="#" 
+                  <PaginationPrevious
+                    href="#"
                     onClick={(e) => {
                       e.preventDefault();
                       if (currentPage > 1) setCurrentPage(currentPage - 1);
                     }}
-                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                    className={
+                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                    }
                   />
                 </PaginationItem>
-                
+
                 {Array.from({ length: totalPages }).map((_, i) => (
                   <PaginationItem key={i}>
                     <PaginationLink
@@ -243,15 +598,19 @@ export function PatientTable({ patients, onEdit, onView, onDelete }: PatientTabl
                     </PaginationLink>
                   </PaginationItem>
                 ))}
-                
                 <PaginationItem>
-                  <PaginationNext 
-                    href="#" 
+                  <PaginationNext
+                    href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                      if (currentPage < totalPages)
+                        setCurrentPage(currentPage + 1);
                     }}
-                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
                   />
                 </PaginationItem>
               </PaginationContent>

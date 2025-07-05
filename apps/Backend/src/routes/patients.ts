@@ -68,6 +68,24 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Get recent patients (paginated)
+router.get("/recent", async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const [patients, totalCount] = await Promise.all([
+      storage.getRecentPatients(limit, offset),
+      storage.getTotalPatientCount(),
+    ]);
+
+    res.json({ patients, totalCount });
+  } catch (error) {
+    console.error("Failed to retrieve recent patients:", error);
+    res.status(500).json({ message: "Failed to retrieve recent patients" });
+  }
+});
+
 // Get a single patient by ID
 router.get(
   "/:id",
@@ -101,19 +119,6 @@ router.get(
   }
 );
 
-// Get recent patients (paginated)
-router.get("/recent", async (req: Request, res: Response) => {
-  try {
-    const limit = parseInt(req.query.limit as string) || 10;
-    const offset = parseInt(req.query.offset as string) || 0;
-
-    const recentPatients = await storage.getRecentPatients(limit, offset);
-    res.json(recentPatients);
-  } catch (error) {
-    console.error("Failed to retrieve recent patients:", error);
-    res.status(500).json({ message: "Failed to retrieve recent patients" });
-  }
-});
 
 // Create a new patient
 router.post("/", async (req: Request, res: Response): Promise<any> => {

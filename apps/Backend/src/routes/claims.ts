@@ -4,7 +4,7 @@ import { storage } from "../storage";
 import { z } from "zod";
 import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import multer from "multer";
-import { forwardToSeleniumAgent } from "../services/seleniumClient";
+import { forwardToSeleniumAgent } from "../services/seleniumClaimClient";
 import path from "path";
 import axios from "axios";
 import fs from "fs";

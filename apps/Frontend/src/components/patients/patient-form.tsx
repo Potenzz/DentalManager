@@ -338,11 +338,12 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
                         <SelectItem value="placeholder">
                           Select provider
                         </SelectItem>
-                        <SelectItem value="delta">Delta Dental</SelectItem>
-                        <SelectItem value="metlife">MetLife</SelectItem>
-                        <SelectItem value="cigna">Cigna</SelectItem>
-                        <SelectItem value="aetna">Aetna</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="Mass Health">Mass Health</SelectItem>
+                        <SelectItem value="Delta MA">Delta MA</SelectItem>
+                        <SelectItem value="Metlife">MetLife</SelectItem>
+                        <SelectItem value="Cigna">Cigna</SelectItem>
+                        <SelectItem value="Aetna">Aetna</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
                         <SelectItem value="none">None</SelectItem>
                       </SelectContent>
                     </Select>

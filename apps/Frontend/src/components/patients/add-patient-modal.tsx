@@ -74,7 +74,6 @@ export const AddPatientModal = forwardRef<
 >(function AddPatientModal(props, ref) {
   const { open, onOpenChange, onSubmit, isLoading, patient, extractedInfo } =
     props;
-  const { toast } = useToast();
   const [formData, setFormData] = useState<
     InsertPatient | UpdatePatient | null
   >(null);

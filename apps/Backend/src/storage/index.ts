@@ -167,6 +167,7 @@ export interface IStorage {
   getPatient(id: number): Promise<Patient | undefined>;
   getPatientsByUserId(userId: number): Promise<Patient[]>;
   getRecentPatients(limit: number, offset: number): Promise<Patient[]>;
+  getTotalPatientCount(): Promise<number>;
   createPatient(patient: InsertPatient): Promise<Patient>;
   updatePatient(id: number, patient: UpdatePatient): Promise<Patient>;
   deletePatient(id: number): Promise<void>;
@@ -304,6 +305,10 @@ export const storage: IStorage = {
     });
   },
 
+  async getTotalPatientCount(): Promise<number> {
+    return db.patient.count();
+  },
+
   async createPatient(patient: InsertPatient): Promise<Patient> {
     return await db.patient.create({ data: patient as Patient });
   },
@@ -371,7 +376,7 @@ export const storage: IStorage = {
     return db.appointment.findMany({
       skip: offset,
       take: limit,
-      orderBy: { date: "desc" }
+      orderBy: { date: "desc" },
     });
   },
 
@@ -589,7 +594,7 @@ export const storage: IStorage = {
         id: true,
         filename: true,
         uploadedAt: true,
-        patient:true,
+        patient: true,
       },
     });
   },
