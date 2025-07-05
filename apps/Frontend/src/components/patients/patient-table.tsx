@@ -35,6 +35,8 @@ import {
 import { AddPatientModal } from "./add-patient-modal";
 import { DeleteConfirmationDialog } from "../ui/deleteDialog";
 import { useAuth } from "@/hooks/use-auth";
+import { PatientSearch, SearchCriteria } from "./patient-search";
+import { useDebounce } from "use-debounce";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -42,7 +44,6 @@ const PatientSchema = (
   appointments: true,
 });
 type Patient = z.infer<typeof PatientSchema>;
-
 
 const updatePatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -55,7 +56,6 @@ const updatePatientSchema = (
   .partial();
 
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
-
 
 interface PatientApiResponse {
   patients: Patient[];
@@ -76,7 +76,6 @@ export function PatientTable({
   const { toast } = useToast();
   const { user } = useAuth();
 
-
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isViewPatientOpen, setIsViewPatientOpen] = useState(false);
   const [isDeletePatientOpen, setIsDeletePatientOpen] = useState(false);
@@ -88,96 +87,111 @@ export function PatientTable({
   const patientsPerPage = 5;
   const offset = (currentPage - 1) * patientsPerPage;
 
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(
+    null
+  );
+  const [debouncedSearchCriteria] = useDebounce(searchCriteria, 500);
+
   const {
-    data: patientsData,
-    isLoading,
-    isError,
-  } = useQuery<PatientApiResponse>({
-    queryKey: ["patients", currentPage],
-    queryFn: async () => {
-      const res = await apiRequest(
-        "GET",
-        `/api/patients/recent?limit=${patientsPerPage}&offset=${offset}`
-      );
+  data: patientsData,
+  isLoading,
+  isError,
+} = useQuery<PatientApiResponse>({
+  queryKey: ["patients", currentPage, debouncedSearchCriteria?.searchTerm || "recent"],
+  queryFn: async () => {
+    const trimmedTerm = debouncedSearchCriteria?.searchTerm?.trim();
+    const isSearch = trimmedTerm && trimmedTerm.length > 0;
+
+    const baseUrl = isSearch
+      ? `/api/patients/search?term=${encodeURIComponent(trimmedTerm)}&by=${debouncedSearchCriteria!.searchBy}`
+      : `/api/patients/recent`;
+
+    const hasQueryParams = baseUrl.includes("?");
+    const url = `${baseUrl}${hasQueryParams ? "&" : "?"}limit=${patientsPerPage}&offset=${offset}`;
+
+    const res = await apiRequest("GET", url);
+    return res.json();
+  },
+  placeholderData: {
+    patients: [],
+    totalCount: 0,
+  },
+});
+
+
+
+  // Update patient mutation
+  const updatePatientMutation = useMutation({
+    mutationFn: async ({
+      id,
+      patient,
+    }: {
+      id: number;
+      patient: UpdatePatient;
+    }) => {
+      const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
       return res.json();
     },
-    placeholderData: {
-      patients: [],
-      totalCount: 0,
+    onSuccess: () => {
+      setIsAddPatientOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["patients", currentPage] });
+      toast({
+        title: "Success",
+        description: "Patient updated successfully!",
+        variant: "default",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update patient: ${error.message}`,
+        variant: "destructive",
+      });
     },
   });
 
-    // Update patient mutation
-    const updatePatientMutation = useMutation({
-      mutationFn: async ({
-        id,
-        patient,
-      }: {
-        id: number;
-        patient: UpdatePatient;
-      }) => {
-        const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
-        return res.json();
-      },
-      onSuccess: () => {
-        setIsAddPatientOpen(false);
-        queryClient.invalidateQueries({ queryKey: ["patients", currentPage] });
-        toast({
-          title: "Success",
-          description: "Patient updated successfully!",
-          variant: "default",
-        });
-      },
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: `Failed to update patient: ${error.message}`,
-          variant: "destructive",
-        });
-      },
-    });
-  
-    const deletePatientMutation = useMutation({
-      mutationFn: async (id: number) => {
-        const res = await apiRequest("DELETE", `/api/patients/${id}`);
-        return;
-      },
-      onSuccess: () => {
-        setIsDeletePatientOpen(false);
-        queryClient.invalidateQueries({ queryKey: ["patients", currentPage] });
-        toast({
-          title: "Success",
-          description: "Patient deleted successfully!",
-          variant: "default",
-        });
-      },
-      onError: (error) => {
-        console.log(error);
-        toast({
-          title: "Error",
-          description: `Failed to delete patient: ${error.message}`,
-          variant: "destructive",
-        });
-      },
-    });
-  
-    const handleUpdatePatient = (patient: UpdatePatient & { id?: number }) => {
-      if (currentPatient && user) {
-        const { id, ...sanitizedPatient } = patient;
-        updatePatientMutation.mutate({
-          id: currentPatient.id,
-          patient: sanitizedPatient,
-        });
-      } else {
-        console.error("No current patient or user found for update");
-        toast({
-          title: "Error",
-          description: "Cannot update patient: No patient or user found",
-          variant: "destructive",
-        });
-      }
-    };
-  
+  const deletePatientMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/patients/${id}`);
+      return;
+    },
+    onSuccess: () => {
+      setIsDeletePatientOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["patients", currentPage] });
+      toast({
+        title: "Success",
+        description: "Patient deleted successfully!",
+        variant: "default",
+      });
+    },
+    onError: (error) => {
+      console.log(error);
+      toast({
+        title: "Error",
+        description: `Failed to delete patient: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleUpdatePatient = (patient: UpdatePatient & { id?: number }) => {
+    if (currentPatient && user) {
+      const { id, ...sanitizedPatient } = patient;
+      updatePatientMutation.mutate({
+        id: currentPatient.id,
+        patient: sanitizedPatient,
+      });
+    } else {
+      console.error("No current patient or user found for update");
+      toast({
+        title: "Error",
+        description: "Cannot update patient: No patient or user found",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleEditPatient = (patient: Patient) => {
     setCurrentPatient(patient);
     setIsAddPatientOpen(true);
@@ -244,6 +258,19 @@ export function PatientTable({
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
+        <PatientSearch
+          onSearch={(criteria) => {
+            setSearchCriteria(criteria);
+            setCurrentPage(1); // reset page on new search
+            setIsSearchActive(true);
+          }}
+          onClearSearch={() => {
+            setSearchCriteria({ searchTerm: "", searchBy: "name" }); // triggers `recent`
+            setCurrentPage(1);
+            setIsSearchActive(false);
+          }}
+          isSearchActive={isSearchActive}
+        />
         <Table>
           <TableHeader>
             <TableRow>

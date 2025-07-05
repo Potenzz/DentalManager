@@ -171,6 +171,24 @@ export interface IStorage {
   createPatient(patient: InsertPatient): Promise<Patient>;
   updatePatient(id: number, patient: UpdatePatient): Promise<Patient>;
   deletePatient(id: number): Promise<void>;
+  searchPatients(args: {
+    filters: any;
+    limit: number;
+    offset: number;
+  }): Promise<
+    {
+      id: number;
+      firstName: string | null;
+      lastName: string | null;
+      phone: string | null;
+      gender: string | null;
+      dateOfBirth: Date;
+      insuranceId: string | null;
+      insuranceProvider: string | null;
+      status: string;
+    }[]
+  >;
+  countPatients(filters: any): Promise<number>; // optional but useful
 
   // Appointment methods
   getAppointment(id: number): Promise<Appointment | undefined>;
@@ -305,8 +323,40 @@ export const storage: IStorage = {
     });
   },
 
+  async searchPatients({
+    filters,
+    limit,
+    offset,
+  }: {
+    filters: any;
+    limit: number;
+    offset: number;
+  }) {
+    return db.patient.findMany({
+      where: filters,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        gender: true,
+        dateOfBirth: true,
+        insuranceId: true,
+        insuranceProvider: true,
+        status: true,
+      },
+    });
+  },
+
   async getTotalPatientCount(): Promise<number> {
     return db.patient.count();
+  },
+
+  async countPatients(filters: any) {
+    return db.patient.count({ where: filters });
   },
 
   async createPatient(patient: InsertPatient): Promise<Patient> {

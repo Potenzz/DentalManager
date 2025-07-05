@@ -21,7 +21,7 @@ import {
 
 export type SearchCriteria = {
   searchTerm: string;
-  searchBy: "name" | "insuranceProvider" | "phone" | "insuranceId" | "all";
+  searchBy: "name" | "insuranceId" | "phone" | "gender" | "dob" | "all";
 };
 
 interface PatientSearchProps {
@@ -61,7 +61,10 @@ export function PatientSearch({
     setShowAdvanced(false);
   };
 
-  const updateAdvancedCriteria = (field: keyof SearchCriteria, value: string) => {
+  const updateAdvancedCriteria = (
+    field: keyof SearchCriteria,
+    value: string
+  ) => {
     setAdvancedCriteria({
       ...advancedCriteria,
       [field]: value,
@@ -104,7 +107,9 @@ export function PatientSearch({
 
         <Select
           value={searchBy}
-          onValueChange={(value) => setSearchBy(value as SearchCriteria["searchBy"])}
+          onValueChange={(value) =>
+            setSearchBy(value as SearchCriteria["searchBy"])
+          }
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Search by..." />
@@ -113,8 +118,9 @@ export function PatientSearch({
             <SelectItem value="all">All Fields</SelectItem>
             <SelectItem value="name">Name</SelectItem>
             <SelectItem value="phone">Phone</SelectItem>
-            <SelectItem value="insuranceProvider">Insurance Provider</SelectItem>
-            <SelectItem value="insuranceId">Insurance ID</SelectItem>
+            <SelectItem value="insuranceId">InsuranceId</SelectItem>
+            <SelectItem value="gender">Gender</SelectItem>
+            <SelectItem value="dob">DOB</SelectItem>
           </SelectContent>
         </Select>
 
@@ -132,11 +138,16 @@ export function PatientSearch({
 
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <label className="text-right text-sm font-medium">Search by</label>
+                <label className="text-right text-sm font-medium">
+                  Search by
+                </label>
                 <Select
                   value={advancedCriteria.searchBy}
                   onValueChange={(value) =>
-                    updateAdvancedCriteria("searchBy", value as SearchCriteria["searchBy"])
+                    updateAdvancedCriteria(
+                      "searchBy",
+                      value as SearchCriteria["searchBy"]
+                    )
                   }
                 >
                   <SelectTrigger className="col-span-3">
@@ -146,14 +157,17 @@ export function PatientSearch({
                     <SelectItem value="all">All Fields</SelectItem>
                     <SelectItem value="name">Name</SelectItem>
                     <SelectItem value="phone">Phone</SelectItem>
-                    <SelectItem value="insuranceProvider">Insurance Provider</SelectItem>
-                    <SelectItem value="insuranceId">Insurance ID</SelectItem>
+                    <SelectItem value="insuranceId">InsuranceId</SelectItem>
+                    <SelectItem value="gender">Gender</SelectItem>
+                    <SelectItem value="dob">DOB</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="grid grid-cols-4 items-center gap-4">
-                <label className="text-right text-sm font-medium">Search term</label>
+                <label className="text-right text-sm font-medium">
+                  Search term
+                </label>
                 <Input
                   className="col-span-3"
                   value={advancedCriteria.searchTerm}

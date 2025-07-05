@@ -86,6 +86,64 @@ router.get("/recent", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/search", async (req: Request, res: Response) => {
+  try {
+    const {
+      name,
+      phone,
+      insuranceId,
+      gender,
+      dob,
+      limit = "10",
+      offset = "0",
+    } = req.query as Record<string, string>;
+
+    const filters: any = {
+      userId: req.user!.id, // Assumes auth middleware sets this
+    };
+
+    if (name) {
+      filters.OR = [
+        { firstName: { contains: name, mode: "insensitive" } },
+        { lastName: { contains: name, mode: "insensitive" } },
+      ];
+    }
+
+    if (phone) {
+      filters.phone = { contains: phone, mode: "insensitive" };
+    }
+
+    if (insuranceId) {
+      filters.insuranceId = { contains: insuranceId, mode: "insensitive" };
+    }
+
+    if (gender) {
+      filters.gender = gender;
+    }
+
+    if (dob) {
+      const parsedDate = new Date(dob);
+      if (!isNaN(parsedDate.getTime())) {
+        filters.dateOfBirth = parsedDate;
+      }
+    }
+
+    const [patients, totalCount] = await Promise.all([
+      storage.searchPatients({
+        filters,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      }),
+      storage.countPatients(filters),
+    ]);
+
+    res.json({ patients, totalCount });
+  } catch (error) {
+    console.error("Search error:", error);
+    res.status(500).json({ message: "Failed to search patients" });
+  }
+});
+
 // Get a single patient by ID
 router.get(
   "/:id",

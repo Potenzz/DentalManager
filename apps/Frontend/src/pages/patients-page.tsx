@@ -4,10 +4,6 @@ import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PatientTable } from "@/components/patients/patient-table";
 import { AddPatientModal } from "@/components/patients/add-patient-modal";
-import {
-  PatientSearch,
-  SearchCriteria,
-} from "@/components/patients/patient-search";
 import { FileUploadZone } from "@/components/file-upload/file-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw, File, FilePlus } from "lucide-react";
@@ -56,9 +52,6 @@ export default function PatientsPage() {
     undefined
   );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(
-    null
-  );
   const addPatientModalRef = useRef<AddPatientModalRef | null>(null);
 
   // File upload states
@@ -112,14 +105,6 @@ export default function PatientsPage() {
 
   const isLoading = addPatientMutation.isPending;
 
-  // Search handling
-  const handleSearch = (criteria: SearchCriteria) => {
-    setSearchCriteria(criteria);
-  };
-
-  const handleClearSearch = () => {
-    setSearchCriteria(null);
-  };
 
   // File upload handling
   const handleFileUpload = (file: File) => {
@@ -252,12 +237,6 @@ export default function PatientsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <PatientSearch
-                  onSearch={handleSearch}
-                  onClearSearch={handleClearSearch}
-                  isSearchActive={!!searchCriteria}
-                />
-
                 <PatientTable
                   allowDelete={true}
                   allowEdit={true}
