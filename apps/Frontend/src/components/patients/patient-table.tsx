@@ -37,6 +37,7 @@ import { DeleteConfirmationDialog } from "../ui/deleteDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { PatientSearch, SearchCriteria } from "./patient-search";
 import { useDebounce } from "use-debounce";
+import { cn } from "@/lib/utils";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -94,32 +95,62 @@ export function PatientTable({
   const [debouncedSearchCriteria] = useDebounce(searchCriteria, 500);
 
   const {
-  data: patientsData,
-  isLoading,
-  isError,
-} = useQuery<PatientApiResponse>({
-  queryKey: ["patients", currentPage, debouncedSearchCriteria?.searchTerm || "recent"],
-  queryFn: async () => {
-    const trimmedTerm = debouncedSearchCriteria?.searchTerm?.trim();
-    const isSearch = trimmedTerm && trimmedTerm.length > 0;
+    data: patientsData,
+    isLoading,
+    isError,
+  } = useQuery<PatientApiResponse, Error>({
+    queryKey: ["patients", { page: currentPage, search: debouncedSearchCriteria?.searchTerm || "recent" }],
+    queryFn: async () => {
+      const trimmedTerm = debouncedSearchCriteria?.searchTerm?.trim();
+      const isSearch = trimmedTerm && trimmedTerm.length > 0;
 
-    const baseUrl = isSearch
-      ? `/api/patients/search?term=${encodeURIComponent(trimmedTerm)}&by=${debouncedSearchCriteria!.searchBy}`
-      : `/api/patients/recent`;
+      const rawSearchBy = debouncedSearchCriteria?.searchBy || "name";
+      const validSearchKeys = [
+        "name",
+        "phone",
+        "insuranceId",
+        "gender",
+        "dob",
+        "all",
+      ];
+      const searchKey = validSearchKeys.includes(rawSearchBy)
+        ? rawSearchBy
+        : "name";
 
-    const hasQueryParams = baseUrl.includes("?");
-    const url = `${baseUrl}${hasQueryParams ? "&" : "?"}limit=${patientsPerPage}&offset=${offset}`;
+      let url: string;
 
-    const res = await apiRequest("GET", url);
-    return res.json();
-  },
-  placeholderData: {
-    patients: [],
-    totalCount: 0,
-  },
-});
+      if (isSearch) {
+        const searchParams = new URLSearchParams({
+          limit: String(patientsPerPage),
+          offset: String(offset),
+        });
 
+        if (searchKey === "all") {
+          searchParams.set("term", trimmedTerm!);
+        } else {
+          searchParams.set(searchKey, trimmedTerm!);
+        }
 
+        url = `/api/patients/search?${searchParams.toString()}`;
+      } else {
+        url = `/api/patients/recent?limit=${patientsPerPage}&offset=${offset}`;
+      }
+
+      const res = await apiRequest("GET", url);
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Search failed");
+      }
+
+      return res.json();
+    },
+    placeholderData: {
+      patients: [],
+      totalCount: 0,
+    },
+  }
+);
 
   // Update patient mutation
   const updatePatientMutation = useMutation({
@@ -356,14 +387,18 @@ export function PatientTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        patient.status === "active" ? "success" : "warning"
-                      }
-                      className="capitalize"
-                    >
-                      {patient.status}
-                    </Badge>
+                    <div className="col-span-1">
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                          patient.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        )}
+                      >
+                        {patient.status === "active" ? "Active" : "Inactive"}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-2">

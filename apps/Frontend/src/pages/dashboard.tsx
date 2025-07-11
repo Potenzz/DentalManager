@@ -118,7 +118,7 @@ export default function Dashboard() {
     },
     onSuccess: (newPatient) => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
       toast({
         title: "Success",
         description: "Patient added successfully!",

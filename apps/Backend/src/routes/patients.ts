@@ -6,6 +6,8 @@ import {
   PatientUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
+import { extractDobParts } from "../utils/DobParts";
+import { parseDobParts } from "../utils/DobPartsParsing";
 
 const router = Router();
 
@@ -86,7 +88,7 @@ router.get("/recent", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/search", async (req: Request, res: Response) => {
+router.get("/search", async (req: Request, res: Response): Promise<any> => {
   try {
     const {
       name,
@@ -94,13 +96,23 @@ router.get("/search", async (req: Request, res: Response) => {
       insuranceId,
       gender,
       dob,
+      term,
       limit = "10",
       offset = "0",
     } = req.query as Record<string, string>;
 
     const filters: any = {
-      userId: req.user!.id, // Assumes auth middleware sets this
+      userId: req.user!.id,
     };
+
+    if (term) {
+      filters.OR = [
+        { firstName: { contains: term, mode: "insensitive" } },
+        { lastName: { contains: term, mode: "insensitive" } },
+        { phone: { contains: term, mode: "insensitive" } },
+        { insuranceId: { contains: term, mode: "insensitive" } },
+      ];
+    }
 
     if (name) {
       filters.OR = [
@@ -122,9 +134,70 @@ router.get("/search", async (req: Request, res: Response) => {
     }
 
     if (dob) {
-      const parsedDate = new Date(dob);
-      if (!isNaN(parsedDate.getTime())) {
-        filters.dateOfBirth = parsedDate;
+      const range = parseDobParts(dob);
+
+      if (range) {
+        if (!filters.AND) filters.AND = [];
+
+        // Check what kind of match this was
+        const fromYear = range.from.getUTCFullYear();
+        const toYear = range.to.getUTCFullYear();
+        const fromMonth = range.from.getUTCMonth() + 1; // Prisma months: 1-12
+        const toMonth = range.to.getUTCMonth() + 1;
+        const fromDay = range.from.getUTCDate();
+        const toDay = range.to.getUTCDate();
+
+        const isFullDate =
+          fromYear === toYear && fromMonth === toMonth && fromDay === toDay;
+
+        const isDayMonthOnly =
+          fromYear === 1900 &&
+          toYear === 2100 &&
+          fromMonth === toMonth &&
+          fromDay === toDay;
+
+        const isMonthOnly =
+          fromYear === 1900 &&
+          toYear === 2100 &&
+          fromDay === 1 &&
+          toDay >= 28 &&
+          fromMonth === toMonth &&
+          toMonth === toMonth;
+
+        const isYearOnly = fromMonth === 1 && toMonth === 12;
+
+        if (isFullDate) {
+          filters.AND.push({
+            dob_day: fromDay,
+            dob_month: fromMonth,
+            dob_year: fromYear,
+          });
+        } else if (isDayMonthOnly) {
+          filters.AND.push({
+            dob_day: fromDay,
+            dob_month: fromMonth,
+          });
+        } else if (isMonthOnly) {
+          filters.AND.push({
+            dob_month: fromMonth,
+          });
+        } else if (isYearOnly) {
+          filters.AND.push({
+            dob_year: fromYear,
+          });
+        } else {
+          // Fallback: search via dateOfBirth range
+          filters.AND.push({
+            dateOfBirth: {
+              gte: range.from,
+              lte: range.to,
+            },
+          });
+        }
+      } else {
+        return res.status(400).json({
+          message: `Invalid date format for DOB. Try formats like "12 March", "March", "1980", "12/03/1980", etc.`,
+        });
       }
     }
 
@@ -137,10 +210,10 @@ router.get("/search", async (req: Request, res: Response) => {
       storage.countPatients(filters),
     ]);
 
-    res.json({ patients, totalCount });
+    return res.json({ patients, totalCount });
   } catch (error) {
     console.error("Search error:", error);
-    res.status(500).json({ message: "Failed to search patients" });
+    return res.status(500).json({ message: "Failed to search patients" });
   }
 });
 
@@ -177,7 +250,6 @@ router.get(
   }
 );
 
-
 // Create a new patient
 router.post("/", async (req: Request, res: Response): Promise<any> => {
   try {
@@ -187,8 +259,14 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
       userId: req.user!.id,
     });
 
-    // Create patient
-    const patient = await storage.createPatient(patientData);
+    // Extract dob_* from dateOfBirth
+    const dobParts = extractDobParts(new Date(patientData.dateOfBirth));
+
+    const patient = await storage.createPatient({
+      ...patientData,
+      ...dobParts, // adds dob_day/month/year
+    });
+
     res.status(201).json(patient);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -229,11 +307,15 @@ router.put(
       // Validate request body
       const patientData = updatePatientSchema.parse(req.body);
 
+      let dobParts = {};
+      if (patientData.dateOfBirth) {
+        dobParts = extractDobParts(new Date(patientData.dateOfBirth));
+      }
       // Update patient
-      const updatedPatient = await storage.updatePatient(
-        patientId,
-        patientData
-      );
+      const updatedPatient = await storage.updatePatient(patientId, {
+        ...patientData,
+        ...dobParts,
+      });
       res.json(updatedPatient);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -280,7 +362,7 @@ router.delete(
       // Delete patient
       await storage.deletePatient(patientId);
       res.status(204).send();
-    } catch (error:any) {
+    } catch (error: any) {
       console.error("Delete patient error:", error);
       res.status(500).json({ message: "Failed to delete patient" });
     }

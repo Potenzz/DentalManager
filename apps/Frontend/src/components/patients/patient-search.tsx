@@ -36,11 +36,11 @@ export function PatientSearch({
   isSearchActive,
 }: PatientSearchProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchBy, setSearchBy] = useState<SearchCriteria["searchBy"]>("all");
+  const [searchBy, setSearchBy] = useState<SearchCriteria["searchBy"]>("name");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [advancedCriteria, setAdvancedCriteria] = useState<SearchCriteria>({
     searchTerm: "",
-    searchBy: "all",
+    searchBy: "name",
   });
 
   const handleSearch = () => {
@@ -72,7 +72,7 @@ export function PatientSearch({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full pt-8 pb-4 px-4">
       <div className="flex gap-2 mb-4">
         <div className="relative flex-1">
           <Input
@@ -151,7 +151,7 @@ export function PatientSearch({
                   }
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="All Fields" />
+                    <SelectValue placeholder="Name" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Fields</SelectItem>
