@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -12,12 +12,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { CheckCircle } from "lucide-react";
+import { CalendarIcon, CheckCircle } from "lucide-react";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { PatientTable } from "@/components/patients/patient-table";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -28,6 +36,8 @@ type Patient = z.infer<typeof PatientSchema>;
 
 export default function InsuranceEligibilityPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
+
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -37,18 +47,29 @@ export default function InsuranceEligibilityPage() {
 
   // Insurance eligibility check form fields
   const [memberId, setMemberId] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
 
-  // Selected patient for insurance check
-  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(
-    null
-  );
+  // Populate fields from selected patient
+  useEffect(() => {
+  if (selectedPatient) {
+    setMemberId(selectedPatient.insuranceId ?? "");
+    setFirstName(selectedPatient.firstName ?? "");
+    setLastName(selectedPatient.lastName ?? "");
 
-  // Insurance automation states
-  const [selectedProvider, setSelectedProvider] = useState("");
-  const { toast } = useToast();
+    const dob = selectedPatient.dateOfBirth
+      ? new Date(selectedPatient.dateOfBirth)
+      : undefined;
+    setDateOfBirth(dob);
+  } else {
+    setMemberId("");
+    setFirstName("");
+    setLastName("");
+    setDateOfBirth(undefined);
+  }
+}, [selectedPatient]);
+
 
   // Insurance eligibility check mutation
   const checkInsuranceMutation = useMutation({
@@ -93,18 +114,16 @@ export default function InsuranceEligibilityPage() {
   });
 
   // Handle insurance provider button clicks
-  const handleProviderClick = (providerName: string) => {
-    if (!selectedPatientId) {
-      toast({
-        title: "No Patient Selected",
-        description:
-          "Please select a patient first by checking the box next to their name.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSelectedProvider(providerName);
+  const handleMHButton= () => {
+    if (!memberId || !dateOfBirth || !firstName) {
+    toast({
+      title: "Missing Fields",
+      description:
+        "Please fill in all the required fields: Member ID, Date of Birth, First Name.",
+      variant: "destructive",
+    });
+    return;
+  }
   };
 
   return (
@@ -135,7 +154,7 @@ export default function InsuranceEligibilityPage() {
                 <CardTitle>Check Insurance Eligibility</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-4 md:grid-cols-4 gap-4 mb-4">
                   <div className="space-y-2">
                     <Label htmlFor="memberId">Member ID</Label>
                     <Input
@@ -145,15 +164,37 @@ export default function InsuranceEligibilityPage() {
                       onChange={(e) => setMemberId(e.target.value)}
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                    <Input
-                      id="dateOfBirth"
-                      type="date"
-                      value={dateOfBirth}
-                      onChange={(e) => setDateOfBirth(e.target.value)}
-                    />
+                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full pl-3  text-left font-normal",
+                            !dateOfBirth && "text-muted-foreground"
+                          )}
+                        >
+                          {dateOfBirth ? (
+                            format(dateOfBirth, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-4">
+                        <Calendar
+                          mode="single"
+                          selected={dateOfBirth}
+                          onSelect={setDateOfBirth}
+                          disabled={(date) => date > new Date()}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name</Label>
                     <Input
@@ -173,17 +214,15 @@ export default function InsuranceEligibilityPage() {
                     />
                   </div>
                 </div>
+
                 <div>
                   <Button
-                    onClick={() => handleProviderClick("MH")}
+                    onClick={() => handleMHButton()}
                     className="w-full"
                     disabled={checkInsuranceMutation.isPending}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    {checkInsuranceMutation.isPending &&
-                    selectedProvider === "MH"
-                      ? "Checking..."
-                      : "MH"}
+                    MH
                   </Button>
                 </div>
               </CardContent>

@@ -68,7 +68,7 @@ interface PatientTableProps {
   allowView?: boolean;
   allowDelete?: boolean;
   allowCheckbox?: boolean;
-  onSelectPatient?: (patient: Patient) => void;
+  onSelectPatient?: (patient: Patient | null) => void;
 }
 
 export function PatientTable({
@@ -107,8 +107,8 @@ export function PatientTable({
     const newSelectedId = isSelected ? null : patient.id;
     setSelectedPatientId(newSelectedId);
 
-    if (!isSelected && onSelectPatient) {
-      onSelectPatient(patient);
+    if (onSelectPatient) {
+      onSelectPatient(isSelected ? null : patient);
     }
   };
 
