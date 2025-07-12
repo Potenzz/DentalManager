@@ -65,3 +65,11 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+.day-picker-small-scale select {
+  @apply text-sm text-gray-900 bg-white border border-gray-300 rounded-md focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600;
+  height: 32px;           /* Fixed height: ~h-8 */
+  line-height: 1.25rem;   /* To align text nicely */
+  padding: 0 0.5rem;      /* Override padding */
+  min-width: 6rem;        /* Prevent shrinking */
+  appearance: none;       /* Removes native styling */
+}

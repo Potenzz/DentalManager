@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Delete, Edit, Eye } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   Pagination,
   PaginationContent,
@@ -38,6 +37,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { PatientSearch, SearchCriteria } from "./patient-search";
 import { useDebounce } from "use-debounce";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "../ui/checkbox";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -67,12 +67,16 @@ interface PatientTableProps {
   allowEdit?: boolean;
   allowView?: boolean;
   allowDelete?: boolean;
+  allowCheckbox?: boolean;
+  onSelectPatient?: (patient: Patient) => void;
 }
 
 export function PatientTable({
   allowEdit,
   allowView,
   allowDelete,
+  allowCheckbox,
+  onSelectPatient,
 }: PatientTableProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -94,12 +98,32 @@ export function PatientTable({
   );
   const [debouncedSearchCriteria] = useDebounce(searchCriteria, 500);
 
+  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(
+    null
+  );
+
+  const handleSelectPatient = (patient: Patient) => {
+    const isSelected = selectedPatientId === patient.id;
+    const newSelectedId = isSelected ? null : patient.id;
+    setSelectedPatientId(newSelectedId);
+
+    if (!isSelected && onSelectPatient) {
+      onSelectPatient(patient);
+    }
+  };
+
   const {
     data: patientsData,
     isLoading,
     isError,
   } = useQuery<PatientApiResponse, Error>({
-    queryKey: ["patients", { page: currentPage, search: debouncedSearchCriteria?.searchTerm || "recent" }],
+    queryKey: [
+      "patients",
+      {
+        page: currentPage,
+        search: debouncedSearchCriteria?.searchTerm || "recent",
+      },
+    ],
     queryFn: async () => {
       const trimmedTerm = debouncedSearchCriteria?.searchTerm?.trim();
       const isSearch = trimmedTerm && trimmedTerm.length > 0;
@@ -149,8 +173,7 @@ export function PatientTable({
       patients: [],
       totalCount: 0,
     },
-  }
-);
+  });
 
   // Update patient mutation
   const updatePatientMutation = useMutation({
@@ -166,7 +189,15 @@ export function PatientTable({
     },
     onSuccess: () => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["patients", currentPage] });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "patients",
+          {
+            page: currentPage,
+            search: debouncedSearchCriteria?.searchTerm || "recent",
+          },
+        ],
+      });
       toast({
         title: "Success",
         description: "Patient updated successfully!",
@@ -189,7 +220,15 @@ export function PatientTable({
     },
     onSuccess: () => {
       setIsDeletePatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["patients", currentPage] });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "patients",
+          {
+            page: currentPage,
+            search: debouncedSearchCriteria?.searchTerm || "recent",
+          },
+        ],
+      });
       toast({
         title: "Success",
         description: "Patient deleted successfully!",
@@ -305,6 +344,7 @@ export function PatientTable({
         <Table>
           <TableHeader>
             <TableRow>
+              {allowCheckbox && <TableHead>Select</TableHead>}
               <TableHead>Patient</TableHead>
               <TableHead>DOB / Gender</TableHead>
               <TableHead>Contact</TableHead>
@@ -344,6 +384,15 @@ export function PatientTable({
             ) : (
               patientsData?.patients.map((patient) => (
                 <TableRow key={patient.id} className="hover:bg-gray-50">
+                  {allowCheckbox && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedPatientId === patient.id}
+                        onCheckedChange={() => handleSelectPatient(patient)}
+                      />
+                    </TableCell>
+                  )}
+
                   <TableCell>
                     <div className="flex items-center">
                       <Avatar
@@ -393,7 +442,7 @@ export function PatientTable({
                           "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
                           patient.status === "active"
                             ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
+                            : "bg-red-100 text-red-800"
                         )}
                       >
                         {patient.status === "active" ? "Active" : "Inactive"}
@@ -498,7 +547,7 @@ export function PatientTable({
                         className={`${
                           currentPatient.status === "active"
                             ? "text-green-600"
-                            : "text-amber-600"
+                            : "text-red-600"
                         } font-medium`}
                       >
                         {currentPatient.status.charAt(0).toUpperCase() +

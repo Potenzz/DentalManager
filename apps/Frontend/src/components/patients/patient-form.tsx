@@ -21,6 +21,16 @@ import {
 } from "@/components/ui/select";
 import { useEffect, useMemo } from "react";
 import { forwardRef, useImperativeHandle } from "react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "../ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { Button } from "../ui/button";
+import { cn } from "@/lib/utils";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -116,7 +126,9 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
 
     useImperativeHandle(ref, () => ({
       submit() {
-        (document.getElementById("patient-form") as HTMLFormElement | null)?.requestSubmit();
+        (
+          document.getElementById("patient-form") as HTMLFormElement | null
+        )?.requestSubmit();
       },
     }));
 
@@ -195,9 +207,41 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Date of Birth *</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-4">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={(date) => {
+                            if (date) {
+                              const localDate = format(date, "yyyy-MM-dd");
+                              field.onChange(localDate);
+                            }
+                          }}
+                          disabled={
+                            (date) => date > new Date() // Prevent future dates
+                          }
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -319,6 +363,32 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
               Insurance Information
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status *</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      defaultValue="active"
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="insuranceProvider"

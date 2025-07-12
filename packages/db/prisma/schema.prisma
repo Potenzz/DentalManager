@@ -34,9 +34,6 @@ model Patient {
   firstName         String
   lastName          String
   dateOfBirth       DateTime      @db.Date
-  dob_day           Int?
-  dob_month         Int?
-  dob_year          Int?
   gender            String
   phone             String
   email             String?

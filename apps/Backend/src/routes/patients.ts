@@ -7,7 +7,6 @@ import {
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
 import { extractDobParts } from "../utils/DobParts";
-import { parseDobParts } from "../utils/DobPartsParsing";
 
 const router = Router();
 
@@ -134,75 +133,18 @@ router.get("/search", async (req: Request, res: Response): Promise<any> => {
     }
 
     if (dob) {
-      const range = parseDobParts(dob);
-
-      if (range) {
-        if (!filters.AND) filters.AND = [];
-
-        // Check what kind of match this was
-        const fromYear = range.from.getUTCFullYear();
-        const toYear = range.to.getUTCFullYear();
-        const fromMonth = range.from.getUTCMonth() + 1; // Prisma months: 1-12
-        const toMonth = range.to.getUTCMonth() + 1;
-        const fromDay = range.from.getUTCDate();
-        const toDay = range.to.getUTCDate();
-
-        const isFullDate =
-          fromYear === toYear && fromMonth === toMonth && fromDay === toDay;
-
-        const isDayMonthOnly =
-          fromYear === 1900 &&
-          toYear === 2100 &&
-          fromMonth === toMonth &&
-          fromDay === toDay;
-
-        const isMonthOnly =
-          fromYear === 1900 &&
-          toYear === 2100 &&
-          fromDay === 1 &&
-          toDay >= 28 &&
-          fromMonth === toMonth &&
-          toMonth === toMonth;
-
-        const isYearOnly = fromMonth === 1 && toMonth === 12;
-
-        if (isFullDate) {
-          filters.AND.push({
-            dob_day: fromDay,
-            dob_month: fromMonth,
-            dob_year: fromYear,
-          });
-        } else if (isDayMonthOnly) {
-          filters.AND.push({
-            dob_day: fromDay,
-            dob_month: fromMonth,
-          });
-        } else if (isMonthOnly) {
-          filters.AND.push({
-            dob_month: fromMonth,
-          });
-        } else if (isYearOnly) {
-          filters.AND.push({
-            dob_year: fromYear,
-          });
-        } else {
-          // Fallback: search via dateOfBirth range
-          filters.AND.push({
-            dateOfBirth: {
-              gte: range.from,
-              lte: range.to,
-            },
-          });
-        }
-      } else {
+      const parsed = new Date(dob);
+      if (isNaN(parsed.getTime())) {
         return res.status(400).json({
-          message: `Invalid date format for DOB. Try formats like "12 March", "March", "1980", "12/03/1980", etc.`,
+          message: "Invalid date format for DOB. Use format: YYYY-MM-DD",
         });
       }
+      // Match exact dateOfBirth (optional: adjust for timezone)
+      filters.dateOfBirth = parsed;
     }
 
     const [patients, totalCount] = await Promise.all([
-      storage.searchPatients({
+      storage.searchPatients({  
         filters,
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -259,13 +201,8 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
       userId: req.user!.id,
     });
 
-    // Extract dob_* from dateOfBirth
-    const dobParts = extractDobParts(new Date(patientData.dateOfBirth));
 
-    const patient = await storage.createPatient({
-      ...patientData,
-      ...dobParts, // adds dob_day/month/year
-    });
+    const patient = await storage.createPatient(patientData);
 
     res.status(201).json(patient);
   } catch (error) {
@@ -307,15 +244,8 @@ router.put(
       // Validate request body
       const patientData = updatePatientSchema.parse(req.body);
 
-      let dobParts = {};
-      if (patientData.dateOfBirth) {
-        dobParts = extractDobParts(new Date(patientData.dateOfBirth));
-      }
       // Update patient
-      const updatedPatient = await storage.updatePatient(patientId, {
-        ...patientData,
-        ...dobParts,
-      });
+      const updatedPatient = await storage.updatePatient(patientId, patientData);
       res.json(updatedPatient);
     } catch (error) {
       if (error instanceof z.ZodError) {
