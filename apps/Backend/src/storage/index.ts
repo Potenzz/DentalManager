@@ -165,6 +165,7 @@ export interface IStorage {
 
   // Patient methods
   getPatient(id: number): Promise<Patient | undefined>;
+  getPatientByInsuranceId(insuranceId: string): Promise<Patient | null>;
   getPatientsByUserId(userId: number): Promise<Patient[]>;
   getRecentPatients(limit: number, offset: number): Promise<Patient[]>;
   getTotalPatientCount(): Promise<number>;
@@ -313,6 +314,12 @@ export const storage: IStorage = {
 
   async getPatientsByUserId(userId: number): Promise<Patient[]> {
     return await db.patient.findMany({ where: { userId } });
+  },
+
+  async getPatientByInsuranceId(insuranceId: string): Promise<Patient | null> {
+    return db.patient.findFirst({
+      where: { insuranceId },
+    });
   },
 
   async getRecentPatients(limit: number, offset: number): Promise<Patient[]> {

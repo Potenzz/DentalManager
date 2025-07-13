@@ -4,7 +4,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_BACKEND ?? "";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-
     if (res.status === 401 || res.status === 403) {
       localStorage.removeItem("token");
       if (!window.location.pathname.startsWith("/auth")) {
@@ -13,7 +12,19 @@ async function throwIfResNotOk(res: Response) {
       }
       return;
     }
-    throw new Error(`${res.status}: ${res.statusText}`);
+
+    // Try to parse the response as JSON for a more meaningful error message
+    let message = `${res.status}: ${res.statusText}`;
+    try {
+      const errorBody = await res.json();
+      if (errorBody?.message) {
+        message = errorBody.message;
+      }
+    } catch {
+      // ignore JSON parse errors, keep default message
+    }
+
+    throw new Error(message);
   }
 }
 

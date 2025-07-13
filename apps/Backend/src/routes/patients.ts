@@ -144,7 +144,7 @@ router.get("/search", async (req: Request, res: Response): Promise<any> => {
     }
 
     const [patients, totalCount] = await Promise.all([
-      storage.searchPatients({  
+      storage.searchPatients({
         filters,
         limit: parseInt(limit),
         offset: parseInt(offset),
@@ -201,6 +201,18 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
       userId: req.user!.id,
     });
 
+    // Check for duplicate insuranceId if it's provided
+    if (patientData.insuranceId) {
+      const existingPatient = await storage.getPatientByInsuranceId(
+        patientData.insuranceId
+      );
+
+      if (existingPatient) {
+        return res.status(409).json({
+          message: "A patient with this insurance ID already exists.",
+        });
+      }
+    }
 
     const patient = await storage.createPatient(patientData);
 
@@ -244,8 +256,26 @@ router.put(
       // Validate request body
       const patientData = updatePatientSchema.parse(req.body);
 
+      // If updating insuranceId, check for uniqueness (excluding self)
+      if (
+        patientData.insuranceId &&
+        patientData.insuranceId !== existingPatient.insuranceId
+      ) {
+        const duplicatePatient = await storage.getPatientByInsuranceId(
+          patientData.insuranceId
+        );
+        if (duplicatePatient && duplicatePatient.id !== patientId) {
+          return res.status(409).json({
+            message: "Another patient with this insurance ID already exists.",
+          });
+        }
+      }
+
       // Update patient
-      const updatedPatient = await storage.updatePatient(patientId, patientData);
+      const updatedPatient = await storage.updatePatient(
+        patientId,
+        patientData
+      );
       res.json(updatedPatient);
     } catch (error) {
       if (error instanceof z.ZodError) {

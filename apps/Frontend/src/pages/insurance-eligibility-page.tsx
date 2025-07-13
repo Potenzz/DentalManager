@@ -26,6 +26,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -33,6 +34,15 @@ const PatientSchema = (
   appointments: true,
 });
 type Patient = z.infer<typeof PatientSchema>;
+
+const insertPatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
 
 export default function InsuranceEligibilityPage() {
   const { user } = useAuth();
@@ -53,23 +63,55 @@ export default function InsuranceEligibilityPage() {
 
   // Populate fields from selected patient
   useEffect(() => {
-  if (selectedPatient) {
-    setMemberId(selectedPatient.insuranceId ?? "");
-    setFirstName(selectedPatient.firstName ?? "");
-    setLastName(selectedPatient.lastName ?? "");
+    if (selectedPatient) {
+      setMemberId(selectedPatient.insuranceId ?? "");
+      setFirstName(selectedPatient.firstName ?? "");
+      setLastName(selectedPatient.lastName ?? "");
 
-    const dob = selectedPatient.dateOfBirth
-      ? new Date(selectedPatient.dateOfBirth)
-      : undefined;
-    setDateOfBirth(dob);
-  } else {
-    setMemberId("");
-    setFirstName("");
-    setLastName("");
-    setDateOfBirth(undefined);
-  }
-}, [selectedPatient]);
+      const dob = selectedPatient.dateOfBirth
+        ? new Date(selectedPatient.dateOfBirth)
+        : undefined;
+      setDateOfBirth(dob);
+    } else {
+      setMemberId("");
+      setFirstName("");
+      setLastName("");
+      setDateOfBirth(undefined);
+    }
+  }, [selectedPatient]);
 
+  // Add patient mutation
+  const addPatientMutation = useMutation({
+    mutationFn: async (patient: InsertPatient) => {
+      const res = await apiRequest("POST", "/api/patients/", patient);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      toast({
+        title: "Success",
+        description: "Patient added successfully!",
+        variant: "default",
+      });
+    },
+    onError: (error: any) => {
+      const msg = error.message;
+
+      if (msg === "A patient with this insurance ID already exists.") {
+        toast({
+          title: "Patient already exists",
+          description: msg,
+          variant: "default", 
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to add patient: ${msg}`,
+          variant: "destructive", 
+        });
+      }
+    },
+  });
 
   // Insurance eligibility check mutation
   const checkInsuranceMutation = useMutation({
@@ -114,16 +156,34 @@ export default function InsuranceEligibilityPage() {
   });
 
   // Handle insurance provider button clicks
-  const handleMHButton= () => {
+  const handleMHButton = () => {
+    // Form Fields check
     if (!memberId || !dateOfBirth || !firstName) {
-    toast({
-      title: "Missing Fields",
-      description:
-        "Please fill in all the required fields: Member ID, Date of Birth, First Name.",
-      variant: "destructive",
-    });
-    return;
-  }
+      toast({
+        title: "Missing Fields",
+        description:
+          "Please fill in all the required fields: Member ID, Date of Birth, First Name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Adding patient if same patient exists then it will skip.
+    const newPatient: InsertPatient = {
+      firstName,
+      lastName,
+      dateOfBirth: dateOfBirth,
+      gender: "",
+      phone: "",
+      userId: user?.id ?? 1,
+      status: "active",
+      insuranceId: memberId,
+    };
+    addPatientMutation.mutate(newPatient);
+
+    
+
+
   };
 
   return (
