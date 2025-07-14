@@ -7,6 +7,7 @@ import pdfExtractionRoutes from './pdfExtraction';
 import claimsRoutes from './claims';
 import insuranceCredsRoutes from './insuranceCreds';
 import documentRoutes from './documents';
+import insuranceEligibilityRoutes from './insuranceEligibility'
 
 const router = Router();
 
@@ -18,5 +19,7 @@ router.use('/pdfExtraction', pdfExtractionRoutes);
 router.use('/claims', claimsRoutes);
 router.use('/insuranceCreds', insuranceCredsRoutes);
 router.use('/documents', documentRoutes);
+router.use('/insuranceEligibility', insuranceEligibilityRoutes);
+
 
 export default router;

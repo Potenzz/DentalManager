@@ -27,6 +27,12 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import {
+  setTaskStatus,
+  clearTaskStatus,
+} from "@/redux/slices/seleniumEligibilityCheckTaskSlice";
+import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -47,6 +53,11 @@ type InsertPatient = z.infer<typeof insertPatientSchema>;
 export default function InsuranceEligibilityPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
+  const { status, message, show } = useAppSelector(
+    (state) => state.seleniumEligibilityCheckTask
+  );
+
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
@@ -113,7 +124,7 @@ export default function InsuranceEligibilityPage() {
     },
   });
 
-  // Insurance eligibility check mutation
+  // Insurance eligibility check mutation --- not using right now
   const checkInsuranceMutation = useMutation({
     mutationFn: async ({
       provider,
@@ -155,6 +166,67 @@ export default function InsuranceEligibilityPage() {
     },
   });
 
+  // handle selenium
+    const handleSelenium = async () => {
+      const data = {memberId, dateOfBirth, insuranceSiteKey: "MH", };
+      try {
+        dispatch(
+          setTaskStatus({
+            status: "pending",
+            message: "Sending Data to Selenium...",
+          })
+        );
+        const response = await apiRequest(
+          "POST",
+          "/api/insuranceEligibility/check",
+          { data: JSON.stringify(data) }
+        );
+        const result1 = await response.json();
+        if (result1.error) throw new Error(result1.error);
+  
+        dispatch(
+          setTaskStatus({
+            status: "pending",
+            message: "Submitted to Selenium. Awaiting PDF...",
+          })
+        );
+  
+        toast({
+          title: "Selenium service notified",
+          description:
+            "Your claim data was successfully sent to Selenium, Waitinig for its response.",
+          variant: "default",
+        });
+      } catch (error: any) {
+        dispatch(
+          setTaskStatus({
+            status: "error",
+            message: error.message || "Selenium submission failed",
+          })
+        );
+        toast({
+          title: "Selenium service error",
+          description: error.message || "An error occurred.",
+          variant: "destructive",
+        });
+      }
+    };
+
+
+  const handleAddPatient = () => {
+    const newPatient: InsertPatient = {
+      firstName,
+      lastName,
+      dateOfBirth: dateOfBirth,
+      gender: "",
+      phone: "",
+      userId: user?.id ?? 1,
+      status: "active",
+      insuranceId: memberId,
+    };
+    addPatientMutation.mutate(newPatient);
+  }
+
   // Handle insurance provider button clicks
   const handleMHButton = () => {
     // Form Fields check
@@ -169,19 +241,9 @@ export default function InsuranceEligibilityPage() {
     }
 
     // Adding patient if same patient exists then it will skip.
-    const newPatient: InsertPatient = {
-      firstName,
-      lastName,
-      dateOfBirth: dateOfBirth,
-      gender: "",
-      phone: "",
-      userId: user?.id ?? 1,
-      status: "active",
-      insuranceId: memberId,
-    };
-    addPatientMutation.mutate(newPatient);
+    handleAddPatient();
 
-    
+    handleSelenium();
 
 
   };
@@ -195,6 +257,13 @@ export default function InsuranceEligibilityPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
+
+        <SeleniumTaskBanner
+        status={status}
+        message={message}
+        show={show}
+        onClear={() => dispatch(clearTaskStatus())}
+      />
 
         <main className="flex-1 overflow-auto p-6">
           <div className="max-w-7xl mx-auto">

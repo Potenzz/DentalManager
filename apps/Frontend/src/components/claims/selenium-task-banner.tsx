@@ -1,14 +1,15 @@
-import { useSelector, useDispatch } from "react-redux";
-import { RootState } from "@/redux/store";
-import { clearTaskStatus } from "@/redux/slices/seleniumTaskSlice";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 
-export const SeleniumTaskBanner = () => {
-  const { status, message, show } = useSelector(
-    (state: RootState) => state.seleniumTask
-  );
-  const dispatch = useDispatch();
+export type TaskStatus = "idle" | "pending" | "success" | "error";
 
+interface Props {
+  status: TaskStatus;
+  message: string;
+  show: boolean;
+  onClear: () => void;
+}
+
+export const SeleniumTaskBanner = ({ status, message, show, onClear }: Props) => {
   if (!show) return null;
 
   const getIcon = () => {
@@ -33,14 +34,14 @@ export const SeleniumTaskBanner = () => {
             {status === "pending"
               ? "Selenium Task In Progress"
               : status === "success"
-                ? "Selenium Task Completed"
-                : "Selenium Task Error"}
+              ? "Selenium Task Completed"
+              : "Selenium Task Error"}
           </div>
           <p className="text-gray-600 text-sm">{message}</p>
         </div>
       </div>
       <button
-        onClick={() => dispatch(clearTaskStatus())}
+        onClick={onClear}
         className="text-sm text-gray-500 hover:text-gray-800"
       >
         ✕

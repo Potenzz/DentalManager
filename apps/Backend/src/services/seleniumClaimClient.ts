@@ -12,7 +12,7 @@ export interface SeleniumPayload {
   }[];
 }
 
-export async function forwardToSeleniumAgent(
+export async function forwardToSeleniumClaimAgent(
   claimData: any,
   files: Express.Multer.File[]
 ): Promise<any> {
@@ -37,7 +37,7 @@ export async function forwardToSeleniumAgent(
   };
 
   const result = await axios.post(
-    "http://localhost:5002/start-workflow",
+    "http://localhost:5002/claimsubmit",
     payload
   );
   if (result.data.status === "error") {

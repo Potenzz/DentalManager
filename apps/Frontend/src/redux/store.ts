@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
-import seleniumTaskReducer from "./slices/seleniumTaskSlice";
+import seleniumClaimSubmitTaskReducer from "./slices/seleniumClaimSubmitTaskSlice";
+import seleniumEligibilityCheckTaskReducer  from "./slices/seleniumEligibilityCheckTaskSlice";
 
 export const store = configureStore({
   reducer: {
-    seleniumTask: seleniumTaskReducer,
+    seleniumClaimSubmitTask: seleniumClaimSubmitTaskReducer,
+    seleniumEligibilityCheckTask: seleniumEligibilityCheckTaskReducer,
   },
 });
 

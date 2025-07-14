@@ -11,18 +11,18 @@ import {
   AppointmentUncheckedCreateInputObjectSchema,
   ClaimUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
-import { AlertCircle, CheckCircle, Clock, FileCheck } from "lucide-react";
+import { FileCheck } from "lucide-react";
 import { parse, format } from "date-fns";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import RecentClaims from "@/components/claims/recent-claims";
-import { Button } from "@/components/ui/button";
-import { useDispatch } from "react-redux";
+
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import {
   setTaskStatus,
   clearTaskStatus,
-} from "@/redux/slices/seleniumTaskSlice";
+} from "@/redux/slices/seleniumClaimSubmitTaskSlice";
 import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
 
 //creating types out of schema auto generated.
@@ -78,7 +78,11 @@ export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClaimFormOpen, setIsClaimFormOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<number | null>(null);
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
+  const { status, message, show } = useAppSelector(
+    (state) => state.seleniumClaimSubmitTask
+  );
+
   const { toast } = useToast();
   const { user } = useAuth();
   const [claimFormData, setClaimFormData] = useState<any>({
@@ -428,7 +432,6 @@ export default function ClaimsPage() {
     }
   }, [memberId, dob]);
 
-
   const getDisplayProvider = (provider: string) => {
     const insuranceMap: Record<string, string> = {
       delta: "Delta Dental",
@@ -614,8 +617,12 @@ export default function ClaimsPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-
-        <SeleniumTaskBanner />
+        <SeleniumTaskBanner
+          status={status}
+          message={message}
+          show={show}
+          onClear={() => dispatch(clearTaskStatus())}
+        />
 
         <main className="flex-1 overflow-y-auto p-4">
           {/* Header */}

@@ -14,8 +14,8 @@ const initialState: SeleniumTaskState = {
   show: false,
 };
 
-const seleniumTaskSlice = createSlice({
-  name: "seleniumTask",
+const seleniumClaimSubmitTaskSlice = createSlice({
+  name: "seleniumClaimSubmitTask",
   initialState,
   reducers: {
     setTaskStatus: (
@@ -28,5 +28,6 @@ const seleniumTaskSlice = createSlice({
   },
 });
 
-export const { setTaskStatus, clearTaskStatus } = seleniumTaskSlice.actions;
-export default seleniumTaskSlice.reducer;
+// ✅ Make sure you're exporting from the renamed slice
+export const { setTaskStatus, clearTaskStatus } = seleniumClaimSubmitTaskSlice.actions;
+export default seleniumClaimSubmitTaskSlice.reducer;
