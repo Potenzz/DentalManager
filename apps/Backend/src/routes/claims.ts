@@ -92,7 +92,7 @@ router.post(
       if (!credentials) {
         return res
           .status(404)
-          .json({ error: "No insurance credentials found for this provider." });
+          .json({ error: "No insurance credentials found for this provider. Kindly Update this at Settings Page." });
       }
 
       const enrichedData = {
