@@ -182,3 +182,6 @@ class AutomationMassHealthEligibilityCheck:
                 "status": "error",
                 "message": e
             }
+        
+        finally:
+            self.driver.quit()

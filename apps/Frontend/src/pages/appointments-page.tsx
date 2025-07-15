@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, addDays, startOfToday, addMinutes } from "date-fns";
+import {
+  parseLocalDateString,
+  formatLocalDate,
+  normalizeToISOString
+} from "@/utils/dateUtils";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
@@ -372,30 +377,11 @@ export default function AppointmentsPage() {
   ) => {
     // Converts local date to exact UTC date with no offset issues
 
-    function parseLocalDate(dateInput: Date | string): Date {
-      if (dateInput instanceof Date) return dateInput;
-
-      const parts = dateInput.split("-");
-      if (parts.length !== 3) {
-        throw new Error(`Invalid date format: ${dateInput}`);
-      }
-
-      const year = Number(parts[0]);
-      const month = Number(parts[1]);
-      const day = Number(parts[2]);
-
-      if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
-        throw new Error(`Invalid date parts in date string: ${dateInput}`);
-      }
-
-      return new Date(year, month - 1, day); // month is 0-indexed
-    }
-
-    const rawDate = parseLocalDate(appointmentData.date);
+    const rawDate = parseLocalDateString(appointmentData.date);
 
     const updatedData = {
       ...appointmentData,
-      date: rawDate.toLocaleDateString("en-CA"),
+      date: formatLocalDate(rawDate),
     };
 
     // Check if we're editing an existing appointment with a valid ID
@@ -458,15 +444,7 @@ export default function AppointmentsPage() {
         ? new Date(appointment.date)
         : appointment.date;
 
-    // Extract UTC year, month, day
-    const year = dateObj.getUTCFullYear();
-    const month = dateObj.getUTCMonth(); // zero-based
-    const day = dateObj.getUTCDate();
-
-    // Create a date string in UTC format
-    const utcDateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
-    return utcDateStr === formattedDate; // formattedDate should be 'yyyy-MM-dd' string in UTC format as well
+    return formatLocalDate(dateObj) === formatLocalDate(selectedDate); // formattedDate should be 'yyyy-MM-dd' string in UTC format as well
   });
 
   // Process appointments for the scheduler view

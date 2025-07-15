@@ -33,6 +33,7 @@ import {
   clearTaskStatus,
 } from "@/redux/slices/seleniumEligibilityCheckTaskSlice";
 import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
+import { formatLocalDate } from "@/utils/dateUtils";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -167,7 +168,7 @@ export default function InsuranceEligibilityPage() {
   // handle selenium
     const handleSelenium = async () => {
 
-      const formattedDob = dateOfBirth ? format(dateOfBirth, "yyyy-MM-dd") : "";
+      const formattedDob = dateOfBirth ? formatLocalDate(dateOfBirth) : "";
 
       const data = {memberId, dateOfBirth: formattedDob, insuranceSiteKey: "MH", };
       try {
