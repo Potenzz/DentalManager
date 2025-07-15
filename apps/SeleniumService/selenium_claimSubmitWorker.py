@@ -332,7 +332,6 @@ class AutomationMassHealth:
     def main_workflow(self, url):
         try: 
             self.config_driver()
-            print("Reaching Site :", url)
             self.driver.maximize_window()
             self.driver.get(url)
             time.sleep(3)

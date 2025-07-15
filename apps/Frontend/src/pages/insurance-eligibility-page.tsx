@@ -80,8 +80,6 @@ export default function InsuranceEligibilityPage() {
       setLastName(selectedPatient.lastName ?? "");
 
       const dob = selectedPatient.dateOfBirth
-        ? new Date(selectedPatient.dateOfBirth)
-        : undefined;
       setDateOfBirth(dob);
     } else {
       setMemberId("");
@@ -168,7 +166,10 @@ export default function InsuranceEligibilityPage() {
 
   // handle selenium
     const handleSelenium = async () => {
-      const data = {memberId, dateOfBirth, insuranceSiteKey: "MH", };
+
+      const formattedDob = dateOfBirth ? format(dateOfBirth, "yyyy-MM-dd") : "";
+
+      const data = {memberId, dateOfBirth: formattedDob, insuranceSiteKey: "MH", };
       try {
         dispatch(
           setTaskStatus({
@@ -181,13 +182,13 @@ export default function InsuranceEligibilityPage() {
           "/api/insuranceEligibility/check",
           { data: JSON.stringify(data) }
         );
-        const result1 = await response.json();
-        if (result1.error) throw new Error(result1.error);
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
   
         dispatch(
           setTaskStatus({
-            status: "pending",
-            message: "Submitted to Selenium. Awaiting PDF...",
+            status: "success",
+            message: "Submitted to Selenium.",
           })
         );
   
