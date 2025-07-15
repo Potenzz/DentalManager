@@ -33,7 +33,10 @@ export function parseLocalDateString(dateStr: string): Date {
  * Useful for saving date-only data without time component.
  */
 export function formatLocalDate(date: Date): string {
-  return format(date, "yyyy-MM-dd");
+  const year = date.getFullYear();             // ← local time
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;           // e.g. "2025-07-15"
 }
 
 /**
