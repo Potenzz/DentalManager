@@ -441,7 +441,7 @@ export default function AppointmentsPage() {
   const selectedDateAppointments = appointments.filter((appointment) => {
     const dateObj =
       typeof appointment.date === "string"
-        ? new Date(appointment.date)
+        ? parseLocalDateString(appointment.date)
         : appointment.date;
 
     return formatLocalDate(dateObj) === formatLocalDate(selectedDate); // formattedDate should be 'yyyy-MM-dd' string in UTC format as well
