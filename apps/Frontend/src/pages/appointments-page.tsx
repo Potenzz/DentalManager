@@ -4,7 +4,7 @@ import { format, addDays, startOfToday, addMinutes } from "date-fns";
 import {
   parseLocalDateString,
   formatLocalDate,
-  normalizeToISOString
+  normalizeToISOString,
 } from "@/utils/dateUtils";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -474,7 +474,10 @@ export default function AppointmentsPage() {
         patientName,
         staffId,
         status: apt.status ?? null, // Default to null if status is undefined
-        date: apt.date instanceof Date ? apt.date.toISOString() : apt.date, // Ensure d
+        date:
+          apt.date instanceof Date
+            ? formatLocalDate(apt.date)
+            : formatLocalDate(new Date(apt.date)),
       };
 
       return processed;
@@ -889,8 +892,9 @@ export default function AppointmentsPage() {
                           {
                             processedAppointments.filter(
                               (apt) =>
-                                staffMembers.find((s) => Number(s.id) === apt.staffId)
-                                  ?.role === "doctor"
+                                staffMembers.find(
+                                  (s) => Number(s.id) === apt.staffId
+                                )?.role === "doctor"
                             ).length
                           }
                         </span>
@@ -903,8 +907,9 @@ export default function AppointmentsPage() {
                           {
                             processedAppointments.filter(
                               (apt) =>
-                                staffMembers.find((s) => Number(s.id) === apt.staffId)
-                                  ?.role === "hygienist"
+                                staffMembers.find(
+                                  (s) => Number(s.id) === apt.staffId
+                                )?.role === "hygienist"
                             ).length
                           }
                         </span>
