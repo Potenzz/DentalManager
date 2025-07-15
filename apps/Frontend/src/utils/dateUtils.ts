@@ -52,9 +52,18 @@ export function toUTCDate(date: Date): Date {
  * and formats it as local yyyy-MM-dd string for UI use.
  */
 export function formatUTCDateStringToLocal(dateStr: string): string {
-  const date = new Date(dateStr); // parsed as UTC
-  return formatLocalDate(date);
+  const date = new Date(dateStr); // still UTC
+
+  // Create a local Date object with same year, month, day from UTC
+  const localDate = new Date(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  );
+
+  return formatLocalDate(localDate); // now safely in local time
 }
+
 
 /**
  * Ensure any date (Date|string) is formatted to ISO string for consistent backend storage.
