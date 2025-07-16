@@ -6,7 +6,9 @@ import {
   StaffUncheckedCreateInputObjectSchema,
   ClaimUncheckedCreateInputObjectSchema,
   InsuranceCredentialUncheckedCreateInputObjectSchema,
-  ClaimPdfUncheckedCreateInputObjectSchema,
+  PdfFileUncheckedCreateInputObjectSchema,
+  PdfGroupUncheckedCreateInputObjectSchema,
+  PdfCategorySchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
 
@@ -146,8 +148,10 @@ type ClaimWithServiceLines = Claim & {
   }[];
 };
 
-// claim types:
-type ClaimPdf = z.infer<typeof ClaimPdfUncheckedCreateInputObjectSchema>;
+// Pdf types:
+type PdfGroup = z.infer<typeof PdfGroupUncheckedCreateInputObjectSchema>;
+type PdfFile = z.infer<typeof PdfFileUncheckedCreateInputObjectSchema>;
+type PdfCategory = z.infer<typeof PdfCategorySchema>;
 
 export interface ClaimPdfMetadata {
   id: number;
@@ -245,29 +249,36 @@ export interface IStorage {
     siteKey: string
   ): Promise<InsuranceCredential | null>;
 
-  // Claim PDF Methods
-  createClaimPdf(
-    patientId: number,
-    claimId: number,
+  // General PDF Methods
+  createPdfFile(
+    groupId: number,
     filename: string,
     pdfData: Buffer
-  ): Promise<ClaimPdf>;
-
-  getClaimPdfById(id: number): Promise<ClaimPdf | undefined>;
-
-  getAllClaimPdfs(): Promise<ClaimPdfMetadata[]>;
-
-  getRecentClaimPdfs(
-    limit: number,
-    offset: number
-  ): Promise<ClaimPdfMetadata[]>;
-
-  deleteClaimPdf(id: number): Promise<boolean>;
-
-  updateClaimPdf(
+  ): Promise<PdfFile>;
+  getPdfFileById(id: number): Promise<PdfFile | undefined>;
+  getPdfFilesByGroupId(groupId: number): Promise<PdfFile[]>;
+  getRecentPdfFiles(limit: number, offset: number): Promise<PdfFile[]>;
+  deletePdfFile(id: number): Promise<boolean>;
+  updatePdfFile(
     id: number,
-    updates: Partial<Pick<ClaimPdf, "filename" | "pdfData">>
-  ): Promise<ClaimPdf | undefined>;
+    updates: Partial<Pick<PdfFile, "filename" | "pdfData">>
+  ): Promise<PdfFile | undefined>;
+
+  // Group management
+  createPdfGroup(
+  patientId: number,
+  title: string,
+  category: PdfCategory
+): Promise<PdfGroup>;
+
+  getAllPdfGroups(): Promise<PdfGroup[]>;
+  getPdfGroupById(id: number): Promise<PdfGroup | undefined>;
+  getPdfGroupsByPatientId(patientId: number): Promise<PdfGroup[]>;
+  updatePdfGroup(
+    id: number,
+    updates: Partial<Pick<PdfGroup, "title" | "category">>
+  ): Promise<PdfGroup | undefined>;
+  deletePdfGroup(id: number): Promise<boolean>;
 }
 
 export const storage: IStorage = {
@@ -610,73 +621,107 @@ export const storage: IStorage = {
     });
   },
 
-  // pdf claims
-  async createClaimPdf(
-    patientId,
-    claimId,
-    filename,
-    pdfData
-  ): Promise<ClaimPdf> {
-    return db.claimPdf.create({
+  // PDF Files
+  async createPdfFile(groupId, filename, pdfData) {
+    return db.pdfFile.create({
       data: {
-        patientId,
-        claimId,
+        groupId,
         filename,
         pdfData,
       },
     });
   },
 
-  async getClaimPdfById(id: number): Promise<ClaimPdf | undefined> {
-    const pdf = await db.claimPdf.findUnique({ where: { id } });
-    return pdf ?? undefined;
-  },
-
-  async getAllClaimPdfs(): Promise<ClaimPdfMetadata[]> {
-    return db.claimPdf.findMany({
-      select: { id: true, filename: true, uploadedAt: true },
-      orderBy: { uploadedAt: "desc" },
-    });
-  },
-
-  async getRecentClaimPdfs(
-    limit: number,
-    offset: number
-  ): Promise<ClaimPdfMetadata[]> {
-    return db.claimPdf.findMany({
-      skip: offset,
-      take: limit,
-      orderBy: { uploadedAt: "desc" },
-      select: {
-        id: true,
-        filename: true,
-        uploadedAt: true,
-        patient: true,
+  async getAllPdfGroups(): Promise<PdfGroup[]> {
+    return db.pdfGroup.findMany({
+      orderBy: {
+        createdAt: "desc",
       },
     });
   },
 
-  async deleteClaimPdf(id: number): Promise<boolean> {
+  async getPdfFileById(id) {
+    return (await db.pdfFile.findUnique({ where: { id } })) ?? undefined;
+  },
+
+  async getPdfFilesByGroupId(groupId) {
+    return db.pdfFile.findMany({
+      where: { groupId },
+      orderBy: { uploadedAt: "desc" },
+    });
+  },
+
+  async getRecentPdfFiles(limit: number, offset: number): Promise<PdfFile[]> {
+    return db.pdfFile.findMany({
+      skip: offset,
+      take: limit,
+      orderBy: { uploadedAt: "desc" },
+      include: { group: true },
+    });
+  },
+
+  async updatePdfFile(id, updates) {
     try {
-      await db.claimPdf.delete({ where: { id } });
+      return await db.pdfFile.update({
+        where: { id },
+        data: updates,
+      });
+    } catch {
+      return undefined;
+    }
+  },
+
+  async deletePdfFile(id) {
+    try {
+      await db.pdfFile.delete({ where: { id } });
       return true;
     } catch {
       return false;
     }
   },
 
-  async updateClaimPdf(
-    id: number,
-    updates: Partial<Pick<ClaimPdf, "filename" | "pdfData">>
-  ): Promise<ClaimPdf | undefined> {
+  // ----------------------
+  // PdfGroup CRUD
+  // ----------------------
+
+  async createPdfGroup(patientId, title, category) {
+    return db.pdfGroup.create({
+      data: {
+        patientId,
+        title,
+        category,
+      },
+    });
+  },
+
+  async getPdfGroupById(id) {
+    return (await db.pdfGroup.findUnique({ where: { id } })) ?? undefined;
+  },
+
+  async getPdfGroupsByPatientId(patientId) {
+    return db.pdfGroup.findMany({
+      where: { patientId },
+      orderBy: { createdAt: "desc" },
+    });
+  },
+
+  async updatePdfGroup(id, updates) {
     try {
-      const updated = await db.claimPdf.update({
+      return await db.pdfGroup.update({
         where: { id },
         data: updates,
       });
-      return updated;
     } catch {
       return undefined;
+    }
+  },
+
+  async deletePdfGroup(id) {
+    try {
+      await db.pdfGroup.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
     }
   },
 };

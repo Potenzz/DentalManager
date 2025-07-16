@@ -5,4 +5,6 @@ export * from '../shared/schemas/objects/UserUncheckedCreateInput.schema';
 export * from '../shared/schemas/objects/StaffUncheckedCreateInput.schema'
 export * from '../shared/schemas/objects/ClaimUncheckedCreateInput.schema'
 export * from '../shared/schemas/objects/InsuranceCredentialUncheckedCreateInput.schema'
-export * from '../shared/schemas/objects/ClaimPdfUncheckedCreateInput.schema'
+export * from '../shared/schemas/objects/PdfFileUncheckedCreateInput.schema'
+export * from '../shared/schemas/objects/PdfGroupUncheckedCreateInput.schema'
+export * from '../shared/schemas/enums/PdfCategory.schema'
