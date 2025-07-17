@@ -34,6 +34,24 @@ router.post(
 );
 
 router.get(
+  "/pdf-groups/patient/:patientId",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const { patientId } = req.params;
+      if (!patientId) {
+        return res.status(400).json({ error: "Missing patient ID" });
+      }
+
+      const groups = await storage.getPdfGroupsByPatientId(parseInt(patientId));
+      res.json(groups);
+    } catch (err) {
+      console.error("Error fetching groups by patient ID:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+router.get(
   "/pdf-groups/:id",
   async (req: Request, res: Response): Promise<any> => {
     try {
@@ -125,6 +143,21 @@ router.post(
     }
   }
 );
+
+router.get("/pdf-files/group/:groupId", async (req: Request, res: Response):Promise<any> => {
+  try {
+    const idParam = req.params.groupId;
+      if (!idParam) {
+        return res.status(400).json({ error: "Missing Groupt ID" });
+      }
+    const groupId = parseInt(idParam);
+    const files = await storage.getPdfFilesByGroupId(groupId); // implement this
+    res.json(files);
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 
 router.get(
   "/pdf-files/:id",

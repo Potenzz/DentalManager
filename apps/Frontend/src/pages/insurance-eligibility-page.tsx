@@ -12,7 +12,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, CheckCircle } from "lucide-react";
+import {
+  CalendarIcon,
+  CheckCircle,
+  LoaderCircleIcon,
+} from "lucide-react";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -58,9 +62,7 @@ export default function InsuranceEligibilityPage() {
   const { status, message, show } = useAppSelector(
     (state) => state.seleniumEligibilityCheckTask
   );
-
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -71,6 +73,7 @@ export default function InsuranceEligibilityPage() {
   const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
 
   // Populate fields from selected patient
   useEffect(() => {
@@ -125,48 +128,6 @@ export default function InsuranceEligibilityPage() {
     },
   });
 
-  // Insurance eligibility check mutation --- not using right now
-  const checkInsuranceMutation = useMutation({
-    mutationFn: async ({
-      provider,
-      patientId,
-      credentials,
-    }: {
-      provider: string;
-      patientId: number;
-      credentials: { username: string; password: string };
-    }) => {
-      const response = await fetch("/api/insurance/check", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ provider, patientId, credentials }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to check insurance");
-      }
-
-      return response.json();
-    },
-    onSuccess: (result) => {
-      toast({
-        title: "Insurance Check Complete",
-        description: result.isEligible
-          ? `Patient is eligible. Plan: ${result.planName}`
-          : "Patient eligibility could not be verified",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Insurance Check Failed",
-        description: error.message || "Unable to verify insurance eligibility",
-        variant: "destructive",
-      });
-    },
-  });
-
   // handle selenium
   const handleSelenium = async () => {
     const formattedDob = dateOfBirth ? formatLocalDate(dateOfBirth) : "";
@@ -194,7 +155,8 @@ export default function InsuranceEligibilityPage() {
       dispatch(
         setTaskStatus({
           status: "success",
-          message: "Submitted to Selenium.",
+          message:
+            "Patient status is updated, and Its eligibility pdf is uploaded at Document Page.",
         })
       );
 
@@ -216,10 +178,12 @@ export default function InsuranceEligibilityPage() {
         description: error.message || "An error occurred.",
         variant: "destructive",
       });
+    } finally {
+      setIsCheckingEligibility(false); // End loading
     }
   };
 
-  const handleAddPatient = () => {
+  const handleAddPatient = async () => {
     const newPatient: InsertPatient = {
       firstName,
       lastName,
@@ -230,11 +194,11 @@ export default function InsuranceEligibilityPage() {
       status: "active",
       insuranceId: memberId,
     };
-    addPatientMutation.mutate(newPatient);
+    await addPatientMutation.mutateAsync(newPatient);
   };
 
   // Handle insurance provider button clicks
-  const handleMHButton = () => {
+  const handleMHButton = async () => {
     // Form Fields check
     if (!memberId || !dateOfBirth || !firstName) {
       toast({
@@ -246,10 +210,14 @@ export default function InsuranceEligibilityPage() {
       return;
     }
 
+    setIsCheckingEligibility(true);
+
     // Adding patient if same patient exists then it will skip.
     handleAddPatient();
 
     handleSelenium();
+
+    await queryClient.invalidateQueries({ queryKey: ["patients"] });
   };
 
   return (
@@ -352,10 +320,19 @@ export default function InsuranceEligibilityPage() {
                   <Button
                     onClick={() => handleMHButton()}
                     className="w-full"
-                    disabled={checkInsuranceMutation.isPending}
+                    disabled={isCheckingEligibility}
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    MH
+                    {isCheckingEligibility ? (
+                      <>
+                        <LoaderCircleIcon className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        MH
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>

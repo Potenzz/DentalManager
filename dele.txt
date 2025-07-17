@@ -1,5 +1,0 @@
-{
-    "status": "success",
-    "eligibility": "Y",
-    "pdf_path": "C:\\Users\\Potenz\\Desktop\\DentalManager\\apps\\SeleniumService\\seleniumDownloads\\MassDHP_Member_Eligibility_1497211726.pdf"
-}

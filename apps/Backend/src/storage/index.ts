@@ -266,11 +266,15 @@ export interface IStorage {
 
   // Group management
   createPdfGroup(
-  patientId: number,
-  title: string,
-  category: PdfCategory
-): Promise<PdfGroup>;
-
+    patientId: number,
+    title: string,
+    category: PdfCategory
+  ): Promise<PdfGroup>;
+  findPdfGroupByPatientTitleAndCategory(
+    patientId: number,
+    title: string,
+    category: PdfCategory
+  ): Promise<PdfGroup | undefined>;
   getAllPdfGroups(): Promise<PdfGroup[]>;
   getPdfGroupById(id: number): Promise<PdfGroup | undefined>;
   getPdfGroupsByPatientId(patientId: number): Promise<PdfGroup[]>;
@@ -692,6 +696,18 @@ export const storage: IStorage = {
         category,
       },
     });
+  },
+
+  async findPdfGroupByPatientTitleAndCategory(patientId, title, category) {
+    return (
+      (await db.pdfGroup.findFirst({
+        where: {
+          patientId,
+          title,
+          category,
+        },
+      })) ?? undefined
+    );
   },
 
   async getPdfGroupById(id) {

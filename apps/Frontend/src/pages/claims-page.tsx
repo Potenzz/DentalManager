@@ -17,7 +17,6 @@ import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import RecentClaims from "@/components/claims/recent-claims";
-
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import {
   setTaskStatus,
@@ -556,9 +555,6 @@ export default function ClaimsPage() {
   // selenium pdf download handler
   const handleSeleniumPdfDownload = async (data: any) => {
     try {
-      if (!data.claimId) {
-        throw new Error("Missing claimId in handleSeleniumPdfDownload");
-      }
       if (!selectedPatient) {
         throw new Error("Missing patientId");
       }
@@ -572,7 +568,6 @@ export default function ClaimsPage() {
 
       const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
         patientId: selectedPatient,
-        claimId: data.claimId,
         pdf_url: data.pdf_url,
       });
       const result = await res.json();

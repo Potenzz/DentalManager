@@ -2,6 +2,8 @@ import { Router } from "express";
 import { Request, Response } from "express";
 import { storage } from "../storage";
 import { forwardToSeleniumInsuranceEligibilityAgent } from "../services/seleniumInsuranceEligibilityClient";
+import fs from "fs/promises";
+import path from "path";
 
 const router = Router();
 
@@ -48,15 +50,55 @@ router.post("/check", async (req: Request, res: Response): Promise<any> => {
       const newStatus = result.eligibility === "Y" ? "active" : "inactive";
       await storage.updatePatient(patient.id, { status: newStatus });
       result.patientUpdateStatus = `Patient status updated to ${newStatus}`;
+
+      // ✅ Step 2: Handle PDF Upload
+      if (result.pdf_path && result.pdf_path.endsWith(".pdf")) {
+        const pdfBuffer = await fs.readFile(result.pdf_path);
+
+        const groupTitle = "Eligibility PDFs";
+        const groupCategory = "ELIGIBILITY";
+
+        let group = await storage.findPdfGroupByPatientTitleAndCategory(
+          patient.id,
+          groupTitle,
+          groupCategory
+        );
+
+        // Step 2b: Create group if it doesn’t exist
+        if (!group) {
+          group = await storage.createPdfGroup(
+            patient.id,
+            groupTitle,
+            groupCategory
+          );
+        }
+
+        if (!group?.id) {
+          throw new Error("PDF group creation failed: missing group ID");
+        }
+        await storage.createPdfFile(
+          group.id,
+          path.basename(result.pdf_path),
+          pdfBuffer
+        );
+
+        await fs.unlink(result.pdf_path);
+
+        result.pdfUploadStatus = `PDF saved to group: ${group.title}`;
+      } else {
+        result.pdfUploadStatus =
+          "No valid PDF path provided by Selenium, Couldn't upload pdf to server.";
+      }
     } else {
-      console.warn(
-        `No patient found with insuranceId: ${insuranceEligibilityData.memberId}`
-      );
       result.patientUpdateStatus =
         "Patient not found or missing ID; no update performed";
     }
 
-    res.json(result);
+    res.json({
+  patientUpdateStatus: result.patientUpdateStatus,
+  pdfUploadStatus: result.pdfUploadStatus,
+});
+
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({

@@ -132,7 +132,7 @@ router.post(
         return sendError(res, "Unauthorized: user info missing", 401);
       }
 
-      const { patientId, claimId, pdf_url } = req.body;
+      const { patientId, pdf_url } = req.body;
 
       if (!pdf_url) {
         return sendError(res, "Missing pdf_url");
@@ -141,25 +141,34 @@ router.post(
       if (!patientId) {
         return sendError(res, "Missing Patient Id");
       }
-      if (!claimId) {
-        return sendError(res, "Missing Claim Id");
-      }
 
       const parsedPatientId = parseInt(patientId);
-      const parsedClaimId = parseInt(claimId);
 
       const filename = path.basename(new URL(pdf_url).pathname);
       const pdfResponse = await axios.get(pdf_url, {
         responseType: "arraybuffer",
       });
 
-      // saving at postgres db
-      await storage.createClaimPdf(
+      const groupTitle = `Insurance Claim`;
+      const groupCategory = "CLAIM";
+
+      // ✅ Find or create PDF group for this claim
+      let group = await storage.findPdfGroupByPatientTitleAndCategory(
         parsedPatientId,
-        parsedClaimId,
-        filename,
-        pdfResponse.data
+        groupTitle,
+        groupCategory
       );
+
+      if (!group) {
+        group = await storage.createPdfGroup(
+          parsedPatientId,
+          groupTitle,
+          groupCategory
+        );
+      }
+
+      // ✅ Save PDF file into that group
+      await storage.createPdfFile(group.id!, filename, pdfResponse.data);
 
       return res.json({
         success: true,

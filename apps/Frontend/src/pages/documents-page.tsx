@@ -1,163 +1,102 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { TopAppBar } from "@/components/layout/top-app-bar";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Input } from "@/components/ui/input";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Search,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
-  Settings,
-  Trash,
-  Download,
-} from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
-import { cn } from "@/lib/utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ClaimPdfUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-import { z } from "zod";
-import "@react-pdf-viewer/core/lib/styles/index.css";
-import "@react-pdf-viewer/default-layout/lib/styles/index.css";
-import { Viewer, Worker } from "@react-pdf-viewer/core";
-import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Eye, Trash, Download, FolderOpen } from "lucide-react";
+import {
+  PatientUncheckedCreateInputObjectSchema,
+  PdfFileUncheckedCreateInputObjectSchema,
+} from "@repo/db/usedSchemas";
 import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
+import { PatientTable } from "@/components/patients/patient-table";
+import { z } from "zod";
+import { Sidebar } from "@/components/layout/sidebar";
+import { TopAppBar } from "@/components/layout/top-app-bar";
 
-const ClaimPdfSchema =
-  ClaimPdfUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>;
-type ClaimPdf = z.infer<typeof ClaimPdfSchema>;
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
+const PdfFileSchema =
+  PdfFileUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>;
+type PdfFile = z.infer<typeof PdfFileSchema>;
 
 export default function DocumentsPage() {
-  const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchField, setSearchField] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [selectedPdfId, setSelectedPdfId] = useState<number | null>(null);
-  const defaultLayoutPluginInstance = defaultLayoutPlugin();
+  const [fileBlobUrl, setFileBlobUrl] = useState<string | null>(null);
   const [isDeletePdfOpen, setIsDeletePdfOpen] = useState(false);
-  const [currentPdf, setCurrentPdf] = useState<ClaimPdf | null>(null);
+  const [currentPdf, setCurrentPdf] = useState<PdfFile | null>(null);
 
-  const { data: pdfs = [], isLoading } = useQuery<ClaimPdf[]>({
-    queryKey: ["/api/documents/claim-pdf/recent"],
-    enabled: !!user,
+  const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
+
+  useEffect(() => {
+    setSelectedGroupId(null);
+  }, [selectedPatient]);
+
+  const handleSelectGroup = (groupId: number) => {
+    setSelectedGroupId((prev) => (prev === groupId ? null : groupId));
+  };
+
+  const { data: groups = [] } = useQuery({
+    queryKey: ["groups", selectedPatient?.id],
+    enabled: !!selectedPatient,
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/documents/claim-pdf/recent");
+      const res = await apiRequest(
+        "GET",
+        `/api/documents/pdf-groups/patient/${selectedPatient?.id}`
+      );
+      return res.json();
+    },
+  });
+
+  const { data: groupPdfs = [] } = useQuery({
+    queryKey: ["groupPdfs", selectedGroupId],
+    enabled: !!selectedGroupId,
+    queryFn: async () => {
+      const res = await apiRequest(
+        "GET",
+        `/api/documents/pdf-files/group/${selectedGroupId}`
+      );
       return res.json();
     },
   });
 
   const deletePdfMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/documents/claim-pdf/${id}`);
+      await apiRequest("DELETE", `/api/documents/pdf-files/${id}`);
     },
     onSuccess: () => {
       setIsDeletePdfOpen(false);
       setCurrentPdf(null);
-      queryClient.invalidateQueries({
-        queryKey: ["/api/documents/claim-pdf/recent"],
-      });
-
-      toast({
-        title: "Success",
-        description: "PDF deleted successfully!",
-        variant: "default",
-      });
+      if (selectedGroupId != null) {
+        queryClient.invalidateQueries({
+          queryKey: ["groupPdfs", selectedGroupId],
+        });
+      }
+      toast({ title: "Success", description: "PDF deleted successfully!" });
     },
     onError: (error: any) => {
-      console.error("Error deleting PDF:", error);
       toast({
         title: "Error",
-        description: `Failed to delete PDF: ${error.message || error}`,
+        description: error.message || "Failed to delete PDF",
         variant: "destructive",
       });
     },
   });
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
-  const getPatientInitials = (first: string, last: string) =>
-    `${first[0]}${last[0]}`.toUpperCase();
-
-  const [fileBlobUrl, setFileBlobUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedPdfId) return;
-    let url: string | null = null;
-
-    const fetchPdf = async () => {
-      try {
-        const res = await apiRequest(
-          "GET",
-          `/api/documents/claim-pdf/${selectedPdfId}`
-        );
-
-        const arrayBuffer = await res.arrayBuffer();
-        const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-        const objectUrl = URL.createObjectURL(blob);
-        setFileBlobUrl(objectUrl);
-        url = objectUrl;
-      } catch (err) {
-        console.error("Failed to load PDF", err);
-      }
-    };
-
-    fetchPdf();
-
-    return () => {
-      if (url) {
-        URL.revokeObjectURL(url);
-      }
-    };
-  }, [selectedPdfId]);
-
-  const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
-
-  const viewPdf = (pdfId: number) => {
-    setSelectedPdfId(pdfId);
-  };
-
-  const downloadPdf = async (pdfId: number, filename: string) => {
-    try {
-      const res = await apiRequest("GET", `/api/documents/claim-pdf/${pdfId}`);
-      const arrayBuffer = await res.arrayBuffer();
-      const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Failed to download PDF:", err);
-    }
-  };
-
-  const handleDeletePdf = (pdf: ClaimPdf) => {
-    setCurrentPdf(pdf);
-    setIsDeletePdfOpen(true);
-  };
 
   const handleConfirmDeletePdf = () => {
     if (currentPdf) {
@@ -171,37 +110,31 @@ export default function DocumentsPage() {
     }
   };
 
-  const filteredPdfs = pdfs.filter((pdf) => {
-    const patient = pdf.patient;
-    const searchLower = searchTerm.toLowerCase();
-    const fullName = `${patient.firstName} ${patient.lastName}`.toLowerCase();
-    const patientId = `PID-${patient.id.toString().padStart(4, "0")}`;
+  const handleViewPdf = async (pdfId: number) => {
+    const res = await apiRequest("GET", `/api/documents/pdf-files/${pdfId}`);
+    const arrayBuffer = await res.arrayBuffer();
+    const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    setFileBlobUrl(url);
+    setSelectedPdfId(pdfId);
+  };
 
-    switch (searchField) {
-      case "name":
-        return fullName.includes(searchLower);
-      case "id":
-        return patientId.toLowerCase().includes(searchLower);
-      case "phone":
-        return patient.phone?.toLowerCase().includes(searchLower) || false;
-      case "all":
-      default:
-        return (
-          fullName.includes(searchLower) ||
-          patientId.includes(searchLower) ||
-          patient.phone?.toLowerCase().includes(searchLower) ||
-          patient.email?.toLowerCase().includes(searchLower) ||
-          false
-        );
-    }
-  });
-
-  const totalPages = Math.ceil(filteredPdfs.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentPdfs = filteredPdfs.slice(startIndex, startIndex + itemsPerPage);
+  const handleDownloadPdf = async (pdfId: number, filename: string) => {
+    const res = await apiRequest("GET", `/api/documents/pdf-files/${pdfId}`);
+    const arrayBuffer = await res.arrayBuffer();
+    const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-100">
       <Sidebar
         isMobileOpen={isMobileMenuOpen}
         setIsMobileOpen={setIsMobileMenuOpen}
@@ -211,7 +144,7 @@ export default function DocumentsPage() {
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
 
         <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto space-y-6">
             <div className="mb-6">
               <h1 className="text-2xl font-semibold text-gray-900 mb-2">
                 Documents
@@ -221,251 +154,142 @@ export default function DocumentsPage() {
               </p>
             </div>
 
-            <Card className="mb-6">
-              <CardContent className="p-4">
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search patients..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Select value={searchField} onValueChange={setSearchField}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Fields</SelectItem>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="id">Patient ID</SelectItem>
-                        <SelectItem value="phone">Phone</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button variant="outline" size="sm">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Advanced
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {selectedPatient && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    Document Groups for {selectedPatient.firstName}{" "}
+                    {selectedPatient.lastName}
+                  </CardTitle>
+                  <CardDescription>Select a group to view PDFs</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {groups.length === 0 ? (
+                    <p className="text-muted-foreground">
+                      No groups found for this patient.
+                    </p>
+                  ) : (
+                    groups.map((group: any) => (
+                      <Button
+                        key={group.id}
+                        variant={
+                          group.id === selectedGroupId ? "default" : "outline"
+                        }
+                        onClick={() =>
+                          setSelectedGroupId((prevId) =>
+                            prevId === group.id ? null : group.id
+                          )
+                        }
+                      >
+                        <FolderOpen className="w-4 h-4 mr-2" />
+                        Group #{group.id} - {group.title}
+                      </Button>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-            <Card>
-              <CardContent className="p-0">
-                {isLoading ? (
-                  <div className="text-center py-8">Loading data...</div>
-                ) : currentPdfs.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    {searchTerm
-                      ? "No results matching your search."
-                      : "No recent claim PDFs available."}
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 border-b text-sm font-medium text-gray-600">
-                      <div className="col-span-3">Patient</div>
-                      <div className="col-span-2">DOB / Gender</div>
-                      <div className="col-span-2">Contact</div>
-                      <div className="col-span-2">Insurance</div>
-                      <div className="col-span-2">Status</div>
-                      <div className="col-span-1">Actions</div>
-                    </div>
-
-                    {currentPdfs.map((pdf) => {
-                      const patient = pdf.patient;
-                      return (
-                        <div
-                          key={pdf.id}
-                          className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-gray-50"
-                        >
-                          <div className="col-span-3 flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-sm font-medium text-gray-600">
-                              {getPatientInitials(
-                                patient.firstName,
-                                patient.lastName
-                              )}
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900">
-                                {patient.firstName} {patient.lastName}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                PID-{patient.id.toString().padStart(4, "0")}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="col-span-2">
-                            <div className="text-sm text-gray-900">
-                              {formatDate(patient.dateOfBirth)}
-                            </div>
-                            <div className="text-sm text-gray-500 capitalize">
-                              {patient.gender}
-                            </div>
-                          </div>
-
-                          <div className="col-span-2">
-                            <div className="text-sm text-gray-900">
-                              {patient.phone || "Not provided"}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {patient.email || "No email"}
-                            </div>
-                          </div>
-
-                          <div className="col-span-2">
-                            <div className="text-sm text-gray-900">
-                              {patient.insuranceProvider
-                                ? `${patient.insuranceProvider.charAt(0).toUpperCase()}${patient.insuranceProvider.slice(1)}`
-                                : "Not specified"}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              ID: {patient.insuranceId || "N/A"}
-                            </div>
-                          </div>
-
-                          <div className="col-span-2">
-                            <span
-                              className={cn(
-                                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                                patient.status === "active"
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-gray-100 text-gray-800"
-                              )}
-                            >
-                              {patient.status === "active"
-                                ? "Active"
-                                : "Inactive"}
-                            </span>
-                          </div>
-
-                          <div className="col-span-1">
-                            <div className="flex space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => handleDeletePdf(pdf)}
-                              >
-                                <Trash className="h-4 w-4 text-red-600" />
-                              </Button>
-
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() =>
-                                  downloadPdf(pdf.id, pdf.filename)
-                                }
-                              >
-                                <Download className="h-4 w-4 text-blue-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => viewPdf(pdf.id)}
-                              >
-                                <Eye className="h-4 w-4 text-gray-600" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    <DeleteConfirmationDialog
-                      isOpen={isDeletePdfOpen}
-                      onConfirm={handleConfirmDeletePdf}
-                      onCancel={() => setIsDeletePdfOpen(false)}
-                      entityName={`PDF #${currentPdf?.id}`}
-                    />
-
-                    {/* PDF Viewer */}
-                    {selectedPdfId && fileBlobUrl && (
-                      <div className="mt-6 border rounded-lg shadow-sm p-4 bg-white">
-                        <div className="flex justify-between items-center mb-4">
-                          <h2 className="text-lg font-semibold text-gray-700">
-                            Viewing PDF #{selectedPdfId}
-                          </h2>
+            {selectedGroupId && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>PDFs in Group #{selectedGroupId}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {groupPdfs.length === 0 ? (
+                    <p className="text-muted-foreground">
+                      No PDFs found in this group.
+                    </p>
+                  ) : (
+                    groupPdfs.map((pdf: any) => (
+                      <div
+                        key={pdf.id}
+                        className="flex justify-between items-center border p-2 rounded"
+                      >
+                        <span className="text-sm">{pdf.filename}</span>
+                        <div className="flex gap-2">
                           <Button
                             variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewPdf(pdf.id)}
+                          >
+                            <Eye className="w-4 h-4 text-gray-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleDownloadPdf(pdf.id, pdf.filename)
+                            }
+                          >
+                            <Download className="w-4 h-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
-                              setSelectedPdfId(null);
-                              setFileBlobUrl(null);
+                              setCurrentPdf(pdf);
+                              setIsDeletePdfOpen(true);
                             }}
                           >
-                            Close
+                            <Trash className="w-4 h-4 text-red-600" />
                           </Button>
                         </div>
-                        <div className="h-[80vh] border">
-                          <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
-                            <Viewer
-                              fileUrl={fileBlobUrl}
-                              plugins={[defaultLayoutPluginInstance]}
-                            />
-                          </Worker>
-                        </div>
                       </div>
-                    )}
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between p-4 border-t bg-gray-50">
-                        <div className="text-sm text-gray-700">
-                          Showing {startIndex + 1} to{" "}
-                          {Math.min(
-                            startIndex + itemsPerPage,
-                            filteredPdfs.length
-                          )}{" "}
-                          of {filteredPdfs.length} results
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCurrentPage(currentPage - 1)}
-                            disabled={currentPage === 1}
-                          >
-                            <ChevronLeft className="h-4 w-4 mr-1" />
-                            Previous
-                          </Button>
-                          {Array.from(
-                            { length: totalPages },
-                            (_, i) => i + 1
-                          ).map((page) => (
-                            <Button
-                              key={page}
-                              variant={
-                                currentPage === page ? "default" : "outline"
-                              }
-                              size="sm"
-                              onClick={() => setCurrentPage(page)}
-                              className="w-8 h-8 p-0"
-                            >
-                              {page}
-                            </Button>
-                          ))}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCurrentPage(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                          >
-                            Next
-                            <ChevronRight className="h-4 w-4 ml-1" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
+            <Card>
+              <CardHeader>
+                <CardTitle>Patient Records</CardTitle>
+                <CardDescription>
+                  Select a patient to view document groups
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PatientTable
+                  allowView
+                  allowDelete
+                  allowCheckbox
+                  allowEdit
+                  onSelectPatient={setSelectedPatient}
+                />
               </CardContent>
             </Card>
+
+            <DeleteConfirmationDialog
+              isOpen={isDeletePdfOpen}
+              onConfirm={handleConfirmDeletePdf}
+              onCancel={() => setIsDeletePdfOpen(false)}
+              entityName={`PDF #${currentPdf?.id}`}
+            />
+
+            {fileBlobUrl && (
+              <Card>
+                <CardHeader className="flex justify-between items-center">
+                  <CardTitle>Viewing PDF #{selectedPdfId}</CardTitle>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setFileBlobUrl(null);
+                      setSelectedPdfId(null);
+                    }}
+                  >
+                    Close
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <iframe
+                    src={fileBlobUrl}
+                    className="w-full h-[80vh] border rounded"
+                    title="PDF Viewer"
+                  />
+                </CardContent>
+              </Card>
+            )}
           </div>
         </main>
       </div>

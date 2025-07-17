@@ -67,7 +67,6 @@ async def start_workflow(request: Request):
         try:
             bot = AutomationMassHealthEligibilityCheck(data)
             result = bot.main_workflow("https://providers.massdhp.com/providers_login.asp")
-            print(result)
 
             if result.get("status") != "success":
                 return {"status": "error", "message": result.get("message")}
