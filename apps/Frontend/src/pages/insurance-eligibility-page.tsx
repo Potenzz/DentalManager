@@ -33,7 +33,7 @@ import {
   clearTaskStatus,
 } from "@/redux/slices/seleniumEligibilityCheckTaskSlice";
 import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
-import { formatLocalDate, parseLocalDateString } from "@/utils/dateUtils";
+import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -85,7 +85,7 @@ export default function InsuranceEligibilityPage() {
 
       const dob =
         typeof selectedPatient.dateOfBirth === "string"
-          ? parseLocalDateString(selectedPatient.dateOfBirth)
+          ? parseLocalDate(selectedPatient.dateOfBirth)
           : selectedPatient.dateOfBirth;
       setDateOfBirth(dob);
     } else {

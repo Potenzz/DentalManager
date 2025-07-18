@@ -23,6 +23,7 @@ import {
   clearTaskStatus,
 } from "@/redux/slices/seleniumClaimSubmitTaskSlice";
 import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
+import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -223,34 +224,11 @@ export default function ClaimsPage() {
     },
   });
 
-  // Converts local date to exact UTC date with no offset issues
-  function parseLocalDate(dateInput: Date | string): Date {
-    if (dateInput instanceof Date) return dateInput;
-
-    const dateString = dateInput.split("T")[0] || dateInput;
-
-    const parts = dateString.split("-");
-    if (parts.length !== 3) {
-      throw new Error(`Invalid date format: ${dateString}`);
-    }
-
-    const year = Number(parts[0]);
-    const month = Number(parts[1]);
-    const day = Number(parts[2]);
-
-    if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
-      throw new Error(`Invalid date parts in date string: ${dateString}`);
-    }
-
-    return new Date(year, month - 1, day); // month is 0-indexed
-  }
-
   const handleAppointmentSubmit = async (
     appointmentData: InsertAppointment | UpdateAppointment
   ): Promise<number> => {
     const rawDate = parseLocalDate(appointmentData.date);
-
-    const formattedDate = rawDate.toLocaleDateString("en-CA"); // YYYY-MM-DD format
+    const formattedDate = formatLocalDate(rawDate);
 
     // Prepare minimal data to update/create
     const minimalData = {
@@ -264,7 +242,7 @@ export default function ClaimsPage() {
     const existingAppointment = appointments.find(
       (a) =>
         a.patientId === appointmentData.patientId &&
-        new Date(a.date).toLocaleDateString("en-CA") === formattedDate
+        formatLocalDate(parseLocalDate(a.date)) === formattedDate
     );
 
     if (existingAppointment && typeof existingAppointment.id === "number") {
@@ -374,18 +352,21 @@ export default function ClaimsPage() {
   const prefillClaimForm = (patient: Patient) => {
     const patientAppointments = appointments
       .filter((a) => a.patientId === patient.id)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort(
+  (a, b) =>
+    parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+);
 
     const lastAppointment = patientAppointments[0]; // most recent
 
     const dateToUse = lastAppointment
       ? parseLocalDate(lastAppointment.date)
-      : new Date();
+      : parseLocalDate(new Date());
 
     setClaimFormData((prev: any) => ({
       ...prev,
       patientId: patient.id,
-      serviceDate: dateToUse.toLocaleDateString("en-CA"), // consistent "YYYY-MM-DD"
+      serviceDate: formatLocalDate(dateToUse)
     }));
   };
 
@@ -405,14 +386,11 @@ export default function ClaimsPage() {
         const lastName = rest.join(" ") || "";
 
         const parsedDob = parse(dob, "M/d/yyyy", new Date()); // robust for "4/17/1964", "12/1/1975", etc.
-        const isValidDob = !isNaN(parsedDob.getTime());
-
+        
         const newPatient: InsertPatient = {
           firstName,
           lastName,
-          dateOfBirth: isValidDob
-            ? format(parsedDob, "yyyy-MM-dd")
-            : format(new Date(), "yyyy-MM-dd"),
+          dateOfBirth: formatLocalDate(parsedDob),
           gender: "",
           phone: "",
           userId: user?.id ?? 1,
@@ -447,7 +425,8 @@ export default function ClaimsPage() {
       const patientAppointments = appointments
         .filter((appt) => appt.patientId === patient.id)
         .sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  (a, b) =>
+    parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
         ); // Sort descending by date
 
       if (patientAppointments.length > 0) {
@@ -458,7 +437,7 @@ export default function ClaimsPage() {
           appointmentId: latestAppointment!.id,
           insuranceProvider: patient.insuranceProvider || "N/A",
           insuranceId: patient.insuranceId || "N/A",
-          lastAppointment: String(latestAppointment!.date),
+          lastAppointment: formatLocalDate(parseLocalDate(latestAppointment!.date)),
         });
       }
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, addDays, startOfToday, addMinutes } from "date-fns";
 import {
-  parseLocalDateString,
+  parseLocalDate,
   formatLocalDate,
   normalizeToISOString,
 } from "@/utils/dateUtils";
@@ -200,7 +200,7 @@ export default function AppointmentsPage() {
     // Calculate end time (30 minutes after start time)
     const startHour = parseInt(timeSlot.time.split(":")[0] as string);
     const startMinute = parseInt(timeSlot.time.split(":")[1] as string);
-    const startDate = new Date(selectedDate);
+    const startDate = parseLocalDate(selectedDate);
     startDate.setHours(startHour, startMinute, 0);
 
     const endDate = addMinutes(startDate, 30);
@@ -377,7 +377,7 @@ export default function AppointmentsPage() {
   ) => {
     // Converts local date to exact UTC date with no offset issues
 
-    const rawDate = parseLocalDateString(appointmentData.date);
+    const rawDate = parseLocalDate(appointmentData.date);
 
     const updatedData = {
       ...appointmentData,
@@ -439,12 +439,8 @@ export default function AppointmentsPage() {
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
   const selectedDateAppointments = appointments.filter((appointment) => {
-    const dateObj =
-      typeof appointment.date === "string"
-        ? parseLocalDateString(appointment.date)
-        : appointment.date;
-
-    return formatLocalDate(dateObj) === formatLocalDate(selectedDate); // formattedDate should be 'yyyy-MM-dd' string in UTC format as well
+    const dateObj = parseLocalDate(appointment.date)
+    return formatLocalDate(dateObj) === formatLocalDate(selectedDate); 
   });
 
   // Process appointments for the scheduler view
@@ -473,11 +469,8 @@ export default function AppointmentsPage() {
         ...apt,
         patientName,
         staffId,
-        status: apt.status ?? null, // Default to null if status is undefined
-        date:
-          apt.date instanceof Date
-            ? formatLocalDate(apt.date)
-            : formatLocalDate(new Date(apt.date)),
+        status: apt.status ?? null, 
+        date: formatLocalDate(parseLocalDate(apt.date))
       };
 
       return processed;
@@ -529,7 +522,7 @@ export default function AppointmentsPage() {
     // Calculate new end time (30 minutes from start)
     const startHour = parseInt(newTimeSlot.time.split(":")[0] as string);
     const startMinute = parseInt(newTimeSlot.time.split(":")[1] as string);
-    const startDate = new Date(selectedDate);
+    const startDate = parseLocalDate(selectedDate);
     startDate.setHours(startHour, startMinute, 0);
 
     const endDate = addMinutes(startDate, 30);

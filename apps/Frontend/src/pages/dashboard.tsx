@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { z } from "zod";
+import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -62,7 +63,6 @@ const insertPatientSchema = (
   createdAt: true,
 });
 type InsertPatient = z.infer<typeof insertPatientSchema>;
-
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
@@ -151,9 +151,7 @@ export default function Dashboard() {
     }
   };
 
-  const isLoading =
-    isLoadingPatients ||
-    addPatientMutation.isPending;
+  const isLoading = isLoadingPatients || addPatientMutation.isPending;
 
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
@@ -235,24 +233,10 @@ export default function Dashboard() {
   };
 
   // Since we removed filters, just return all patients
-  const filteredPatients = patients;
-  const now = new Date();
-  const todayUTC = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
-
+  const today = formatLocalDate(new Date());
   const todaysAppointments = appointments.filter((appointment) => {
-    const dateObj =
-      typeof appointment.date === "string"
-        ? parseISO(appointment.date)
-        : appointment.date;
-
-    // Extract UTC year, month, day from appointment date
-    const year = dateObj.getUTCFullYear();
-    const month = dateObj.getUTCMonth();
-    const day = dateObj.getUTCDate();
-
-    const appointmentUTCDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
-    return appointmentUTCDate === todayUTC;
+    const parsedDate = parseLocalDate(appointment.date);
+    return formatLocalDate(parsedDate) === today;
   });
 
   // Count completed appointments today
