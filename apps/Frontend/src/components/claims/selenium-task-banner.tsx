@@ -9,7 +9,12 @@ interface Props {
   onClear: () => void;
 }
 
-export const SeleniumTaskBanner = ({ status, message, show, onClear }: Props) => {
+export const SeleniumTaskBanner = ({
+  status,
+  message,
+  show,
+  onClear,
+}: Props) => {
   if (!show) return null;
 
   const getIcon = () => {
@@ -26,7 +31,7 @@ export const SeleniumTaskBanner = ({ status, message, show, onClear }: Props) =>
   };
 
   return (
-    <div className="bg-white border border-gray-200 shadow-md rounded-lg p-3 mb-4 flex items-start justify-between">
+    <div className="bg-white border border-gray-200 shadow-md rounded-lg p-3 m-4 flex items-start justify-between">
       <div className="flex items-start gap-3">
         {getIcon()}
         <div>
@@ -34,8 +39,8 @@ export const SeleniumTaskBanner = ({ status, message, show, onClear }: Props) =>
             {status === "pending"
               ? "Selenium Task In Progress"
               : status === "success"
-              ? "Selenium Task Completed"
-              : "Selenium Task Error"}
+                ? "Selenium Task Completed"
+                : "Selenium Task Error"}
           </div>
           <p className="text-gray-600 text-sm">{message}</p>
         </div>

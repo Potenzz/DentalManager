@@ -12,11 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  CalendarIcon,
-  CheckCircle,
-  LoaderCircleIcon,
-} from "lucide-react";
+import { CalendarIcon, CheckCircle, LoaderCircleIcon } from "lucide-react";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +59,11 @@ export default function InsuranceEligibilityPage() {
     (state) => state.seleniumEligibilityCheckTask
   );
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [currentTablePage, setCurrentTablePage] = useState<number | null>(null);
+  const [currentTableSearchTerm, setCurrentTableSearchTerm] = useState<
+    string | null
+  >(null);
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -116,7 +117,7 @@ export default function InsuranceEligibilityPage() {
         toast({
           title: "Patient already exists",
           description: msg,
-          variant: "default",
+          variant: "destructive",
         });
       } else {
         toast({
@@ -156,14 +157,14 @@ export default function InsuranceEligibilityPage() {
         setTaskStatus({
           status: "success",
           message:
-            "Patient status is updated, and Its eligibility pdf is uploaded at Document Page.",
+            "Patient status is updated, and its eligibility pdf is uploaded at Document Page.",
         })
       );
 
       toast({
-        title: "Selenium service notified",
+        title: "Selenium service done.",
         description:
-          "Your claim data was successfully sent to Selenium, Waitinig for its response.",
+          "Your Patient Eligibility is fetched and updated, Kindly search through the patient.",
         variant: "default",
       });
     } catch (error: any) {
@@ -178,8 +179,6 @@ export default function InsuranceEligibilityPage() {
         description: error.message || "An error occurred.",
         variant: "destructive",
       });
-    } finally {
-      setIsCheckingEligibility(false); // End loading
     }
   };
 
@@ -213,11 +212,25 @@ export default function InsuranceEligibilityPage() {
     setIsCheckingEligibility(true);
 
     // Adding patient if same patient exists then it will skip.
-    handleAddPatient();
+    try {
+      if (!selectedPatient) {
+        await handleAddPatient();
+      }
 
-    handleSelenium();
+      await handleSelenium();
 
-    await queryClient.invalidateQueries({ queryKey: ["patients"] });
+      await queryClient.invalidateQueries({
+        queryKey: [
+          "patients",
+          {
+            page: currentTablePage ?? 1,
+            search: currentTableSearchTerm ?? "recent",
+          },
+        ],
+      });
+    } finally {
+      setIsCheckingEligibility(false);
+    }
   };
 
   return (
@@ -353,6 +366,8 @@ export default function InsuranceEligibilityPage() {
                   allowCheckbox={true}
                   allowEdit={true}
                   onSelectPatient={setSelectedPatient}
+                  onPageChange={setCurrentTablePage}
+                  onSearchChange={setCurrentTableSearchTerm}
                 />
               </CardContent>
             </Card>

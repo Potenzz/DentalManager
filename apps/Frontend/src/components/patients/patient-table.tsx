@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -69,6 +69,8 @@ interface PatientTableProps {
   allowDelete?: boolean;
   allowCheckbox?: boolean;
   onSelectPatient?: (patient: Patient | null) => void;
+  onPageChange?: (page: number) => void;
+  onSearchChange?: (searchTerm: string) => void;
 }
 
 export function PatientTable({
@@ -77,6 +79,8 @@ export function PatientTable({
   allowDelete,
   allowCheckbox,
   onSelectPatient,
+  onPageChange,
+  onSearchChange,
 }: PatientTableProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -288,6 +292,15 @@ export function PatientTable({
       });
     }
   };
+
+  useEffect(() => {
+    if (onPageChange) onPageChange(currentPage);
+  }, [currentPage, onPageChange]);
+
+  useEffect(() => {
+    const term = debouncedSearchCriteria?.searchTerm?.trim() || "recent";
+    if (onSearchChange) onSearchChange(term);
+  }, [debouncedSearchCriteria, onSearchChange]);
 
   const totalPages = useMemo(
     () => Math.ceil((patientsData?.totalCount || 0) / patientsPerPage),

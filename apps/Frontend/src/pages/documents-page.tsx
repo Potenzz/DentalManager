@@ -47,10 +47,6 @@ export default function DocumentsPage() {
     setSelectedGroupId(null);
   }, [selectedPatient]);
 
-  const handleSelectGroup = (groupId: number) => {
-    setSelectedGroupId((prev) => (prev === groupId ? null : groupId));
-  };
-
   const { data: groups = [] } = useQuery({
     queryKey: ["groups", selectedPatient?.id],
     enabled: !!selectedPatient,
