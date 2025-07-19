@@ -130,7 +130,7 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen overflow-hidden bg-gray-100">
       <Sidebar
         isMobileOpen={isMobileMenuOpen}
         setIsMobileOpen={setIsMobileMenuOpen}
@@ -139,15 +139,15 @@ export default function DocumentsPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
 
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="mb-6">
-              <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-                Documents
-              </h1>
-              <p className="text-gray-600">
-                View and manage recent uploaded claim PDFs
-              </p>
+        <main className="flex-1 overflow-y-auto p-4">
+          <div className="container mx-auto space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+                <p className="text-muted-foreground">
+                  View and manage recent uploaded claim PDFs
+                </p>
+              </div>
             </div>
 
             {selectedPatient && (

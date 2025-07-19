@@ -234,7 +234,7 @@ export default function InsuranceEligibilityPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-gray-100">
       <Sidebar
         isMobileOpen={isMobileMenuOpen}
         setIsMobileOpen={setIsMobileMenuOpen}
@@ -250,16 +250,17 @@ export default function InsuranceEligibilityPage() {
           onClear={() => dispatch(clearTaskStatus())}
         />
 
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-6">
-              <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-                Insurance Eligibility
-              </h1>
-              <p className="text-gray-600">
-                Check insurance eligibility and view patient information
-              </p>
+        <main className="flex-1 overflow-y-auto p-4">
+          <div className="container mx-auto space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Insurance Eligibility
+                </h1>
+                <p className="text-muted-foreground">
+                  Check insurance eligibility and view patient information
+                </p>
+              </div>
             </div>
 
             {/* Insurance Eligibility Check Form */}

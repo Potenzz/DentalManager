@@ -353,9 +353,9 @@ export default function ClaimsPage() {
     const patientAppointments = appointments
       .filter((a) => a.patientId === patient.id)
       .sort(
-  (a, b) =>
-    parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
-);
+        (a, b) =>
+          parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+      );
 
     const lastAppointment = patientAppointments[0]; // most recent
 
@@ -366,7 +366,7 @@ export default function ClaimsPage() {
     setClaimFormData((prev: any) => ({
       ...prev,
       patientId: patient.id,
-      serviceDate: formatLocalDate(dateToUse)
+      serviceDate: formatLocalDate(dateToUse),
     }));
   };
 
@@ -386,7 +386,7 @@ export default function ClaimsPage() {
         const lastName = rest.join(" ") || "";
 
         const parsedDob = parse(dob, "M/d/yyyy", new Date()); // robust for "4/17/1964", "12/1/1975", etc.
-        
+
         const newPatient: InsertPatient = {
           firstName,
           lastName,
@@ -425,8 +425,8 @@ export default function ClaimsPage() {
       const patientAppointments = appointments
         .filter((appt) => appt.patientId === patient.id)
         .sort(
-  (a, b) =>
-    parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+          (a, b) =>
+            parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
         ); // Sort descending by date
 
       if (patientAppointments.length > 0) {
@@ -437,7 +437,9 @@ export default function ClaimsPage() {
           appointmentId: latestAppointment!.id,
           insuranceProvider: patient.insuranceProvider || "N/A",
           insuranceId: patient.insuranceId || "N/A",
-          lastAppointment: formatLocalDate(parseLocalDate(latestAppointment!.date)),
+          lastAppointment: formatLocalDate(
+            parseLocalDate(latestAppointment!.date)
+          ),
         });
       }
 
@@ -591,6 +593,7 @@ export default function ClaimsPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopAppBar toggleMobileMenu={toggleMobileMenu} />
+
         <SeleniumTaskBanner
           status={status}
           message={message}
@@ -599,18 +602,21 @@ export default function ClaimsPage() {
         />
 
         <main className="flex-1 overflow-y-auto p-4">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-gray-800">
-              Insurance Claims
-            </h1>
-            <p className="text-gray-600">
-              Manage and submit insurance claims for patients
-            </p>
+          <div className="container mx-auto space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Insurance Claims
+                </h1>
+                <p className="text-muted-foreground">
+                  Manage and submit insurance claims for patients
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* New Claims Section */}
-          <div className="mb-8">
+          <div className="mb-8 mt-8">
             <div className="flex items-center justify-between mb-4">
               <div
                 className="flex items-center cursor-pointer group"
