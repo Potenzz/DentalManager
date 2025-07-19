@@ -238,6 +238,30 @@ export default function DocumentsPage() {
               </Card>
             )}
 
+            {fileBlobUrl && (
+              <Card>
+                <CardHeader className="flex justify-between items-center">
+                  <CardTitle>Viewing PDF #{selectedPdfId}</CardTitle>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setFileBlobUrl(null);
+                      setSelectedPdfId(null);
+                    }}
+                  >
+                    Close
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <iframe
+                    src={fileBlobUrl}
+                    className="w-full h-[80vh] border rounded"
+                    title="PDF Viewer"
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Patient Records</CardTitle>
@@ -262,30 +286,6 @@ export default function DocumentsPage() {
               onCancel={() => setIsDeletePdfOpen(false)}
               entityName={`PDF #${currentPdf?.id}`}
             />
-
-            {fileBlobUrl && (
-              <Card>
-                <CardHeader className="flex justify-between items-center">
-                  <CardTitle>Viewing PDF #{selectedPdfId}</CardTitle>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setFileBlobUrl(null);
-                      setSelectedPdfId(null);
-                    }}
-                  >
-                    Close
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <iframe
-                    src={fileBlobUrl}
-                    className="w-full h-[80vh] border rounded"
-                    title="PDF Viewer"
-                  />
-                </CardContent>
-              </Card>
-            )}
           </div>
         </main>
       </div>
