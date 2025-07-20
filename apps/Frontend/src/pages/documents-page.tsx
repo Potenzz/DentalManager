@@ -44,8 +44,11 @@ export default function DocumentsPage() {
   const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
 
   useEffect(() => {
-    setSelectedGroupId(null);
-  }, [selectedPatient]);
+  setSelectedGroupId(null);
+  setFileBlobUrl(null);
+  setSelectedPdfId(null);
+}, [selectedPatient]);
+
 
   const { data: groups = [] } = useQuery({
     queryKey: ["groups", selectedPatient?.id],
@@ -178,7 +181,7 @@ export default function DocumentsPage() {
                         }
                       >
                         <FolderOpen className="w-4 h-4 mr-2" />
-                        Group #{group.id} - {group.title}
+                        Group - {group.title}
                       </Button>
                     ))
                   )}
@@ -189,7 +192,7 @@ export default function DocumentsPage() {
             {selectedGroupId && (
               <Card>
                 <CardHeader>
-                  <CardTitle>PDFs in Group #{selectedGroupId}</CardTitle>
+                  <CardTitle>PDFs in Group</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {groupPdfs.length === 0 ? (
@@ -241,15 +244,16 @@ export default function DocumentsPage() {
             {fileBlobUrl && (
               <Card>
                 <CardHeader className="flex justify-between items-center">
-                  <CardTitle>Viewing PDF #{selectedPdfId}</CardTitle>
+                  <CardTitle>Viewing PDF</CardTitle>
                   <Button
-                    variant="ghost"
+                    variant="outline"
+                    className="ml-auto text-red-600 border-red-500 hover:bg-red-100 hover:border-red-600"
                     onClick={() => {
                       setFileBlobUrl(null);
                       setSelectedPdfId(null);
                     }}
                   >
-                    Close
+                    ✕ Close
                   </Button>
                 </CardHeader>
                 <CardContent>
