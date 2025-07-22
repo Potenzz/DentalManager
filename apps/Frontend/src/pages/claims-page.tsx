@@ -16,7 +16,6 @@ import { parse, format } from "date-fns";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import RecentClaims from "@/components/claims/recent-claims";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import {
   setTaskStatus,
@@ -24,6 +23,7 @@ import {
 } from "@/redux/slices/seleniumClaimSubmitTaskSlice";
 import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
+import ClaimsRecentTable from "@/components/claims/claims-recent-table";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -703,7 +703,11 @@ export default function ClaimsPage() {
           </div>
 
           {/* Recent Claims Section */}
-          <RecentClaims />
+          <ClaimsRecentTable
+            allowEdit={true}
+            allowView={true}
+            allowDelete={true}
+          />
         </main>
       </div>
 

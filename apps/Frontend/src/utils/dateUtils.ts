@@ -72,3 +72,29 @@ export function normalizeToISOString(date: Date | string): string {
   const parsed = parseLocalDate(date);
   return parsed.toISOString(); // ensures it always starts from local midnight
 }
+
+/**
+ * Formats a date string or Date object into a human-readable "DD Mon YYYY" string.
+ * Examples: "22 Jul 2025"
+ *
+ * @param dateInput The date as a string (e.g., ISO, YYYY-MM-DD) or a Date object.
+ * @returns A formatted date string.
+ */
+export const formatDateToHumanReadable = (dateInput: string | Date): string => {
+  // Create a Date object from the input.
+  // The Date constructor is quite flexible with various string formats.
+  const date = new Date(dateInput);
+
+  // Check if the date is valid. If new Date() fails to parse, it returns "Invalid Date".
+  if (isNaN(date.getTime())) {
+    console.error("Invalid date input provided:", dateInput);
+    return "Invalid Date"; // Or handle this error in a way that suits your UI
+  }
+
+  // Use Intl.DateTimeFormat for locale-aware, human-readable formatting.
+  return new Intl.DateTimeFormat("en-US", {
+    day: "2-digit", // e.g., "01", "22"
+    month: "short", // e.g., "Jan", "Jul"
+    year: "numeric", // e.g., "2023", "2025"
+  }).format(date);
+};

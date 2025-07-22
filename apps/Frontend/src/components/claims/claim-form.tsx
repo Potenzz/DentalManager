@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import procedureCodes from "../../assets/data/procedureCodes.json";
+import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -78,7 +79,6 @@ const updateAppointmentSchema = (
 type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
 
 type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
-
 
 interface ServiceLine {
   procedureCode: string;
@@ -185,33 +185,15 @@ export function ClaimForm({
   }, [staffMembersRaw, staff]);
 
   // Service date state
-  function parseLocalDate(dateInput: Date | string): Date {
-    if (dateInput instanceof Date) return dateInput;
-
-    const parts = dateInput.split("-");
-    if (parts.length !== 3) {
-      throw new Error(`Invalid date format: ${dateInput}`);
-    }
-
-    const year = Number(parts[0]);
-    const month = Number(parts[1]);
-    const day = Number(parts[2]);
-
-    if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
-      throw new Error(`Invalid date parts in date string: ${dateInput}`);
-    }
-
-    return new Date(year, month - 1, day); // month is 0-indexed
-  }
-
   const [serviceDateValue, setServiceDateValue] = useState<Date>(new Date());
   const [serviceDate, setServiceDate] = useState<string>(
-    new Date().toLocaleDateString("en-CA") // "YYYY-MM-DD"
+    formatLocalDate(new Date())
   );
+
   useEffect(() => {
     if (extractedData?.serviceDate) {
       const parsed = parseLocalDate(extractedData.serviceDate);
-      const isoFormatted = parsed.toLocaleDateString("en-CA");
+      const isoFormatted = formatLocalDate(parsed);
       setServiceDateValue(parsed);
       setServiceDate(isoFormatted);
     }
@@ -220,7 +202,7 @@ export function ClaimForm({
   // Update service date when calendar date changes
   const onServiceDateChange = (date: Date | undefined) => {
     if (date) {
-      const formattedDate = date.toLocaleDateString("en-CA"); // "YYYY-MM-DD"
+      const formattedDate = formatLocalDate(date);
       setServiceDateValue(date);
       setServiceDate(formattedDate);
       setForm((prev) => ({ ...prev, serviceDate: formattedDate }));
@@ -253,7 +235,7 @@ export function ClaimForm({
     serviceDate: serviceDate,
     insuranceProvider: "",
     insuranceSiteKey: "",
-    status: "pending",
+    status: "PENDING",
     serviceLines: Array.from({ length: 10 }, () => ({
       procedureCode: "",
       procedureDate: serviceDate,
@@ -321,8 +303,7 @@ export function ClaimForm({
 
   const updateProcedureDate = (index: number, date: Date | undefined) => {
     if (!date) return;
-
-    const formattedDate = date.toLocaleDateString("en-CA");
+    const formattedDate = formatLocalDate(date);
     const updatedLines = [...form.serviceLines];
 
     if (updatedLines[index]) {
@@ -417,13 +398,13 @@ export function ClaimForm({
 
     const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
     const createdClaim = await onSubmit({
-    ...formToCreateClaim,
-    serviceLines: filteredServiceLines,
-    staffId: Number(staff?.id),
-    patientId: patientId,
-    insuranceProvider: "MassHealth",
-    appointmentId: appointmentId!,
-  });
+      ...formToCreateClaim,
+      serviceLines: filteredServiceLines,
+      staffId: Number(staff?.id),
+      patientId: patientId,
+      insuranceProvider: "MassHealth",
+      appointmentId: appointmentId!,
+    });
 
     // 4. sending form data to selenium service
     onHandleForSelenium({

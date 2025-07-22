@@ -93,20 +93,20 @@ model Staff {
 }
 
 model Claim {
-  id                Int      @id @default(autoincrement())
+  id                Int         @id @default(autoincrement())
   patientId         Int
   appointmentId     Int
   userId            Int
   staffId           Int
   patientName       String
   memberId          String
-  dateOfBirth       DateTime @db.Date
+  dateOfBirth       DateTime    @db.Date
   remarks           String
   serviceDate       DateTime
   insuranceProvider String // e.g., "Delta MA"
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  status            String   @default("pending") // "pending", "approved", "cancelled", "review"
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  status            ClaimStatus @default(PENDING)
 
   patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
@@ -114,6 +114,13 @@ model Claim {
   staff       Staff?      @relation("ClaimStaff", fields: [staffId], references: [id])
 
   serviceLines ServiceLine[]
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  CANCELLED
+  REVIEW
 }
 
 model ServiceLine {
@@ -163,7 +170,6 @@ model PdfFile {
   group      PdfGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@index([groupId])
-
 }
 
 enum PdfCategory {

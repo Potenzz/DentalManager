@@ -90,9 +90,10 @@ router.post(
         claimData.insuranceSiteKey
       );
       if (!credentials) {
-        return res
-          .status(404)
-          .json({ error: "No insurance credentials found for this provider. Kindly Update this at Settings Page." });
+        return res.status(404).json({
+          error:
+            "No insurance credentials found for this provider. Kindly Update this at Settings Page.",
+        });
       }
 
       const enrichedData = {
@@ -183,35 +184,20 @@ router.post(
   }
 );
 
-// GET /api/claims?page=1&limit=5
-router.get("/", async (req: Request, res: Response) => {
-  const userId = req.user!.id;
-  const offset = parseInt(req.query.offset as string) || 0;
-  const limit = parseInt(req.query.limit as string) || 5;
-
-  try {
-    const [claims, total] = await Promise.all([
-      storage.getClaimsPaginated(userId, offset, limit),
-      storage.countClaimsByUserId(userId),
-    ]);
-
-    res.json({
-      data: claims,
-      page: Math.floor(offset / limit) + 1,
-      limit,
-      total,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to retrieve paginated claims" });
-  }
-});
-
 // GET /api/claims/recent
 router.get("/recent", async (req: Request, res: Response) => {
   try {
-    const claims = await storage.getClaimsMetadataByUser(req.user!.id);
-    res.json(claims); // Just ID and createdAt
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const [claims, totalCount] = await Promise.all([
+      storage.getRecentClaimsByUser(req.user!.id, limit, offset),
+      storage.getTotalClaimCountByUser(req.user!.id),
+    ]);
+
+    res.json({ claims, totalCount });
   } catch (error) {
+    console.error("Failed to retrieve recent claims:", error);
     res.status(500).json({ message: "Failed to retrieve recent claims" });
   }
 });
@@ -219,7 +205,7 @@ router.get("/recent", async (req: Request, res: Response) => {
 // Get all claims for the logged-in user
 router.get("/all", async (req: Request, res: Response) => {
   try {
-    const claims = await storage.getClaimsByUserId(req.user!.id);
+    const claims = await storage.getTotalClaimCountByUser(req.user!.id);
     res.json(claims);
   } catch (error) {
     res.status(500).json({ message: "Failed to retrieve claims" });

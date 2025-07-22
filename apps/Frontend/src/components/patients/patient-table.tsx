@@ -38,6 +38,7 @@ import { PatientSearch, SearchCriteria } from "./patient-search";
 import { useDebounce } from "use-debounce";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "../ui/checkbox";
+import { formatDateToHumanReadable } from "@/utils/dateUtils";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -329,15 +330,6 @@ export function PatientTable({
     return colorClasses[id % colorClasses.length];
   };
 
-  const formatDate = (dateString: string | Date) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }).format(date);
-  };
-
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
@@ -428,7 +420,7 @@ export function PatientTable({
                   </TableCell>
                   <TableCell>
                     <div className="text-sm text-gray-900">
-                      {formatDate(patient.dateOfBirth)}
+                      {formatDateToHumanReadable(patient.dateOfBirth)}
                     </div>
                     <div className="text-sm text-gray-500 capitalize">
                       {patient.gender}

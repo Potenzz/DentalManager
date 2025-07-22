@@ -8,3 +8,4 @@ export * from '../shared/schemas/objects/InsuranceCredentialUncheckedCreateInput
 export * from '../shared/schemas/objects/PdfFileUncheckedCreateInput.schema'
 export * from '../shared/schemas/objects/PdfGroupUncheckedCreateInput.schema'
 export * from '../shared/schemas/enums/PdfCategory.schema'
+export * from '../shared/schemas/enums/ClaimStatus.schema'
