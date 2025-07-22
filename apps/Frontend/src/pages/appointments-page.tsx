@@ -172,12 +172,13 @@ export default function AppointmentsPage() {
     isLoading: isLoadingAppointments,
     refetch: refetchAppointments,
   } = useQuery<Appointment[]>({
-    queryKey: ["/api/appointments/all"],
+    queryKey: ["appointments", selectedDate],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/appointments/all");
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const res = await apiRequest("GET", `/api/appointments/on/${dateStr}`);
       return res.json();
     },
-    enabled: !!user,
+    enabled: !!user && !!selectedDate,
   });
 
   // Fetch patients (needed for the dropdowns)
