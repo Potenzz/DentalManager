@@ -32,7 +32,7 @@ import {
   setTaskStatus,
   clearTaskStatus,
 } from "@/redux/slices/seleniumEligibilityCheckTaskSlice";
-import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
+import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 
 const PatientSchema = (

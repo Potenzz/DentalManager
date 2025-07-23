@@ -21,7 +21,7 @@ import {
   setTaskStatus,
   clearTaskStatus,
 } from "@/redux/slices/seleniumClaimSubmitTaskSlice";
-import { SeleniumTaskBanner } from "@/components/claims/selenium-task-banner";
+import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import ClaimsRecentTable from "@/components/claims/claims-recent-table";
 
