@@ -41,6 +41,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import ClaimViewModal from "./claim-view-modal";
 
 //creating types out of schema auto generated.
 type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
@@ -99,9 +100,9 @@ export default function ClaimsRecentTable({
   const claimsPerPage = 5;
   const offset = (currentPage - 1) * claimsPerPage;
 
-  const [currentClaim, setCurrentClaim] = useState<Claim | undefined>(
-    undefined
-  );
+  const [currentClaim, setCurrentClaim] = useState<
+    ClaimWithServiceLines | undefined
+  >(undefined);
   const [selectedClaimId, setSelectedClaimId] = useState<number | null>(null);
 
   const handleSelectClaim = (claim: Claim) => {
@@ -170,17 +171,17 @@ export default function ClaimsRecentTable({
     },
   });
 
-  const handleEditClaim = (claim: Claim) => {
+  const handleEditClaim = (claim: ClaimWithServiceLines) => {
     setCurrentClaim(claim);
     setIsEditClaimOpen(true);
   };
 
-  const handleViewClaim = (claim: Claim) => {
+  const handleViewClaim = (claim: ClaimWithServiceLines) => {
     setCurrentClaim(claim);
     setIsViewClaimOpen(true);
   };
 
-  const handleDeleteClaim = (claim: Claim) => {
+  const handleDeleteClaim = (claim: ClaimWithServiceLines) => {
     setCurrentClaim(claim);
     setIsDeleteClaimOpen(true);
   };
@@ -463,6 +464,16 @@ export default function ClaimsRecentTable({
           onCancel={() => setIsDeleteClaimOpen(false)}
           entityName={currentClaim?.patientName}
         />
+
+        {isViewClaimOpen && currentClaim && (
+          <ClaimViewModal
+            isOpen={isViewClaimOpen}
+            onClose={() => setIsViewClaimOpen(false)}
+            onOpenChange={(open) => setIsViewClaimOpen(open)}
+            onEditClaim={(claim) => handleEditClaim(claim)}
+            claim={currentClaim}
+          />
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (
