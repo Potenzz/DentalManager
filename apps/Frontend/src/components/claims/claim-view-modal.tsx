@@ -6,12 +6,17 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
+import {
+  ClaimUncheckedCreateInputObjectSchema,
+  StaffUncheckedCreateInputObjectSchema,
+} from "@repo/db/usedSchemas";
 import React from "react";
 import { z } from "zod";
+import { formatDateToHumanReadable } from "@/utils/dateUtils";
 
 //creating types out of schema auto generated.
 type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
+type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
 type ClaimWithServiceLines = Claim & {
   serviceLines: {
@@ -24,6 +29,7 @@ type ClaimWithServiceLines = Claim & {
     toothSurface: string | null;
     billedAmount: number;
   }[];
+  staff: Staff | null;
 };
 
 type ClaimViewModalProps = {
@@ -43,8 +49,7 @@ export default function ClaimViewModal({
 }: ClaimViewModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Claim Details</DialogTitle>
           <DialogDescription>
@@ -70,10 +75,6 @@ export default function ClaimViewModal({
               <div>
                 <h4 className="font-medium text-gray-900">Basic Information</h4>
                 <div className="mt-2 space-y-2">
-                  <p>
-                    <span className="text-gray-500">Member ID:</span>{" "}
-                    {claim.memberId}
-                  </p>
                   <p>
                     <span className="text-gray-500">Date of Birth:</span>{" "}
                     {new Date(claim.dateOfBirth).toLocaleDateString()}
@@ -105,11 +106,15 @@ export default function ClaimViewModal({
               </div>
 
               <div>
-                <h4 className="font-medium text-gray-900">Insurance</h4>
+                <h4 className="font-medium text-gray-900">Insurance Details</h4>
                 <div className="mt-2 space-y-2">
                   <p>
-                    <span className="text-gray-500">Provider:</span>{" "}
+                    <span className="text-gray-500">Insurance Provider:</span>{" "}
                     {claim.insuranceProvider || "N/A"}
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Member ID:</span>{" "}
+                    {claim.memberId}
                   </p>
                   <p>
                     <span className="text-gray-500">Remarks:</span>{" "}
@@ -119,49 +124,98 @@ export default function ClaimViewModal({
               </div>
             </div>
 
+            {/* Metadata */}
+            <div className="space-y-2">
+              <h4 className="font-medium text-gray-900">Timestamps</h4>
+              <p>
+                <span className="text-gray-500">Created At:</span>{" "}
+                {formatDateToHumanReadable(claim.createdAt)}
+              </p>
+              <p>
+                <span className="text-gray-500">Updated At:</span>{" "}
+                {formatDateToHumanReadable(claim.updatedAt)}
+              </p>
+            </div>
+
+            {claim.staff && (
+              <div className="space-y-2 pt-4">
+                <h4 className="font-medium text-gray-900">Assigned Staff</h4>
+                <p>
+                  <span className="text-gray-500">Name:</span>{" "}
+                  {claim.staff.name}
+                </p>
+                <p>
+                  <span className="text-gray-500">Role:</span>{" "}
+                  {claim.staff.role}
+                </p>
+                {claim.staff.email && (
+                  <p>
+                    <span className="text-gray-500">Email:</span>{" "}
+                    {claim.staff.email}
+                  </p>
+                )}
+                {claim.staff.phone && (
+                  <p>
+                    <span className="text-gray-500">Phone:</span>{" "}
+                    {claim.staff.phone}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <h4 className="font-medium text-gray-900 pt-4">Service Lines</h4>
               <div className="mt-2 space-y-3">
                 {claim.serviceLines.length > 0 ? (
-                  claim.serviceLines.map((line, index) => (
-                    <div
-                      key={line.id}
-                      className="border p-3 rounded-md bg-gray-50"
-                    >
-                      <p>
-                        <span className="text-gray-500">Procedure Code:</span>{" "}
-                        {line.procedureCode}
-                      </p>
-                      <p>
-                        <span className="text-gray-500">Procedure Date:</span>{" "}
-                        {new Date(line.procedureDate).toLocaleDateString()}
-                      </p>
-                      {line.oralCavityArea && (
+                  <>
+                    {claim.serviceLines.map((line, index) => (
+                      <div
+                        key={line.id}
+                        className="border p-3 rounded-md bg-gray-50"
+                      >
                         <p>
-                          <span className="text-gray-500">
-                            Oral Cavity Area:
-                          </span>{" "}
-                          {line.oralCavityArea}
+                          <span className="text-gray-500">Procedure Code:</span>{" "}
+                          {line.procedureCode}
                         </p>
-                      )}
-                      {line.toothNumber && (
                         <p>
-                          <span className="text-gray-500">Tooth Number:</span>{" "}
-                          {line.toothNumber}
+                          <span className="text-gray-500">Procedure Date:</span>{" "}
+                          {new Date(line.procedureDate).toLocaleDateString()}
                         </p>
-                      )}
-                      {line.toothSurface && (
+                        {line.oralCavityArea && (
+                          <p>
+                            <span className="text-gray-500">
+                              Oral Cavity Area:
+                            </span>{" "}
+                            {line.oralCavityArea}
+                          </p>
+                        )}
+                        {line.toothNumber && (
+                          <p>
+                            <span className="text-gray-500">Tooth Number:</span>{" "}
+                            {line.toothNumber}
+                          </p>
+                        )}
+                        {line.toothSurface && (
+                          <p>
+                            <span className="text-gray-500">
+                              Tooth Surface:
+                            </span>{" "}
+                            {line.toothSurface}
+                          </p>
+                        )}
                         <p>
-                          <span className="text-gray-500">Tooth Surface:</span>{" "}
-                          {line.toothSurface}
+                          <span className="text-gray-500">Billed Amount:</span>{" "}
+                          ${line.billedAmount.toFixed(2)}
                         </p>
-                      )}
-                      <p>
-                        <span className="text-gray-500">Billed Amount:</span> $
-                        {line.billedAmount.toFixed(2)}
-                      </p>
+                      </div>
+                    ))}
+                    <div className="text-right font-semibold text-gray-900 pt-2 border-t mt-4">
+                      Total Billed Amount: $
+                      {claim.serviceLines
+                        .reduce((total, line) => total + line.billedAmount, 0)
+                        .toFixed(2)}
                     </div>
-                  ))
+                  </>
                 ) : (
                   <p className="text-gray-500">No service lines available.</p>
                 )}

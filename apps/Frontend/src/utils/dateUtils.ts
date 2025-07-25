@@ -80,7 +80,10 @@ export function normalizeToISOString(date: Date | string): string {
  * @param dateInput The date as a string (e.g., ISO, YYYY-MM-DD) or a Date object.
  * @returns A formatted date string.
  */
-export const formatDateToHumanReadable = (dateInput: string | Date): string => {
+export const formatDateToHumanReadable = (
+  dateInput?: string | Date
+): string => {
+  if (!dateInput) return "N/A";
   // Create a Date object from the input.
   // The Date constructor is quite flexible with various string formats.
   const date = new Date(dateInput);

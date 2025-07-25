@@ -32,6 +32,7 @@ import {
   PatientUncheckedCreateInputObjectSchema,
   ClaimUncheckedCreateInputObjectSchema,
   ClaimStatusSchema,
+  StaffUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
@@ -42,10 +43,12 @@ import { cn } from "@/lib/utils";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import ClaimViewModal from "./claim-view-modal";
+import ClaimEditModal from "./claim-edit-modal";
 
 //creating types out of schema auto generated.
 type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
 export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
+type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
 type ClaimWithServiceLines = Claim & {
   serviceLines: {
@@ -58,6 +61,7 @@ type ClaimWithServiceLines = Claim & {
     toothSurface: string | null;
     billedAmount: number;
   }[];
+  staff: Staff | null;
 };
 
 const PatientSchema = (
@@ -138,6 +142,42 @@ export default function ClaimsRecentTable({
       return res.json();
     },
     placeholderData: { claims: [], totalCount: 0 },
+  });
+
+  const updateClaimMutation = useMutation({
+    mutationFn: async (claim: ClaimWithServiceLines) => {
+      const response = await apiRequest("PUT", `/api/claims/${claim.id}`, {
+        status: claim.status,
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update claim");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsEditClaimOpen(false);
+      toast({
+        title: "Success",
+        description: "Claim updated successfully!",
+        variant: "default",
+      });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "claims-recent",
+          {
+            page: currentPage,
+          },
+        ],
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Update failed: ${error.message}`,
+        variant: "destructive",
+      });
+    },
   });
 
   const deleteClaimMutation = useMutation({
@@ -472,6 +512,18 @@ export default function ClaimsRecentTable({
             onOpenChange={(open) => setIsViewClaimOpen(open)}
             onEditClaim={(claim) => handleEditClaim(claim)}
             claim={currentClaim}
+          />
+        )}
+
+        {isEditClaimOpen && currentClaim && (
+          <ClaimEditModal
+            isOpen={isEditClaimOpen}
+            onClose={() => setIsEditClaimOpen(false)}
+            onOpenChange={(open) => setIsEditClaimOpen(open)}
+            claim={currentClaim}
+            onSave={(updatedClaim) => {
+              updateClaimMutation.mutate(updatedClaim);
+            }}
           />
         )}
 

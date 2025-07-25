@@ -146,6 +146,7 @@ type ClaimWithServiceLines = Claim & {
     toothSurface: string | null;
     billedAmount: number;
   }[];
+  staff: Staff | null;
 };
 
 // Pdf types:
@@ -538,7 +539,7 @@ export const storage: IStorage = {
       orderBy: { createdAt: "desc" },
       skip: offset,
       take: limit,
-      include: { serviceLines: true },
+      include: { serviceLines: true, staff: true },
     });
   },
 
