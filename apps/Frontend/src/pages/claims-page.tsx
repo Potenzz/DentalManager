@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { ClaimForm } from "@/components/claims/claim-form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -704,11 +704,21 @@ export default function ClaimsPage() {
           </div>
 
           {/* Recent Claims Section */}
-          <ClaimsRecentTable
+          <Card>
+              <CardHeader>
+                <CardTitle>Recently Submitted Claims</CardTitle>
+                <CardDescription>
+                  View and manage all recent claims information
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ClaimsRecentTable
             allowEdit={true}
             allowView={true}
             allowDelete={true}
           />
+              </CardContent>
+            </Card>
 
           {/* Recent Claims by Patients */}
           <ClaimsOfPatientModal />

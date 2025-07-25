@@ -9,7 +9,13 @@ import ClaimsRecentTable from "./claims-recent-table";
 import { PatientTable } from "../patients/patient-table";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { z } from "zod";
-import { Card, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -28,6 +34,9 @@ export default function ClaimsOfPatientModal() {
       setSelectedPatient(patient);
       setClaimsPage(1);
       setIsModalOpen(true);
+    } else {
+      setSelectedPatient(null);
+      setIsModalOpen(false);
     }
   };
 
@@ -36,7 +45,7 @@ export default function ClaimsOfPatientModal() {
       {/* Claims Section */}
       {selectedPatient && (
         <Card>
-          <CardHeader className="pb-4">
+          <CardHeader>
             <CardTitle>
               Claims for {selectedPatient.firstName} {selectedPatient.lastName}
             </CardTitle>
@@ -44,7 +53,7 @@ export default function ClaimsOfPatientModal() {
               Displaying recent claims for the selected patient.
             </CardDescription>
           </CardHeader>
-          <div className="p-4">
+          <CardContent>
             <ClaimsRecentTable
               patientId={selectedPatient.id}
               allowView
@@ -52,25 +61,25 @@ export default function ClaimsOfPatientModal() {
               allowDelete
               onPageChange={setClaimsPage}
             />
-          </div>
+          </CardContent>
         </Card>
       )}
 
       {/* Patients Section */}
       <Card>
-        <CardHeader className="pb-4">
-          <CardTitle>Patients</CardTitle>
+        <CardHeader>
+          <CardTitle>Patient Records</CardTitle>
           <CardDescription>
-            Select a patient to view their recent claims.
+            View and manage all patient information
           </CardDescription>
         </CardHeader>
-        <div className="p-4">
+        <CardContent>
           <PatientTable
             allowView
             allowCheckbox
             onSelectPatient={handleSelectPatient}
           />
-        </div>
+        </CardContent>
       </Card>
     </div>
   );

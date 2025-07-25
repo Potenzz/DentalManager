@@ -39,9 +39,7 @@ import { useAuth } from "@/hooks/use-auth";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import ClaimViewModal from "./claim-view-modal";
 import ClaimEditModal from "./claim-edit-modal";
 
@@ -319,10 +317,6 @@ export default function ClaimsRecentTable({
   };
 
   return (
-    <Card className="mt-8">
-      <CardHeader className="pb-8">
-        <CardTitle>Recently Submitted Claims</CardTitle>
-      </CardHeader>
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
@@ -581,6 +575,5 @@ export default function ClaimsRecentTable({
           </div>
         )}
       </div>
-    </Card>
   );
 }

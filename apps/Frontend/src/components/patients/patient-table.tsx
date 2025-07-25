@@ -537,9 +537,7 @@ export function PatientTable({
                   <div className="mt-2 space-y-2">
                     <p>
                       <span className="text-gray-500">Date of Birth:</span>{" "}
-                      {new Date(
-                        currentPatient.dateOfBirth
-                      ).toLocaleDateString()}
+                      {formatDateToHumanReadable(currentPatient.dateOfBirth)}
                     </p>
                     <p>
                       <span className="text-gray-500">Gender:</span>{" "}

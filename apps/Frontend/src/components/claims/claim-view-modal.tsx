@@ -77,11 +77,11 @@ export default function ClaimViewModal({
                 <div className="mt-2 space-y-2">
                   <p>
                     <span className="text-gray-500">Date of Birth:</span>{" "}
-                    {new Date(claim.dateOfBirth).toLocaleDateString()}
+                    {formatDateToHumanReadable(claim.dateOfBirth)}
                   </p>
                   <p>
                     <span className="text-gray-500">Service Date:</span>{" "}
-                    {new Date(claim.serviceDate).toLocaleDateString()}
+                    {formatDateToHumanReadable(claim.serviceDate)}
                   </p>
                   <p>
                     <span className="text-gray-500">Status:</span>{" "}
@@ -179,7 +179,7 @@ export default function ClaimViewModal({
                         </p>
                         <p>
                           <span className="text-gray-500">Procedure Date:</span>{" "}
-                          {new Date(line.procedureDate).toLocaleDateString()}
+                          {formatDateToHumanReadable(line.procedureCode)}
                         </p>
                         {line.oralCavityArea && (
                           <p>
