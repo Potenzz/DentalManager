@@ -24,6 +24,7 @@ import {
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import ClaimsRecentTable from "@/components/claims/claims-recent-table";
+import ClaimsOfPatientModal from "@/components/claims/claims-of-patient-table";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -708,6 +709,9 @@ export default function ClaimsPage() {
             allowView={true}
             allowDelete={true}
           />
+
+          {/* Recent Claims by Patients */}
+          <ClaimsOfPatientModal />
         </main>
       </div>
 

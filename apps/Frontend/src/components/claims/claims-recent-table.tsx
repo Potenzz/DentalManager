@@ -83,6 +83,7 @@ interface ClaimsRecentTableProps {
   allowCheckbox?: boolean;
   onSelectClaim?: (claim: Claim | null) => void;
   onPageChange?: (page: number) => void;
+  patientId?: number;
 }
 
 export default function ClaimsRecentTable({
@@ -92,6 +93,7 @@ export default function ClaimsRecentTable({
   allowCheckbox,
   onSelectClaim,
   onPageChange,
+  patientId,
 }: ClaimsRecentTableProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -119,22 +121,24 @@ export default function ClaimsRecentTable({
     }
   };
 
+  const getClaimsQueryKey = () =>
+    patientId
+      ? ["claims-recent", "patient", patientId, currentPage]
+      : ["claims-recent", "global", currentPage];
+
   const {
     data: claimsData,
     isLoading,
     isError,
   } = useQuery<ClaimApiResponse, Error>({
-    queryKey: [
-      "claims-recent",
-      {
-        page: currentPage,
-      },
-    ],
+    queryKey: getClaimsQueryKey(),
+
     queryFn: async () => {
-      const res = await apiRequest(
-        "GET",
-        `/api/claims/recent?limit=${claimsPerPage}&offset=${offset}`
-      );
+      const endpoint = patientId
+        ? `/api/claims/patient/${patientId}?limit=${claimsPerPage}&offset=${offset}`
+        : `/api/claims/recent?limit=${claimsPerPage}&offset=${offset}`;
+
+      const res = await apiRequest("GET", endpoint);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Search failed");
@@ -163,12 +167,7 @@ export default function ClaimsRecentTable({
         variant: "default",
       });
       queryClient.invalidateQueries({
-        queryKey: [
-          "claims-recent",
-          {
-            page: currentPage,
-          },
-        ],
+        queryKey: getClaimsQueryKey(),
       });
     },
     onError: (error) => {
@@ -188,12 +187,7 @@ export default function ClaimsRecentTable({
     onSuccess: () => {
       setIsDeleteClaimOpen(false);
       queryClient.invalidateQueries({
-        queryKey: [
-          "claims-recent",
-          {
-            page: currentPage,
-          },
-        ],
+        queryKey: getClaimsQueryKey(),
       });
       toast({
         title: "Success",

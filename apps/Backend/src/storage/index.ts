@@ -219,7 +219,13 @@ export interface IStorage {
 
   // Claim methods
   getClaim(id: number): Promise<Claim | undefined>;
-  getClaimsByPatientId(patientId: number): Promise<Claim[]>;
+  getRecentClaimsByPatientId(
+    patientId: number,
+    limit: number,
+    offset: number
+  ): Promise<ClaimWithServiceLines[]>;
+
+  getTotalClaimCountByPatient(patientId: number): Promise<number>;
   getClaimsByAppointmentId(appointmentId: number): Promise<Claim[]>;
   getRecentClaimsByUser(
     userId: number,
@@ -521,8 +527,27 @@ export const storage: IStorage = {
     return claim ?? undefined;
   },
 
-  async getClaimsByPatientId(patientId: number): Promise<Claim[]> {
-    return await db.claim.findMany({ where: { patientId } });
+  async getRecentClaimsByPatientId(
+    patientId: number,
+    limit: number,
+    offset: number
+  ): Promise<ClaimWithServiceLines[]> {
+    return db.claim.findMany({
+      where: { patientId },
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+      include: {
+        serviceLines: true,
+        staff: true,
+      },
+    });
+  },
+
+  async getTotalClaimCountByPatient(patientId: number): Promise<number> {
+    return db.claim.count({
+      where: { patientId },
+    });
   },
 
   async getClaimsByAppointmentId(appointmentId: number): Promise<Claim[]> {

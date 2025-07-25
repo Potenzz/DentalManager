@@ -202,6 +202,39 @@ router.get("/recent", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/claims/patient/:patientId
+router.get(
+  "/patient/:patientId",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const patientIdParam = req.params.patientId;
+      if (!patientIdParam) {
+        return res.status(400).json({ message: "Missing patientId" });
+      }
+      const patientId = parseInt(patientIdParam);
+      if (isNaN(patientId)) {
+        return res.status(400).json({ message: "Invalid patientId" });
+      }
+      const limit = parseInt(req.query.limit as string) || 10;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      if (isNaN(patientId)) {
+        return res.status(400).json({ message: "Invalid patient ID" });
+      }
+
+      const [claims, totalCount] = await Promise.all([
+        storage.getRecentClaimsByPatientId(patientId, limit, offset),
+        storage.getTotalClaimCountByPatient(patientId),
+      ]);
+
+      res.json({ claims, totalCount });
+    } catch (error) {
+      console.error("Failed to retrieve claims for patient:", error);
+      res.status(500).json({ message: "Failed to retrieve patient claims" });
+    }
+  }
+);
+
 // Get all claims for the logged-in user
 router.get("/all", async (req: Request, res: Response) => {
   try {
