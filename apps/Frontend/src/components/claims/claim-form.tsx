@@ -22,6 +22,8 @@ import {
   PatientUncheckedCreateInputObjectSchema,
   AppointmentUncheckedCreateInputObjectSchema,
   ClaimUncheckedCreateInputObjectSchema,
+  ClaimStatusSchema,
+  StaffUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
@@ -31,7 +33,6 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import procedureCodes from "../../assets/data/procedureCodes.json";
@@ -57,7 +58,6 @@ const updatePatientSchema = (
 type UpdatePatient = z.infer<typeof updatePatientSchema>;
 
 //creating types out of schema auto generated.
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
 
 const insertAppointmentSchema = (
   AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -114,35 +114,31 @@ interface ClaimFormProps {
     appointmentData: InsertAppointment | UpdateAppointment
   ) => void;
   onHandleUpdatePatient: (patient: UpdatePatient & { id: number }) => void;
-  onHandleForSelenium: (data: ClaimFormData) => void;
+  onHandleForMHSelenium: (data: ClaimFormData) => void;
   onClose: () => void;
 }
 
-interface Staff {
-  id: string;
-  name: string;
-  role: "doctor" | "hygienist";
-  color: string;
-}
+export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
+type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
 export function ClaimForm({
   patientId,
   extractedData,
   onHandleAppointmentSubmit,
   onHandleUpdatePatient,
-  onHandleForSelenium,
+  onHandleForMHSelenium,
   onSubmit,
   onClose,
 }: ClaimFormProps) {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Patient state - initialize from extractedData or null (new patient)
+  // Patient state - initialize from extractedData (if given ) or null (new patient)
   const [patient, setPatient] = useState<Patient | null>(
     extractedData ? ({ ...extractedData } as Patient) : null
   );
 
-  // Query patient
+  // Query patient based on given patient id
   const {
     data: fetchedPatient,
     isLoading,
@@ -189,7 +185,6 @@ export function ClaimForm({
   const [serviceDate, setServiceDate] = useState<string>(
     formatLocalDate(new Date())
   );
-
   useEffect(() => {
     if (extractedData?.serviceDate) {
       const parsed = parseLocalDate(extractedData.serviceDate);
@@ -208,6 +203,21 @@ export function ClaimForm({
       setForm((prev) => ({ ...prev, serviceDate: formattedDate }));
     }
   };
+
+  // when service date is chenged, it will change the each service lines procedure date in sync as well.
+  useEffect(() => {
+    setForm((prevForm) => {
+      const updatedLines = prevForm.serviceLines.map((line) => ({
+        ...line,
+        procedureDate: serviceDate, // set all to current serviceDate string
+      }));
+      return {
+        ...prevForm,
+        serviceLines: updatedLines,
+        serviceDate, // keep form.serviceDate in sync as well
+      };
+    });
+  }, [serviceDate]);
 
   // Determine patient date of birth format
   const formatDOB = (dob: string | undefined) => {
@@ -261,20 +271,6 @@ export function ClaimForm({
       }));
     }
   }, [patient]);
-
-  useEffect(() => {
-    setForm((prevForm) => {
-      const updatedLines = prevForm.serviceLines.map((line) => ({
-        ...line,
-        procedureDate: serviceDate, // set all to current serviceDate string
-      }));
-      return {
-        ...prevForm,
-        serviceLines: updatedLines,
-        serviceDate, // keep form.serviceDate in sync as well
-      };
-    });
-  }, [serviceDate]);
 
   // Handle patient field changes (to make inputs controlled and editable)
   const updatePatientField = (field: keyof Patient, value: any) => {
@@ -362,15 +358,14 @@ export function ClaimForm({
     setIsUploading(false);
   };
 
-  // Mass Health Button Handler
+  // 1st Button workflow - Mass Health Button Handler
   const handleMHSubmit = async () => {
+    // 1. Create or update appointment
     const appointmentData = {
       patientId: patientId,
       date: serviceDate,
       staffId: staff?.id,
     };
-
-    // 1. Create or update appointment
     const appointmentId = await onHandleAppointmentSubmit(appointmentData);
 
     // 2. Update patient
@@ -395,7 +390,6 @@ export function ClaimForm({
     const filteredServiceLines = form.serviceLines.filter(
       (line) => line.procedureCode.trim() !== ""
     );
-
     const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
     const createdClaim = await onSubmit({
       ...formToCreateClaim,
@@ -407,7 +401,7 @@ export function ClaimForm({
     });
 
     // 4. sending form data to selenium service
-    onHandleForSelenium({
+    onHandleForMHSelenium({
       ...form,
       serviceLines: filteredServiceLines,
       staffId: Number(staff?.id),
@@ -417,7 +411,8 @@ export function ClaimForm({
       insuranceSiteKey: "MH",
       claimId: createdClaim.id,
     });
-    // 4. Close form
+
+    // 5. Close form
     onClose();
   };
 
@@ -541,10 +536,10 @@ export function ClaimForm({
                     Treating Doctor
                   </Label>
                   <Select
-                    value={staff?.id || ""}
+                    value={staff?.id?.toString() || ""}
                     onValueChange={(id) => {
                       const selected = staffMembersRaw.find(
-                        (member) => member.id === id
+                        (member) => member.id?.toString() === id
                       );
                       if (selected) {
                         setStaff(selected);
@@ -562,11 +557,18 @@ export function ClaimForm({
                     </SelectTrigger>
 
                     <SelectContent>
-                      {staffMembersRaw.map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
-                          {member.name}
-                        </SelectItem>
-                      ))}
+                      {staffMembersRaw.map((member) => {
+                        if (member.id === undefined) return null;
+
+                        return (
+                          <SelectItem
+                            key={member.id}
+                            value={member.id.toString()}
+                          >
+                            {member.name}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>

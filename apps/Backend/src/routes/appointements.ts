@@ -172,7 +172,7 @@ router.get("/appointments/recent", async (req: Request, res: Response) => {
 
 // Create a new appointment
 router.post(
-  "/",
+  "/upsert",
 
   async (req: Request, res: Response): Promise<any> => {
     try {
@@ -182,53 +182,55 @@ router.post(
         userId: req.user!.id,
       });
 
-      // Verify patient exists and belongs to user
+      const userId = req.user!.id;
+
+      // 1. Verify patient exists and belongs to user
       const patient = await storage.getPatient(appointmentData.patientId);
       if (!patient) {
-        console.log("Patient not found:", appointmentData.patientId);
         return res.status(404).json({ message: "Patient not found" });
       }
 
-      if (patient.userId !== req.user!.id) {
-        console.log(
-          "Patient belongs to another user. Patient userId:",
-          patient.userId,
-          "Request userId:",
-          req.user!.id
-        );
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
-      // Check if there's already an appointment at this time slot
-      const existingAppointments = await storage.getAppointmentsByUserId(
-        req.user!.id
-      );
-      const conflictingAppointment = existingAppointments.find(
-        (apt) =>
-          apt.date === appointmentData.date &&
-          apt.startTime === appointmentData.startTime &&
-          apt.notes?.includes(
-            appointmentData.notes.split("Appointment with ")[1]
-          )
-      );
-
-      if (conflictingAppointment) {
-        console.log(
-          "Time slot already booked:",
-          appointmentData.date,
-          appointmentData.startTime
-        );
-        return res.status(409).json({
-          message:
-            "This time slot is already booked. Please select another time or staff member.",
+      if (patient.userId !== userId) {
+        return res.status(403).json({
+          message: "Forbidden, You are not the user who created this patient.",
         });
       }
 
-      // Create appointment
-      const appointment = await storage.createAppointment(appointmentData);
-      res.status(201).json(appointment);
+      // 2. Check if patient already has an appointment on the same date and time.
+      const sameDayAppointment = await storage.getPatientAppointmentByDateTime(
+        appointmentData.patientId,
+        appointmentData.date,
+        appointmentData.startTime
+      );
+      // 3.  Check if there's already an appointment at this time slot of Staff.
+      const staffConflict = await storage.getStaffAppointmentByDateTime(
+        appointmentData.staffId,
+        appointmentData.date,
+        appointmentData.startTime,
+        sameDayAppointment?.id
+      );
+
+      if (staffConflict) {
+        return res.status(409).json({
+          message:
+            "This time slot is already booked for the selected staff. Please choose another time or staff member.",
+        });
+      }
+
+      // 4. If same-day appointment exists, update it
+      if (sameDayAppointment?.id !== undefined) {
+        const updatedAppointment = await storage.updateAppointment(
+          sameDayAppointment.id,
+          appointmentData
+        );
+        return res.status(200).json(updatedAppointment);
+      }
+
+      // 6. Otherwise, create a new appointment
+      const newAppointment = await storage.createAppointment(appointmentData);
+      return res.status(201).json(newAppointment);
     } catch (error) {
-      console.error("Error creating appointment:", error);
+      console.error("Error in upsert appointment:", error);
 
       if (error instanceof z.ZodError) {
         console.log(
@@ -242,7 +244,7 @@ router.post(
       }
 
       res.status(500).json({
-        message: "Failed to create appointment",
+        message: "Failed to upsert appointment",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -255,89 +257,85 @@ router.put(
 
   async (req: Request, res: Response): Promise<any> => {
     try {
+      const appointmentData = updateAppointmentSchema.parse({
+        ...req.body,
+        userId: req.user!.id,
+      });
+
+      const userId = req.user!.id;
+
       const appointmentIdParam = req.params.id;
       if (!appointmentIdParam) {
         return res.status(400).json({ message: "Appointment ID is required" });
       }
       const appointmentId = parseInt(appointmentIdParam);
 
-      // Check if appointment exists and belongs to user
+      // 1. Verify patient exists and belongs to user
+      const patient = await storage.getPatient(appointmentData.patientId);
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      if (patient.userId !== userId) {
+        return res.status(403).json({
+          message: "Forbidden, You are not the user who created this patient.",
+        });
+      }
+
+      // 2. Check if appointment exists and belongs to user
       const existingAppointment = await storage.getAppointment(appointmentId);
       if (!existingAppointment) {
         console.log("Appointment not found:", appointmentId);
         return res.status(404).json({ message: "Appointment not found" });
       }
-
       if (existingAppointment.userId !== req.user!.id) {
-        console.log(
-          "Appointment belongs to another user. Appointment userId:",
-          existingAppointment.userId,
-          "Request userId:",
-          req.user!.id
-        );
-        return res.status(403).json({ message: "Forbidden" });
+        return res.status(403).json({
+          message:
+            "Forbidden, You are not the user who created this appointment.",
+        });
       }
 
-      // Validate request body
-      const appointmentData = updateAppointmentSchema.parse(req.body);
-
-      // If patient ID is being updated, verify the new patient belongs to user
+      // 4. Reject patientId change (not allowed)
       if (
         appointmentData.patientId &&
         appointmentData.patientId !== existingAppointment.patientId
       ) {
-        const patient = await storage.getPatient(appointmentData.patientId);
-        if (!patient) {
-          console.log("New patient not found:", appointmentData.patientId);
-          return res.status(404).json({ message: "Patient not found" });
-        }
-
-        if (patient.userId !== req.user!.id) {
-          console.log(
-            "New patient belongs to another user. Patient userId:",
-            patient.userId,
-            "Request userId:",
-            req.user!.id
-          );
-          return res.status(403).json({ message: "Forbidden" });
-        }
+        return res
+          .status(400)
+          .json({ message: "Changing patientId is not allowed" });
       }
 
-      // Check if there's already an appointment at this time slot (if time is being changed)
-      if (
-        appointmentData.date &&
-        appointmentData.startTime &&
-        (appointmentData.date !== existingAppointment.date ||
-          appointmentData.startTime !== existingAppointment.startTime)
-      ) {
-        // Extract staff name from notes
-        const staffInfo =
-          appointmentData.notes?.split("Appointment with ")[1] ||
-          existingAppointment.notes?.split("Appointment with ")[1];
+      // 5. Check for conflicting appointments (same patient OR staff at same time)
 
-        const existingAppointments = await storage.getAppointmentsByUserId(
-          req.user!.id
-        );
-        const conflictingAppointment = existingAppointments.find(
-          (apt) =>
-            apt.id !== appointmentId && // Don't match with itself
-            apt.date === (appointmentData.date || existingAppointment.date) &&
-            apt.startTime ===
-              (appointmentData.startTime || existingAppointment.startTime) &&
-            apt.notes?.includes(staffInfo)
-        );
+      const date = appointmentData.date ?? existingAppointment.date;
+      const startTime =
+        appointmentData.startTime ?? existingAppointment.startTime;
+      const staffId = appointmentData.staffId ?? existingAppointment.staffId;
 
-        if (conflictingAppointment) {
-          console.log(
-            "Time slot already booked:",
-            appointmentData.date,
-            appointmentData.startTime
-          );
-          return res.status(409).json({
-            message:
-              "This time slot is already booked. Please select another time or staff member.",
-          });
-        }
+      const patientConflict = await storage.getPatientConflictAppointment(
+        existingAppointment.patientId,
+        date,
+        startTime,
+        appointmentId
+      );
+
+      if (patientConflict) {
+        return res.status(409).json({
+          message: "This patient already has an appointment at this time.",
+        });
+      }
+
+      const staffConflict = await storage.getStaffConflictAppointment(
+        staffId,
+        date,
+        startTime,
+        appointmentId
+      );
+
+      if (staffConflict) {
+        return res.status(409).json({
+          message: "This time slot is already booked for the selected staff.",
+        });
       }
 
       // Update appointment
@@ -345,7 +343,7 @@ router.put(
         appointmentId,
         appointmentData
       );
-      res.json(updatedAppointment);
+      return res.json(updatedAppointment);
     } catch (error) {
       console.error("Error updating appointment:", error);
 

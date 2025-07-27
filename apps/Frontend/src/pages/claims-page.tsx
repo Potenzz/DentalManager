@@ -2,7 +2,13 @@ import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
 import { ClaimForm } from "@/components/claims/claim-form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,7 +18,7 @@ import {
   ClaimUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { FileCheck } from "lucide-react";
-import { parse, format } from "date-fns";
+import { parse } from "date-fns";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -78,7 +84,9 @@ type UpdatePatient = z.infer<typeof updatePatientSchema>;
 export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClaimFormOpen, setIsClaimFormOpen] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<number | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(
+    null
+  );
   const dispatch = useAppDispatch();
   const { status, message, show } = useAppSelector(
     (state) => state.seleniumClaimSubmitTask
@@ -168,10 +176,14 @@ export default function ClaimsPage() {
     },
   });
 
-  // Create appointment mutation
+  // Create/upsert appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointment: InsertAppointment) => {
-      const res = await apiRequest("POST", "/api/appointments/", appointment);
+      const res = await apiRequest(
+        "POST",
+        "/api/appointments/upsert",
+        appointment
+      );
       return await res.json();
     },
     onSuccess: () => {
@@ -228,50 +240,29 @@ export default function ClaimsPage() {
   const handleAppointmentSubmit = async (
     appointmentData: InsertAppointment | UpdateAppointment
   ): Promise<number> => {
-    const rawDate = parseLocalDate(appointmentData.date);
-    const formattedDate = formatLocalDate(rawDate);
-
-    // Prepare minimal data to update/create
-    const minimalData = {
-      date: rawDate.toLocaleDateString("en-CA"), // "YYYY-MM-DD" format
-      startTime: appointmentData.startTime || "09:00",
-      endTime: appointmentData.endTime || "09:30",
-      staffId: appointmentData.staffId,
-    };
-
-    // Find existing appointment for this patient on the same date
-    const existingAppointment = appointments.find(
-      (a) =>
-        a.patientId === appointmentData.patientId &&
-        formatLocalDate(parseLocalDate(a.date)) === formattedDate
-    );
-
-    if (existingAppointment && typeof existingAppointment.id === "number") {
-      // Update appointment with only date
-      updateAppointmentMutation.mutate({
-        id: existingAppointment.id,
-        appointment: minimalData,
-      });
-      return existingAppointment.id;
-    }
-
     return new Promise<number>((resolve, reject) => {
+      console.log("Constructed appointmentData:", appointmentData);
+
+      console.log(appointmentData.date);
       createAppointmentMutation.mutate(
         {
-          ...minimalData,
+          date: appointmentData.date,
+          startTime: appointmentData.startTime || "09:00",
+          endTime: appointmentData.endTime || "09:30",
+          staffId: appointmentData.staffId,
           patientId: appointmentData.patientId,
           userId: user?.id,
           title: "Scheduled Appointment",
           type: "checkup",
         },
         {
-          onSuccess: (newAppointment) => {
-            resolve(newAppointment.id);
+          onSuccess: (appointment) => {
+            resolve(appointment.id);
           },
           onError: (error) => {
             toast({
               title: "Error",
-              description: "Could not create appointment",
+              description: "Could not schedule appointment",
               variant: "destructive",
             });
             reject(error);
@@ -324,7 +315,7 @@ export default function ClaimsPage() {
   };
 
   const handleNewClaim = (patientId: number) => {
-    setSelectedPatient(patientId);
+    setSelectedPatientId(patientId);
     setIsClaimFormOpen(true);
 
     const patient = patients.find((p) => p.id === patientId);
@@ -334,6 +325,7 @@ export default function ClaimsPage() {
   };
 
   const closeClaim = () => {
+    setSelectedPatientId(null);
     setIsClaimFormOpen(false);
     setClaimFormData({
       patientId: null,
@@ -379,7 +371,7 @@ export default function ClaimsPage() {
       );
 
       if (matchingPatient) {
-        setSelectedPatient(matchingPatient.id);
+        setSelectedPatientId(matchingPatient.id);
         prefillClaimForm(matchingPatient);
         setIsClaimFormOpen(true);
       } else {
@@ -401,7 +393,7 @@ export default function ClaimsPage() {
 
         addPatientMutation.mutate(newPatient, {
           onSuccess: (created) => {
-            setSelectedPatient(created.id);
+            setSelectedPatientId(created.id);
             prefillClaimForm(created);
             setIsClaimFormOpen(true);
           },
@@ -474,8 +466,8 @@ export default function ClaimsPage() {
     }
   };
 
-  // handle selenium
-  const handleSelenium = async (data: any) => {
+  // handle selenium sybmiting Mass Health claim
+  const handleMHClaimSubmitSelenium = async (data: any) => {
     const formData = new FormData();
     formData.append("data", JSON.stringify(data));
     const uploadedFiles: File[] = data.uploadedFiles ?? [];
@@ -517,7 +509,7 @@ export default function ClaimsPage() {
         variant: "default",
       });
 
-      const result2 = await handleSeleniumPdfDownload(result1);
+      const result2 = await handleMHSeleniumPdfDownload(result1);
       return result2;
     } catch (error: any) {
       dispatch(
@@ -535,9 +527,9 @@ export default function ClaimsPage() {
   };
 
   // selenium pdf download handler
-  const handleSeleniumPdfDownload = async (data: any) => {
+  const handleMHSeleniumPdfDownload = async (data: any) => {
     try {
-      if (!selectedPatient) {
+      if (!selectedPatientId) {
         throw new Error("Missing patientId");
       }
 
@@ -549,7 +541,7 @@ export default function ClaimsPage() {
       );
 
       const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
-        patientId: selectedPatient,
+        patientId: selectedPatientId,
         pdf_url: data.pdf_url,
       });
       const result = await res.json();
@@ -566,8 +558,6 @@ export default function ClaimsPage() {
         title: "Success",
         description: "Claim Submitted and Pdf Downloaded completed.",
       });
-
-      setSelectedPatient(null);
 
       return result;
     } catch (error: any) {
@@ -705,20 +695,20 @@ export default function ClaimsPage() {
 
           {/* Recent Claims Section */}
           <Card>
-              <CardHeader>
-                <CardTitle>Recently Submitted Claims</CardTitle>
-                <CardDescription>
-                  View and manage all recent claims information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ClaimsRecentTable
-            allowEdit={true}
-            allowView={true}
-            allowDelete={true}
-          />
-              </CardContent>
-            </Card>
+            <CardHeader>
+              <CardTitle>Recently Submitted Claims</CardTitle>
+              <CardDescription>
+                View and manage all recent claims information
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ClaimsRecentTable
+                allowEdit={true}
+                allowView={true}
+                allowDelete={true}
+              />
+            </CardContent>
+          </Card>
 
           {/* Recent Claims by Patients */}
           <ClaimsOfPatientModal />
@@ -726,15 +716,15 @@ export default function ClaimsPage() {
       </div>
 
       {/* Claim Form Modal */}
-      {isClaimFormOpen && selectedPatient !== null && (
+      {isClaimFormOpen && selectedPatientId !== null && (
         <ClaimForm
-          patientId={selectedPatient}
+          patientId={selectedPatientId}
           onClose={closeClaim}
           extractedData={claimFormData}
           onSubmit={handleClaimSubmit}
           onHandleAppointmentSubmit={handleAppointmentSubmit}
           onHandleUpdatePatient={handleUpdatePatient}
-          onHandleForSelenium={handleSelenium}
+          onHandleForMHSelenium={handleMHClaimSubmitSelenium}
         />
       )}
     </div>

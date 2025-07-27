@@ -209,6 +209,29 @@ export interface IStorage {
     appointment: UpdateAppointment
   ): Promise<Appointment>;
   deleteAppointment(id: number): Promise<void>;
+  getPatientAppointmentByDateTime(
+    patientId: number,
+    date: Date,
+    startTime: string
+  ): Promise<Appointment | undefined>;
+  getStaffAppointmentByDateTime(
+    staffId: number,
+    date: Date,
+    startTime: string,
+    excludeId?: number
+  ): Promise<Appointment | undefined>;
+  getPatientConflictAppointment(
+    patientId: number,
+    date: Date,
+    startTime: string,
+    excludeId: number
+  ): Promise<Appointment | undefined>;
+  getStaffConflictAppointment(
+    staffId: number,
+    date: Date,
+    startTime: string,
+    excludeId: number
+  ): Promise<Appointment | undefined>;
 
   // Staff methods
   getStaff(id: number): Promise<Staff | undefined>;
@@ -483,6 +506,70 @@ export const storage: IStorage = {
     }
   },
 
+    async getPatientAppointmentByDateTime(
+    patientId: number,
+    date: Date,
+    startTime: string
+  ): Promise<Appointment | undefined> {
+    return await db.appointment.findFirst({
+      where: {
+        patientId,
+        date,
+        startTime,
+      },
+    }) ?? undefined;
+  },
+
+  async getStaffAppointmentByDateTime(
+    staffId: number,
+    date: Date,
+    startTime: string,
+    excludeId?: number
+  ): Promise<Appointment | undefined> {
+    return await db.appointment.findFirst({
+      where: {
+        staffId,
+        date,
+        startTime,
+        NOT: excludeId ? { id: excludeId } : undefined,
+      },
+    }) ?? undefined;
+  },
+
+  async getPatientConflictAppointment(
+    patientId: number,
+    date: Date,
+    startTime: string,
+    excludeId: number
+  ): Promise<Appointment | undefined> {
+    return await db.appointment.findFirst({
+      where: {
+        patientId,
+        date,
+        startTime,
+        NOT: { id: excludeId },
+      },
+    }) ?? undefined;
+  },
+
+  async getStaffConflictAppointment(
+    staffId: number,
+    date: Date,
+    startTime: string,
+    excludeId: number
+  ): Promise<Appointment | undefined> {
+    return await db.appointment.findFirst({
+      where: {
+        staffId,
+        date,
+        startTime,
+        NOT: { id: excludeId },
+      },
+    }) ?? undefined;
+  },
+
+
+  // Staff methods
   async getStaff(id: number): Promise<Staff | undefined> {
     const staff = await db.staff.findUnique({ where: { id } });
     return staff ?? undefined;

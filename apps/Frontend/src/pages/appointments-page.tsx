@@ -287,10 +287,10 @@ export default function AppointmentsPage() {
     }
   }, [patients, user, location]);
 
-  // Create appointment mutation
+  // Create/upsert appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointment: InsertAppointment) => {
-      const res = await apiRequest("POST", "/api/appointments/", appointment);
+      const res = await apiRequest("POST", "/api/appointments/upsert", appointment);
       return await res.json();
     },
     onSuccess: () => {
