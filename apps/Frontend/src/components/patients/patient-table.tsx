@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Delete, Edit, Eye } from "lucide-react";
+import { Delete, Edit, Eye, FileCheck } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Pagination,
@@ -69,6 +69,8 @@ interface PatientTableProps {
   allowView?: boolean;
   allowDelete?: boolean;
   allowCheckbox?: boolean;
+  allowNewClaim?: boolean;
+  onNewClaim?: (patientId: number) => void;
   onSelectPatient?: (patient: Patient | null) => void;
   onPageChange?: (page: number) => void;
   onSearchChange?: (searchTerm: string) => void;
@@ -79,6 +81,8 @@ export function PatientTable({
   allowView,
   allowDelete,
   allowCheckbox,
+  allowNewClaim,
+  onNewClaim,
   onSelectPatient,
   onPageChange,
   onSearchChange,
@@ -481,6 +485,17 @@ export function PatientTable({
                           <Edit className="h-4 w-4" />
                         </Button>
                       )}
+                      {allowNewClaim && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onNewClaim?.(patient.id)}
+                        className="text-green-600 hover:text-green-800 hover:bg-green-50"
+                        aria-label="New Claim"
+                      >
+                      <FileCheck className="h-5 w-5" />
+                      </Button>
+                    )}
                       {allowView && (
                         <Button
                           variant="ghost"

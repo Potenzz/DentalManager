@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import patientRoutes from './patients';
-import appointmentRoutes from './appointements'
+import appointmentRoutes from './appointments'
 import userRoutes from './users'
 import staffRoutes from './staffs'
 import pdfExtractionRoutes from './pdfExtraction';

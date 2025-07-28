@@ -183,6 +183,8 @@ router.post(
       });
 
       const userId = req.user!.id;
+      const originalStartTime = appointmentData.startTime;
+      const MAX_END_TIME = "18:30";
 
       // 1. Verify patient exists and belongs to user
       const patient = await storage.getPatient(appointmentData.patientId);
@@ -196,39 +198,87 @@ router.post(
         });
       }
 
-      // 2. Check if patient already has an appointment on the same date and time.
-      const sameDayAppointment = await storage.getPatientAppointmentByDateTime(
-        appointmentData.patientId,
-        appointmentData.date,
-        appointmentData.startTime
-      );
-      // 3.  Check if there's already an appointment at this time slot of Staff.
-      const staffConflict = await storage.getStaffAppointmentByDateTime(
-        appointmentData.staffId,
-        appointmentData.date,
-        appointmentData.startTime,
-        sameDayAppointment?.id
-      );
+      // 2. Attempt to find the next available slot
+      let [hour, minute] = originalStartTime.split(":").map(Number);
 
-      if (staffConflict) {
-        return res.status(409).json({
-          message:
-            "This time slot is already booked for the selected staff. Please choose another time or staff member.",
-        });
-      }
+      const pad = (n: number) => n.toString().padStart(2, "0");
 
-      // 4. If same-day appointment exists, update it
-      if (sameDayAppointment?.id !== undefined) {
-        const updatedAppointment = await storage.updateAppointment(
-          sameDayAppointment.id,
-          appointmentData
+      while (`${pad(hour)}:${pad(minute)}` <= MAX_END_TIME) {
+        const currentStartTime = `${pad(hour)}:${pad(minute)}`;
+
+        // Check patient appointment at this time
+        const sameDayAppointment =
+          await storage.getPatientAppointmentByDateTime(
+            appointmentData.patientId,
+            appointmentData.date,
+            currentStartTime
+          );
+
+        // Check staff conflict at this time
+        const staffConflict = await storage.getStaffAppointmentByDateTime(
+          appointmentData.staffId,
+          appointmentData.date,
+          currentStartTime,
+          sameDayAppointment?.id // Ignore self if updating
         );
-        return res.status(200).json(updatedAppointment);
+
+        if (!staffConflict) {
+          const endMinute = minute + 30;
+          let endHour = hour + Math.floor(endMinute / 60);
+          let realEndMinute = endMinute % 60;
+
+          const currentEndTime = `${pad(endHour)}:${pad(realEndMinute)}`;
+
+          const payload = {
+            ...appointmentData,
+            startTime: currentStartTime,
+            endTime: currentEndTime,
+          };
+
+          let responseData;
+
+          if (sameDayAppointment?.id !== undefined) {
+            const updated = await storage.updateAppointment(
+              sameDayAppointment.id,
+              payload
+            );
+            responseData = {
+              ...updated,
+              originalRequestedTime: originalStartTime,
+              finalScheduledTime: currentStartTime,
+              message:
+                originalStartTime !== currentStartTime
+                  ? `Your requested time (${originalStartTime}) was unavailable. Appointment was updated to ${currentStartTime}.`
+                  : `Appointment successfully updated at ${currentStartTime}.`,
+            };
+            return res.status(200).json(responseData);
+          }
+
+          const created = await storage.createAppointment(payload);
+          responseData = {
+            ...created,
+            originalRequestedTime: originalStartTime,
+            finalScheduledTime: currentStartTime,
+            message:
+              originalStartTime !== currentStartTime
+                ? `Your requested time (${originalStartTime}) was unavailable. Appointment was scheduled at ${currentStartTime}.`
+                : `Appointment successfully scheduled at ${currentStartTime}.`,
+          };
+          return res.status(201).json(responseData);
+        }
+
+        // Move to next 30-min slot
+        minute += 30;
+        if (minute >= 60) {
+          hour += 1;
+          minute = 0;
+        }
       }
 
-      // 6. Otherwise, create a new appointment
-      const newAppointment = await storage.createAppointment(appointmentData);
-      return res.status(201).json(newAppointment);
+      return res.status(409).json({
+        message:
+          "No available slots remaining until 6:30 PM for this Staff. Please choose another day.",
+      });
     } catch (error) {
       console.error("Error in upsert appointment:", error);
 

@@ -94,7 +94,6 @@ export default function ClaimsRecentTable({
   patientId,
 }: ClaimsRecentTableProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
 
   const [isViewClaimOpen, setIsViewClaimOpen] = useState(false);
   const [isEditClaimOpen, setIsEditClaimOpen] = useState(false);

@@ -97,39 +97,13 @@ export default function ClaimsPage() {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Fetch patients
-  const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
-    Patient[]
-  >({
-    queryKey: ["/api/patients/"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/patients/");
-      return res.json();
-    },
-    enabled: !!user,
-  });
-
-  // Fetch appointments
-  const {
-    data: appointments = [] as Appointment[],
-    isLoading: isLoadingAppointments,
-  } = useQuery<Appointment[]>({
-    queryKey: ["/api/appointments/all"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/appointments/all");
-      return res.json();
-    },
-    enabled: !!user,
-  });
-
   // Add patient mutation
   const addPatientMutation = useMutation({
     mutationFn: async (patient: InsertPatient) => {
       const res = await apiRequest("POST", "/api/patients/", patient);
       return res.json();
     },
-    onSuccess: (newPatient) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+    onSuccess: () => {
       toast({
         title: "Success",
         description: "Patient added successfully!",
@@ -158,7 +132,6 @@ export default function ClaimsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
       toast({
         title: "Success",
         description: "Patient updated successfully!",
@@ -184,14 +157,11 @@ export default function ClaimsPage() {
       );
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (appointment) => {
       toast({
-        title: "Success",
-        description: "Appointment created successfully.",
+        title: "Appointment Scheduled",
+        description: appointment.message || "Appointment created successfully.",
       });
-      // Invalidate both appointments and patients queries
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
     },
     onError: (error: Error) => {
       toast({
@@ -209,6 +179,11 @@ export default function ClaimsPage() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["claims-recent"],
+        exact: false,
+      });
+
       toast({
         title: "Claim created successfully",
         variant: "default",
@@ -223,8 +198,17 @@ export default function ClaimsPage() {
     },
   });
 
-  // workflow starts from there - this params are set by pdf extraction/patient page.
-  // the fields are either send by pdfExtraction or by selecting patients.
+  // helper
+  const getPatientByInsuranceId = async (insuranceId: string) => {
+    const res = await apiRequest(
+      "GET",
+      `/api/patients/by-insurance-id?insuranceId=${encodeURIComponent(insuranceId)}`
+    );
+    if (!res.ok) throw new Error("Failed to fetch patient by insuranceId");
+    return res.json(); // returns patient object or null
+  };
+
+  // workflow starts from there - this params are set by pdf extraction/patient page. then used in claim page here.
   const [location] = useLocation();
   const { name, memberId, dob } = useMemo(() => {
     const search = window.location.search;
@@ -279,7 +263,7 @@ export default function ClaimsPage() {
       };
       fetchMatchingPatient();
     }
-  }, [memberId, dob]);
+  }, [memberId]);
 
   // 1. upsert appointment.
   const handleAppointmentSubmit = async (
@@ -468,53 +452,6 @@ export default function ClaimsPage() {
     window.history.replaceState({}, document.title, url.toString());
   };
 
-  // helper func for frontend
-  const getDisplayProvider = (provider: string) => {
-    const insuranceMap: Record<string, string> = {
-      delta: "Delta Dental",
-      metlife: "MetLife",
-      cigna: "Cigna",
-      aetna: "Aetna",
-    };
-    return insuranceMap[provider?.toLowerCase()] || provider;
-  };
-
-  // Get unique patients with appointments - might not needed now, can shift this to the recent patients table
-  const patientsWithAppointments = patients.reduce(
-    (acc, patient) => {
-      const patientAppointments = appointments
-        .filter((appt) => appt.patientId === patient.id)
-        .sort(
-          (a, b) =>
-            parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
-        ); // Sort descending by date
-
-      if (patientAppointments.length > 0) {
-        const latestAppointment = patientAppointments[0];
-        acc.push({
-          patientId: patient.id,
-          patientName: `${patient.firstName} ${patient.lastName}`,
-          appointmentId: latestAppointment!.id,
-          insuranceProvider: patient.insuranceProvider || "N/A",
-          insuranceId: patient.insuranceId || "N/A",
-          lastAppointment: formatLocalDate(
-            parseLocalDate(latestAppointment!.date)
-          ),
-        });
-      }
-
-      return acc;
-    },
-    [] as Array<{
-      patientId: number;
-      patientName: string;
-      appointmentId: number;
-      insuranceProvider: string;
-      insuranceId: string;
-      lastAppointment: string;
-    }>
-  );
-
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
       <Sidebar
@@ -546,92 +483,8 @@ export default function ClaimsPage() {
             </div>
           </div>
 
-          {/* New Claims Section */}
-          <div className="mb-8 mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center cursor-pointer group"
-                onClick={() => {
-                  if (patientsWithAppointments.length > 0) {
-                    const firstPatient = patientsWithAppointments[0];
-                    handleNewClaim(Number(firstPatient?.patientId));
-                  } else {
-                    toast({
-                      title: "No patients available",
-                      description:
-                        "There are no patients with appointments to create a claim",
-                    });
-                  }
-                }}
-              >
-                <h2 className="text-xl font-medium text-gray-800 group-hover:text-primary">
-                  New Claims
-                </h2>
-                <div className="ml-2 text-primary">
-                  <FileCheck className="h-5 w-5" />
-                </div>
-              </div>
-            </div>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle>Recent Patients for Claims</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingPatients || isLoadingAppointments ? (
-                  <div className="text-center py-4">
-                    Loading patients data...
-                  </div>
-                ) : patientsWithAppointments.length > 0 ? (
-                  <div className="divide-y">
-                    {patientsWithAppointments.map(
-                      (item: (typeof patientsWithAppointments)[number]) => (
-                        <div
-                          key={item.patientId}
-                          className="py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-                          onClick={() => handleNewClaim(item.patientId)}
-                        >
-                          <div>
-                            <h3 className="font-medium">{item.patientName}</h3>
-                            <div className="text-sm text-gray-500">
-                              <span>
-                                Insurance:{" "}
-                                {getDisplayProvider(item.insuranceProvider)}
-                              </span>
-
-                              <span className="mx-2">•</span>
-                              <span>ID: {item.insuranceId}</span>
-                              <span className="mx-2">•</span>
-                              <span>
-                                Last Visit:{" "}
-                                {parseLocalDate(
-                                  item.lastAppointment
-                                ).toLocaleDateString("en-CA")}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-primary">
-                            <FileCheck className="h-5 w-5" />
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <FileCheck className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                    <h3 className="text-lg font-medium">
-                      No eligible patients for claims
-                    </h3>
-                    <p className="text-gray-500 mt-1">
-                      Patients with appointments will appear here for insurance
-                      claim processing
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* Recent Claims by Patients also handles new claims */}
+          <ClaimsOfPatientModal onNewClaim={handleNewClaim} />
 
           {/* Recent Claims Section */}
           <Card>
@@ -649,9 +502,6 @@ export default function ClaimsPage() {
               />
             </CardContent>
           </Card>
-
-          {/* Recent Claims by Patients */}
-          <ClaimsOfPatientModal />
         </main>
       </div>
 

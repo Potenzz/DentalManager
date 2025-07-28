@@ -159,6 +159,29 @@ router.get("/search", async (req: Request, res: Response): Promise<any> => {
   }
 });
 
+
+// get patient by insurance id
+router.get("/by-insurance-id", async (req: Request, res: Response): Promise<any> => {
+  const insuranceId = req.query.insuranceId?.toString();
+
+  if (!insuranceId) {
+    return res.status(400).json({ error: "Missing insuranceId" });
+  }
+
+  try {
+    const patient = await storage.getPatientByInsuranceId(insuranceId);
+
+    if (patient) {
+      return res.status(200).json(patient);
+    } else {
+      return res.status(404).json(null);
+    }
+  } catch (err) {
+    console.error("Failed to lookup patient:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Get a single patient by ID
 router.get(
   "/:id",

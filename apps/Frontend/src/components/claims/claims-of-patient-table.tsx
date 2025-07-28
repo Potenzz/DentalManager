@@ -24,7 +24,11 @@ const PatientSchema = (
 });
 type Patient = z.infer<typeof PatientSchema>;
 
-export default function ClaimsOfPatientModal() {
+interface ClaimsOfPatientModalProps {
+  onNewClaim?: (patientId: number) => void;
+}
+
+export default function ClaimsOfPatientModal({ onNewClaim }: ClaimsOfPatientModalProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [claimsPage, setClaimsPage] = useState(1);
@@ -70,13 +74,18 @@ export default function ClaimsOfPatientModal() {
         <CardHeader>
           <CardTitle>Patient Records</CardTitle>
           <CardDescription>
-            View and manage all patient information
+            Select any patient and View all their recent claims.
+          </CardDescription>
+          <CardDescription>
+            Also create new claim for any patients.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <PatientTable
             allowView
             allowCheckbox
+            allowNewClaim
+            onNewClaim={onNewClaim}
             onSelectPatient={handleSelectPatient}
           />
         </CardContent>
