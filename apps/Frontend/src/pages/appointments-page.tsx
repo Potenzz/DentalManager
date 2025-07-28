@@ -4,12 +4,10 @@ import { format, addDays, startOfToday, addMinutes } from "date-fns";
 import {
   parseLocalDate,
   formatLocalDate,
-  normalizeToISOString,
 } from "@/utils/dateUtils";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
-import { ClaimModal } from "@/components/claims/claim-modal";
 import { Button } from "@/components/ui/button";
 import {
   Calendar as CalendarIcon,
@@ -19,7 +17,6 @@ import {
   RefreshCw,
   Move,
   Trash2,
-  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -706,40 +703,6 @@ export default function AppointmentsPage() {
                 </span>
               </Item>
               <Item
-                onClick={({ props }) => {
-                  const fullAppointment = appointments.find(
-                    (a) => a.id === props.appointmentId
-                  );
-                  if (fullAppointment) {
-                    // Set the appointment and patient IDs for the claim modal
-                    setClaimAppointmentId(fullAppointment.id ?? null);
-                    setClaimPatientId(fullAppointment.patientId);
-
-                    // Find the patient name for the toast notification
-                    const patient = patients.find(
-                      (p) => p.id === fullAppointment.patientId
-                    );
-                    const patientName = patient
-                      ? `${patient.firstName} ${patient.lastName}`
-                      : `Patient #${fullAppointment.patientId}`;
-
-                    // Show a toast notification
-                    toast({
-                      title: "Claim Services Initiated",
-                      description: `Started insurance claim process for ${patientName}`,
-                    });
-
-                    // Open the claim modal
-                    setIsClaimModalOpen(true);
-                  }
-                }}
-              >
-                <span className="flex items-center gap-2 text-blue-600">
-                  <FileText className="h-4 w-4" />
-                  Claim Services
-                </span>
-              </Item>
-              <Item
                 onClick={({ props }) =>
                   handleDeleteAppointment(props.appointmentId)
                 }
@@ -936,20 +899,6 @@ export default function AppointmentsPage() {
         onCancel={() => setConfirmDeleteState({ open: false })}
         entityName={confirmDeleteState.appointmentTitle}
       />
-
-      {/* Claim Services Modal */}
-      {claimPatientId && claimAppointmentId && (
-        <ClaimModal
-          open={isClaimModalOpen}
-          onClose={() => {
-            setIsClaimModalOpen(false);
-            setClaimPatientId(null);
-            setClaimAppointmentId(null);
-          }}
-          patientId={claimPatientId}
-          appointmentId={claimAppointmentId}
-        />
-      )}
     </div>
   );
 }

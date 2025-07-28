@@ -1,10 +1,4 @@
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import ClaimsRecentTable from "./claims-recent-table";
 import { PatientTable } from "../patients/patient-table";
 import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";

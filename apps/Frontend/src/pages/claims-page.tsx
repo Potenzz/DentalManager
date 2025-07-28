@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation} from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import {
@@ -17,7 +17,6 @@ import {
   AppointmentUncheckedCreateInputObjectSchema,
   ClaimUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
-import { FileCheck } from "lucide-react";
 import { parse } from "date-fns";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -28,7 +27,7 @@ import {
   clearTaskStatus,
 } from "@/redux/slices/seleniumClaimSubmitTaskSlice";
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
-import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
+import { formatLocalDate} from "@/utils/dateUtils";
 import ClaimsRecentTable from "@/components/claims/claims-recent-table";
 import ClaimsOfPatientModal from "@/components/claims/claims-of-patient-table";
 
