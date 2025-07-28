@@ -31,6 +31,7 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
+import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 
 const PatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -94,7 +95,7 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
         return {
           ...sanitizedPatient,
           dateOfBirth: patient.dateOfBirth
-            ? new Date(patient.dateOfBirth).toISOString().split("T")[0]
+            ? formatLocalDate(new Date(patient.dateOfBirth))
             : "",
         };
       }
@@ -146,7 +147,7 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
         const resetValues: Partial<Patient> = {
           ...sanitizedPatient,
           dateOfBirth: patient.dateOfBirth
-            ? new Date(patient.dateOfBirth).toISOString().split("T")[0]
+            ? formatLocalDate(new Date(patient.dateOfBirth))
             : "",
         };
         form.reset(resetValues);
@@ -218,7 +219,7 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
                             )}
                           >
                             {field.value ? (
-                              format(field.value, "PPP")
+                              format(parseLocalDate(field.value), "PPP")
                             ) : (
                               <span>Pick a date</span>
                             )}
@@ -229,10 +230,14 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
                       <PopoverContent className="w-auto p-4">
                         <Calendar
                           mode="single"
-                          selected={field.value}
+                          selected={
+                            field.value
+                              ? parseLocalDate(field.value)
+                              : undefined
+                          }
                           onSelect={(date) => {
                             if (date) {
-                              const localDate = format(date, "yyyy-MM-dd");
+                              const localDate = formatLocalDate(date); // keep yyyy-MM-dd
                               field.onChange(localDate);
                             }
                           }}

@@ -91,13 +91,11 @@ export default function ClaimsPage() {
   const { status, message, show } = useAppSelector(
     (state) => state.seleniumClaimSubmitTask
   );
-
   const { toast } = useToast();
   const { user } = useAuth();
-  const [claimFormData, setClaimFormData] = useState<any>({
-    patientId: null,
-    serviceDate: "",
-  });
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
 
   // Fetch patients
   const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
@@ -204,51 +202,95 @@ export default function ClaimsPage() {
     },
   });
 
-  // Update appointment mutation
-  const updateAppointmentMutation = useMutation({
-    mutationFn: async ({
-      id,
-      appointment,
-    }: {
-      id: number;
-      appointment: UpdateAppointment;
-    }) => {
-      const res = await apiRequest(
-        "PUT",
-        `/api/appointments/${id}`,
-        appointment
-      );
-      return await res.json();
+  // create claim mutation
+  const createClaimMutation = useMutation({
+    mutationFn: async (claimData: any) => {
+      const res = await apiRequest("POST", "/api/claims/", claimData);
+      return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Appointment updated successfully.",
+        title: "Claim created successfully",
+        variant: "default",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
-        title: "Error",
-        description: `Failed to update appointment: ${error.message}`,
+        title: "Error submitting claim",
+        description: error.message,
         variant: "destructive",
       });
     },
   });
 
+  // workflow starts from there - this params are set by pdf extraction/patient page.
+  // the fields are either send by pdfExtraction or by selecting patients.
+  const [location] = useLocation();
+  const { name, memberId, dob } = useMemo(() => {
+    const search = window.location.search;
+    const params = new URLSearchParams(search);
+    return {
+      name: params.get("name") || "",
+      memberId: params.get("memberId") || "",
+      dob: params.get("dob") || "",
+    };
+  }, [location]);
+
+  const handleNewClaim = (patientId: number) => {
+    setSelectedPatientId(patientId);
+    setIsClaimFormOpen(true);
+  };
+
+  useEffect(() => {
+    if (memberId && dob) {
+      // if matching patient found then simply send its id to claim form,
+      // if not then create new patient then send its id to claim form.
+      const fetchMatchingPatient = async () => {
+        try {
+          const matchingPatient = await getPatientByInsuranceId(memberId);
+
+          if (matchingPatient) {
+            handleNewClaim(matchingPatient.id);
+          } else {
+            const [firstName, ...rest] = name.trim().split(" ");
+            const lastName = rest.join(" ") || "";
+            const parsedDob = parse(dob, "M/d/yyyy", new Date()); // robust for "4/17/1964", "12/1/1975", etc.
+
+            const newPatient: InsertPatient = {
+              firstName,
+              lastName,
+              dateOfBirth: formatLocalDate(parsedDob),
+              gender: "",
+              phone: "",
+              userId: user?.id ?? 1,
+              status: "active",
+              insuranceId: memberId,
+            };
+
+            addPatientMutation.mutate(newPatient, {
+              onSuccess: (created) => {
+                handleNewClaim(created.id);
+              },
+            });
+          }
+        } catch (err) {
+          console.error("Error checking/creating patient:", err);
+        }
+      };
+      fetchMatchingPatient();
+    }
+  }, [memberId, dob]);
+
+  // 1. upsert appointment.
   const handleAppointmentSubmit = async (
     appointmentData: InsertAppointment | UpdateAppointment
   ): Promise<number> => {
     return new Promise<number>((resolve, reject) => {
-      console.log("Constructed appointmentData:", appointmentData);
-
-      console.log(appointmentData.date);
       createAppointmentMutation.mutate(
         {
           date: appointmentData.date,
-          startTime: appointmentData.startTime || "09:00",
-          endTime: appointmentData.endTime || "09:30",
+          startTime: "09:00",
+          endTime: "09:30",
           staffId: appointmentData.staffId,
           patientId: appointmentData.patientId,
           userId: user?.id,
@@ -272,192 +314,15 @@ export default function ClaimsPage() {
     });
   };
 
-  const createClaimMutation = useMutation({
-    mutationFn: async (claimData: any) => {
-      const res = await apiRequest("POST", "/api/claims/", claimData);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Claim created successfully",
-        variant: "default",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error submitting claim",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  function handleClaimSubmit(claimData: any): Promise<Claim> {
-    return createClaimMutation.mutateAsync(claimData).then((data) => {
-      return data;
-    });
-  }
-
-  const [location] = useLocation(); // gets path, e.g. "/claims"
-
-  const { name, memberId, dob } = useMemo(() => {
-    const search = window.location.search; // this gets the real query string
-    const params = new URLSearchParams(search);
-    return {
-      name: params.get("name") || "",
-      memberId: params.get("memberId") || "",
-      dob: params.get("dob") || "",
-    };
-  }, [location]);
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  const handleNewClaim = (patientId: number) => {
-    setSelectedPatientId(patientId);
-    setIsClaimFormOpen(true);
-
-    const patient = patients.find((p) => p.id === patientId);
-    if (!patient) return;
-
-    prefillClaimForm(patient);
-  };
-
-  const closeClaim = () => {
-    setSelectedPatientId(null);
-    setIsClaimFormOpen(false);
-    setClaimFormData({
-      patientId: null,
-      serviceDate: "",
-    });
-
-    // Remove query parameters without reload
-    const url = new URL(window.location.href);
-    url.searchParams.delete("memberId");
-    url.searchParams.delete("dob");
-    url.searchParams.delete("name");
-
-    // Use history.replaceState to update the URL without reloading
-    window.history.replaceState({}, document.title, url.toString());
-  };
-
-  const prefillClaimForm = (patient: Patient) => {
-    const patientAppointments = appointments
-      .filter((a) => a.patientId === patient.id)
-      .sort(
-        (a, b) =>
-          parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
-      );
-
-    const lastAppointment = patientAppointments[0]; // most recent
-
-    const dateToUse = lastAppointment
-      ? parseLocalDate(lastAppointment.date)
-      : parseLocalDate(new Date());
-
-    setClaimFormData((prev: any) => ({
-      ...prev,
-      patientId: patient.id,
-      serviceDate: formatLocalDate(dateToUse),
-    }));
-  };
-
-  useEffect(() => {
-    if (memberId && dob) {
-      const matchingPatient = patients.find(
-        (p) =>
-          p.insuranceId?.toLowerCase().trim() === memberId.toLowerCase().trim()
-      );
-
-      if (matchingPatient) {
-        setSelectedPatientId(matchingPatient.id);
-        prefillClaimForm(matchingPatient);
-        setIsClaimFormOpen(true);
-      } else {
-        const [firstName, ...rest] = name.trim().split(" ");
-        const lastName = rest.join(" ") || "";
-
-        const parsedDob = parse(dob, "M/d/yyyy", new Date()); // robust for "4/17/1964", "12/1/1975", etc.
-
-        const newPatient: InsertPatient = {
-          firstName,
-          lastName,
-          dateOfBirth: formatLocalDate(parsedDob),
-          gender: "",
-          phone: "",
-          userId: user?.id ?? 1,
-          status: "active",
-          insuranceId: memberId,
-        };
-
-        addPatientMutation.mutate(newPatient, {
-          onSuccess: (created) => {
-            setSelectedPatientId(created.id);
-            prefillClaimForm(created);
-            setIsClaimFormOpen(true);
-          },
-        });
-      }
-    }
-  }, [memberId, dob]);
-
-  const getDisplayProvider = (provider: string) => {
-    const insuranceMap: Record<string, string> = {
-      delta: "Delta Dental",
-      metlife: "MetLife",
-      cigna: "Cigna",
-      aetna: "Aetna",
-    };
-    return insuranceMap[provider?.toLowerCase()] || provider;
-  };
-
-  // Get unique patients with appointments
-  const patientsWithAppointments = patients.reduce(
-    (acc, patient) => {
-      const patientAppointments = appointments
-        .filter((appt) => appt.patientId === patient.id)
-        .sort(
-          (a, b) =>
-            parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
-        ); // Sort descending by date
-
-      if (patientAppointments.length > 0) {
-        const latestAppointment = patientAppointments[0];
-        acc.push({
-          patientId: patient.id,
-          patientName: `${patient.firstName} ${patient.lastName}`,
-          appointmentId: latestAppointment!.id,
-          insuranceProvider: patient.insuranceProvider || "N/A",
-          insuranceId: patient.insuranceId || "N/A",
-          lastAppointment: formatLocalDate(
-            parseLocalDate(latestAppointment!.date)
-          ),
-        });
-      }
-
-      return acc;
-    },
-    [] as Array<{
-      patientId: number;
-      patientName: string;
-      appointmentId: number;
-      insuranceProvider: string;
-      insuranceId: string;
-      lastAppointment: string;
-    }>
-  );
-
-  // Update Patient ( for insuranceId and Insurance Provider)
+  // 2. Update Patient ( for insuranceId and Insurance Provider)
   const handleUpdatePatient = (patient: UpdatePatient & { id?: number }) => {
-    if (patient && user) {
+    if (patient) {
       const { id, ...sanitizedPatient } = patient;
       updatePatientMutation.mutate({
         id: Number(patient.id),
         patient: sanitizedPatient,
       });
     } else {
-      console.error("No current patient or user found for update");
       toast({
         title: "Error",
         description: "Cannot update patient: No patient or user found",
@@ -466,7 +331,14 @@ export default function ClaimsPage() {
     }
   };
 
-  // handle selenium sybmiting Mass Health claim
+  // 3. create claim.
+  const handleClaimSubmit = (claimData: any): Promise<Claim> => {
+    return createClaimMutation.mutateAsync(claimData).then((data) => {
+      return data;
+    });
+  };
+
+  // 4. handle selenium sybmiting Mass Health claim
   const handleMHClaimSubmitSelenium = async (data: any) => {
     const formData = new FormData();
     formData.append("data", JSON.stringify(data));
@@ -509,7 +381,10 @@ export default function ClaimsPage() {
         variant: "default",
       });
 
-      const result2 = await handleMHSeleniumPdfDownload(result1);
+      const result2 = await handleMHSeleniumPdfDownload(
+        result1,
+        selectedPatientId
+      );
       return result2;
     } catch (error: any) {
       dispatch(
@@ -526,8 +401,11 @@ export default function ClaimsPage() {
     }
   };
 
-  // selenium pdf download handler
-  const handleMHSeleniumPdfDownload = async (data: any) => {
+  // 5. selenium pdf download handler
+  const handleMHSeleniumPdfDownload = async (
+    data: any,
+    selectedPatientId: number | null
+  ) => {
     try {
       if (!selectedPatientId) {
         throw new Error("Missing patientId");
@@ -574,6 +452,68 @@ export default function ClaimsPage() {
       });
     }
   };
+
+  // 6. close claim
+  const closeClaim = () => {
+    setSelectedPatientId(null);
+    setIsClaimFormOpen(false);
+
+    // Remove query parameters without reload
+    const url = new URL(window.location.href);
+    url.searchParams.delete("memberId");
+    url.searchParams.delete("dob");
+    url.searchParams.delete("name");
+
+    // Use history.replaceState to update the URL without reloading
+    window.history.replaceState({}, document.title, url.toString());
+  };
+
+  // helper func for frontend
+  const getDisplayProvider = (provider: string) => {
+    const insuranceMap: Record<string, string> = {
+      delta: "Delta Dental",
+      metlife: "MetLife",
+      cigna: "Cigna",
+      aetna: "Aetna",
+    };
+    return insuranceMap[provider?.toLowerCase()] || provider;
+  };
+
+  // Get unique patients with appointments - might not needed now, can shift this to the recent patients table
+  const patientsWithAppointments = patients.reduce(
+    (acc, patient) => {
+      const patientAppointments = appointments
+        .filter((appt) => appt.patientId === patient.id)
+        .sort(
+          (a, b) =>
+            parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+        ); // Sort descending by date
+
+      if (patientAppointments.length > 0) {
+        const latestAppointment = patientAppointments[0];
+        acc.push({
+          patientId: patient.id,
+          patientName: `${patient.firstName} ${patient.lastName}`,
+          appointmentId: latestAppointment!.id,
+          insuranceProvider: patient.insuranceProvider || "N/A",
+          insuranceId: patient.insuranceId || "N/A",
+          lastAppointment: formatLocalDate(
+            parseLocalDate(latestAppointment!.date)
+          ),
+        });
+      }
+
+      return acc;
+    },
+    [] as Array<{
+      patientId: number;
+      patientName: string;
+      appointmentId: number;
+      insuranceProvider: string;
+      insuranceId: string;
+      lastAppointment: string;
+    }>
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
@@ -720,7 +660,6 @@ export default function ClaimsPage() {
         <ClaimForm
           patientId={selectedPatientId}
           onClose={closeClaim}
-          extractedData={claimFormData}
           onSubmit={handleClaimSubmit}
           onHandleAppointmentSubmit={handleAppointmentSubmit}
           onHandleUpdatePatient={handleUpdatePatient}

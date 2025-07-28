@@ -108,7 +108,6 @@ interface ClaimFormData {
 
 interface ClaimFormProps {
   patientId: number;
-  extractedData?: Partial<Patient>;
   onSubmit: (data: ClaimFormData) => Promise<Claim>;
   onHandleAppointmentSubmit: (
     appointmentData: InsertAppointment | UpdateAppointment
@@ -123,7 +122,6 @@ type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
 export function ClaimForm({
   patientId,
-  extractedData,
   onHandleAppointmentSubmit,
   onHandleUpdatePatient,
   onHandleForMHSelenium,
@@ -133,10 +131,7 @@ export function ClaimForm({
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Patient state - initialize from extractedData (if given ) or null (new patient)
-  const [patient, setPatient] = useState<Patient | null>(
-    extractedData ? ({ ...extractedData } as Patient) : null
-  );
+  const [patient, setPatient] = useState<Patient | null>(null);
 
   // Query patient based on given patient id
   const {
@@ -185,14 +180,6 @@ export function ClaimForm({
   const [serviceDate, setServiceDate] = useState<string>(
     formatLocalDate(new Date())
   );
-  useEffect(() => {
-    if (extractedData?.serviceDate) {
-      const parsed = parseLocalDate(extractedData.serviceDate);
-      const isoFormatted = formatLocalDate(parsed);
-      setServiceDateValue(parsed);
-      setServiceDate(isoFormatted);
-    }
-  }, [extractedData]);
 
   // Update service date when calendar date changes
   const onServiceDateChange = (date: Date | undefined) => {
@@ -219,7 +206,7 @@ export function ClaimForm({
     });
   }, [serviceDate]);
 
-  // Determine patient date of birth format
+  // Determine patient date of birth format - required as date extracted from pdfs has different format.
   const formatDOB = (dob: string | undefined) => {
     if (!dob) return "";
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) return dob; // already MM/DD/YYYY
