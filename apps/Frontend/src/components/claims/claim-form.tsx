@@ -347,6 +347,22 @@ export function ClaimForm({
 
   // 1st Button workflow - Mass Health Button Handler
   const handleMHSubmit = async () => {
+    // 0. Validate required fields
+    const missingFields: string[] = [];
+
+    if (!form.memberId?.trim()) missingFields.push("Member ID");
+    if (!form.dateOfBirth?.trim()) missingFields.push("Date of Birth");
+    if (!patient?.firstName?.trim()) missingFields.push("First Name");
+
+    if (missingFields.length > 0) {
+      toast({
+        title: "Missing Required Fields",
+        description: `Please fill out the following field(s): ${missingFields.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     // 1. Create or update appointment
     const appointmentData = {
       patientId: patientId,
