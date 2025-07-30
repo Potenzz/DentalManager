@@ -9,8 +9,13 @@ import {
   PdfFileUncheckedCreateInputObjectSchema,
   PdfGroupUncheckedCreateInputObjectSchema,
   PdfCategorySchema,
+  PaymentUncheckedCreateInputObjectSchema,
+  PaymentTransactionCreateInputObjectSchema,
+  ServiceLinePaymentCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
+import { Prisma } from "@repo/db/generated/prisma";
+
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -160,6 +165,41 @@ export interface ClaimPdfMetadata {
   uploadedAt: Date;
 }
 
+// Base Payment type
+type Payment = z.infer<typeof PaymentUncheckedCreateInputObjectSchema>;
+type PaymentTransaction = z.infer<typeof PaymentTransactionCreateInputObjectSchema>;
+type ServiceLinePayment = z.infer<typeof ServiceLinePaymentCreateInputObjectSchema>
+
+
+const insertPaymentSchema = (
+  PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+type InsertPayment = z.infer<typeof insertPaymentSchema>;
+
+
+const updatePaymentSchema = (
+  PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .partial();
+type UpdatePayment = z.infer<typeof updatePaymentSchema>;
+
+
+type PaymentWithExtras = Prisma.PaymentGetPayload<{
+  include: {
+    transactions: true;
+    servicePayments: true;
+    claim: true;
+  };
+}>;
+
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
@@ -290,7 +330,7 @@ export interface IStorage {
     updates: Partial<Pick<PdfFile, "filename" | "pdfData">>
   ): Promise<PdfFile | undefined>;
 
-  // Group management
+  // PDF Group management
   createPdfGroup(
     patientId: number,
     title: string,
@@ -309,6 +349,17 @@ export interface IStorage {
     updates: Partial<Pick<PdfGroup, "title" | "category">>
   ): Promise<PdfGroup | undefined>;
   deletePdfGroup(id: number): Promise<boolean>;
+
+  // Payment methods: 
+  createPayment(data: InsertPayment): Promise<Payment>;
+  updatePayment(id: number, updates: UpdatePayment): Promise<Payment>;
+  deletePayment(id: number): Promise<void>;
+  getPaymentById(id: number): Promise<PaymentWithExtras | null>;
+  getPaymentByClaimId(claimId: number): Promise<PaymentWithExtras | null>;
+  getPaymentsByPatientId(patientId: number, userId: number): Promise<PaymentWithExtras[]>;
+  getRecentPaymentsByUser(userId: number, limit: number, offset: number): Promise<PaymentWithExtras[]>;
+  getPaymentsByDateRange(userId: number, from: Date, to: Date): Promise<PaymentWithExtras[]>;
+  getTotalPaymentCountByUser(userId: number): Promise<number>;
 }
 
 export const storage: IStorage = {
@@ -830,5 +881,92 @@ export const storage: IStorage = {
     } catch {
       return false;
     }
+  },
+
+  // Payment Methods
+
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+  return db.payment.create({ data: payment as Payment });
+},
+
+  async updatePayment(id: number, updates: UpdatePayment): Promise<Payment> {
+    return db.payment.update({ where: { id }, data: updates });
+  },
+
+  async deletePayment(id: number): Promise<void> {
+    await db.payment.delete({ where: { id } });
+  },
+
+  async getPaymentById(id: number): Promise<PaymentWithExtras | null> {
+    return db.payment.findUnique({
+      where: { id },
+      include: {
+        claim: true,
+        transactions: true,
+        servicePayments: true,
+      },
+    });
+  },
+
+  async getPaymentByClaimId(claimId: number): Promise<PaymentWithExtras | null> {
+    return db.payment.findFirst({
+      where: { claimId },
+      include: {
+        claim: true,
+        transactions: true,
+        servicePayments: true,
+      },
+    });
+  },
+
+
+  async getPaymentsByPatientId(patientId: number, userId: number): Promise<PaymentWithExtras[]> {
+    return db.payment.findMany({
+      where: {
+        patientId,
+        userId,
+      },
+      include: {
+        claim: true,
+        transactions: true,
+        servicePayments: true,
+      },
+    });
+  },
+
+  async getRecentPaymentsByUser(userId: number, limit: number, offset: number): Promise<PaymentWithExtras[]> {
+    return db.payment.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+      include: {
+        claim: true,
+        transactions: true,
+        servicePayments: true,
+      },
+    });
+  },
+
+  async getPaymentsByDateRange(userId: number, from: Date, to: Date): Promise<PaymentWithExtras[]> {
+    return db.payment.findMany({
+      where: {
+        userId,
+        createdAt: {
+          gte: from,
+          lte: to,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      include: {
+        claim: true,
+        transactions: true,
+        servicePayments: true,
+      },
+    });
+  },
+
+  async getTotalPaymentCountByUser(userId: number): Promise<number> {
+    return db.payment.count({ where: { userId } });
   },
 };

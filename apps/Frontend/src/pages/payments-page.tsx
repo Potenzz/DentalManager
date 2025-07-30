@@ -6,8 +6,6 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-// import { Patient, Appointment } from "@repo/db/shared/schemas";
-import { Patient, Appointment } from "@repo/db/shared/schemas";
 import { 
   CreditCard, 
   Clock, 
@@ -35,6 +33,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PatientUncheckedCreateInputObjectSchema,  AppointmentUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
+import { z } from "zod";
+
+const PatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  appointments: true,
+});
+type Patient = z.infer<typeof PatientSchema>;
+
+const insertPatientSchema = (
+  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+type InsertPatient = z.infer<typeof insertPatientSchema>;
+
+
+//creating types out of schema auto generated.
+type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
+
+const insertAppointmentSchema = (
+  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).omit({
+  id: true,
+  createdAt: true,
+});
+type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+const updateAppointmentSchema = (
+  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+)
+  .omit({
+    id: true,
+    createdAt: true,
+    userId: true,
+  })
+  .partial();
+type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
 
 export default function PaymentsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
