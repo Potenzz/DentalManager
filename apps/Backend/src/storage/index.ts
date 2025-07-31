@@ -16,7 +16,6 @@ import {
 import { z } from "zod";
 import { Prisma } from "@repo/db/generated/prisma";
 
-
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
 
@@ -167,9 +166,12 @@ export interface ClaimPdfMetadata {
 
 // Base Payment type
 type Payment = z.infer<typeof PaymentUncheckedCreateInputObjectSchema>;
-type PaymentTransaction = z.infer<typeof PaymentTransactionCreateInputObjectSchema>;
-type ServiceLinePayment = z.infer<typeof ServiceLinePaymentCreateInputObjectSchema>
-
+type PaymentTransaction = z.infer<
+  typeof PaymentTransactionCreateInputObjectSchema
+>;
+type ServiceLinePayment = z.infer<
+  typeof ServiceLinePaymentCreateInputObjectSchema
+>;
 
 const insertPaymentSchema = (
   PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -180,7 +182,6 @@ const insertPaymentSchema = (
 });
 type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
-
 const updatePaymentSchema = (
   PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
 )
@@ -190,7 +191,6 @@ const updatePaymentSchema = (
   })
   .partial();
 type UpdatePayment = z.infer<typeof updatePaymentSchema>;
-
 
 type PaymentWithExtras = Prisma.PaymentGetPayload<{
   include: {
@@ -350,15 +350,33 @@ export interface IStorage {
   ): Promise<PdfGroup | undefined>;
   deletePdfGroup(id: number): Promise<boolean>;
 
-  // Payment methods: 
+  // Payment methods:
   createPayment(data: InsertPayment): Promise<Payment>;
-  updatePayment(id: number, updates: UpdatePayment): Promise<Payment>;
-  deletePayment(id: number): Promise<void>;
-  getPaymentById(id: number): Promise<PaymentWithExtras | null>;
-  getPaymentByClaimId(claimId: number): Promise<PaymentWithExtras | null>;
-  getPaymentsByPatientId(patientId: number, userId: number): Promise<PaymentWithExtras[]>;
-  getRecentPaymentsByUser(userId: number, limit: number, offset: number): Promise<PaymentWithExtras[]>;
-  getPaymentsByDateRange(userId: number, from: Date, to: Date): Promise<PaymentWithExtras[]>;
+  updatePayment(
+    id: number,
+    updates: UpdatePayment,
+    userId: number
+  ): Promise<Payment>;
+  deletePayment(id: number, userId: number): Promise<void>;
+  getPaymentById(id: number, userId: number): Promise<PaymentWithExtras | null>;
+  getPaymentsByClaimId(
+    claimId: number,
+    userId: number
+  ): Promise<PaymentWithExtras | null>;
+  getPaymentsByPatientId(
+    patientId: number,
+    userId: number
+  ): Promise<PaymentWithExtras[]>;
+  getRecentPaymentsByUser(
+    userId: number,
+    limit: number,
+    offset: number
+  ): Promise<PaymentWithExtras[]>;
+  getPaymentsByDateRange(
+    userId: number,
+    from: Date,
+    to: Date
+  ): Promise<PaymentWithExtras[]>;
   getTotalPaymentCountByUser(userId: number): Promise<number>;
 }
 
@@ -557,18 +575,20 @@ export const storage: IStorage = {
     }
   },
 
-    async getPatientAppointmentByDateTime(
+  async getPatientAppointmentByDateTime(
     patientId: number,
     date: Date,
     startTime: string
   ): Promise<Appointment | undefined> {
-    return await db.appointment.findFirst({
-      where: {
-        patientId,
-        date,
-        startTime,
-      },
-    }) ?? undefined;
+    return (
+      (await db.appointment.findFirst({
+        where: {
+          patientId,
+          date,
+          startTime,
+        },
+      })) ?? undefined
+    );
   },
 
   async getStaffAppointmentByDateTime(
@@ -577,14 +597,16 @@ export const storage: IStorage = {
     startTime: string,
     excludeId?: number
   ): Promise<Appointment | undefined> {
-    return await db.appointment.findFirst({
-      where: {
-        staffId,
-        date,
-        startTime,
-        NOT: excludeId ? { id: excludeId } : undefined,
-      },
-    }) ?? undefined;
+    return (
+      (await db.appointment.findFirst({
+        where: {
+          staffId,
+          date,
+          startTime,
+          NOT: excludeId ? { id: excludeId } : undefined,
+        },
+      })) ?? undefined
+    );
   },
 
   async getPatientConflictAppointment(
@@ -593,14 +615,16 @@ export const storage: IStorage = {
     startTime: string,
     excludeId: number
   ): Promise<Appointment | undefined> {
-    return await db.appointment.findFirst({
-      where: {
-        patientId,
-        date,
-        startTime,
-        NOT: { id: excludeId },
-      },
-    }) ?? undefined;
+    return (
+      (await db.appointment.findFirst({
+        where: {
+          patientId,
+          date,
+          startTime,
+          NOT: { id: excludeId },
+        },
+      })) ?? undefined
+    );
   },
 
   async getStaffConflictAppointment(
@@ -609,16 +633,17 @@ export const storage: IStorage = {
     startTime: string,
     excludeId: number
   ): Promise<Appointment | undefined> {
-    return await db.appointment.findFirst({
-      where: {
-        staffId,
-        date,
-        startTime,
-        NOT: { id: excludeId },
-      },
-    }) ?? undefined;
+    return (
+      (await db.appointment.findFirst({
+        where: {
+          staffId,
+          date,
+          startTime,
+          NOT: { id: excludeId },
+        },
+      })) ?? undefined
+    );
   },
-
 
   // Staff methods
   async getStaff(id: number): Promise<Staff | undefined> {
@@ -884,33 +909,41 @@ export const storage: IStorage = {
   },
 
   // Payment Methods
-
   async createPayment(payment: InsertPayment): Promise<Payment> {
-  return db.payment.create({ data: payment as Payment });
-},
-
-  async updatePayment(id: number, updates: UpdatePayment): Promise<Payment> {
-    return db.payment.update({ where: { id }, data: updates });
+    return db.payment.create({ data: payment as Payment });
   },
 
-  async deletePayment(id: number): Promise<void> {
+  async updatePayment(
+    id: number,
+    updates: UpdatePayment,
+    userId: number
+  ): Promise<Payment> {
+    const existing = await db.payment.findFirst({ where: { id, userId } });
+    if (!existing) {
+      throw new Error("Not authorized or payment not found");
+    }
+
+    return db.payment.update({
+      where: { id },
+      data: updates,
+    });
+  },
+
+  async deletePayment(id: number, userId: number): Promise<void> {
+    const existing = await db.payment.findFirst({ where: { id, userId } });
+    if (!existing) {
+      throw new Error("Not authorized or payment not found");
+    }
+
     await db.payment.delete({ where: { id } });
   },
 
-  async getPaymentById(id: number): Promise<PaymentWithExtras | null> {
-    return db.payment.findUnique({
-      where: { id },
-      include: {
-        claim: true,
-        transactions: true,
-        servicePayments: true,
-      },
-    });
-  },
-
-  async getPaymentByClaimId(claimId: number): Promise<PaymentWithExtras | null> {
+  async getPaymentById(
+    id: number,
+    userId: number
+  ): Promise<PaymentWithExtras | null> {
     return db.payment.findFirst({
-      where: { claimId },
+      where: { id, userId },
       include: {
         claim: true,
         transactions: true,
@@ -919,8 +952,24 @@ export const storage: IStorage = {
     });
   },
 
+  async getPaymentsByClaimId(
+    claimId: number,
+    userId: number
+  ): Promise<PaymentWithExtras | null> {
+    return db.payment.findFirst({
+      where: { claimId, userId },
+      include: {
+        claim: true,
+        transactions: true,
+        servicePayments: true,
+      },
+    });
+  },
 
-  async getPaymentsByPatientId(patientId: number, userId: number): Promise<PaymentWithExtras[]> {
+  async getPaymentsByPatientId(
+    patientId: number,
+    userId: number
+  ): Promise<PaymentWithExtras[]> {
     return db.payment.findMany({
       where: {
         patientId,
@@ -934,7 +983,11 @@ export const storage: IStorage = {
     });
   },
 
-  async getRecentPaymentsByUser(userId: number, limit: number, offset: number): Promise<PaymentWithExtras[]> {
+  async getRecentPaymentsByUser(
+    userId: number,
+    limit: number,
+    offset: number
+  ): Promise<PaymentWithExtras[]> {
     return db.payment.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -948,7 +1001,11 @@ export const storage: IStorage = {
     });
   },
 
-  async getPaymentsByDateRange(userId: number, from: Date, to: Date): Promise<PaymentWithExtras[]> {
+  async getPaymentsByDateRange(
+    userId: number,
+    from: Date,
+    to: Date
+  ): Promise<PaymentWithExtras[]> {
     return db.payment.findMany({
       where: {
         userId,

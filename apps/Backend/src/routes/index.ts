@@ -1,25 +1,26 @@
 import { Router } from 'express';
-import patientRoutes from './patients';
-import appointmentRoutes from './appointments'
-import userRoutes from './users'
-import staffRoutes from './staffs'
+import patientsRoutes from './patients';
+import appointmentsRoutes from './appointments'
+import usersRoutes from './users'
+import staffsRoutes from './staffs'
 import pdfExtractionRoutes from './pdfExtraction';
 import claimsRoutes from './claims';
 import insuranceCredsRoutes from './insuranceCreds';
-import documentRoutes from './documents';
+import documentsRoutes from './documents';
 import insuranceEligibilityRoutes from './insuranceEligibility'
+import paymentsRoutes from './payments'
 
 const router = Router();
 
-router.use('/patients', patientRoutes);
-router.use('/appointments', appointmentRoutes);
-router.use('/users', userRoutes);
-router.use('/staffs', staffRoutes);
+router.use('/patients', patientsRoutes);
+router.use('/appointments', appointmentsRoutes);
+router.use('/users', usersRoutes);
+router.use('/staffs', staffsRoutes);
 router.use('/pdfExtraction', pdfExtractionRoutes);
 router.use('/claims', claimsRoutes);
 router.use('/insuranceCreds', insuranceCredsRoutes);
-router.use('/documents', documentRoutes);
+router.use('/documents', documentsRoutes);
 router.use('/insuranceEligibility', insuranceEligibilityRoutes);
-
+router.use('/payments', paymentsRoutes);
 
 export default router;
