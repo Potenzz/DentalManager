@@ -38,13 +38,7 @@ const updateAppointmentSchema = (
 type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
 
 //patient types
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
 type Patient = z.infer<typeof PatientUncheckedCreateInputObjectSchema>;
-type Patient2 = z.infer<typeof PatientSchema>;
 
 const insertPatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -196,9 +190,17 @@ type PaymentWithExtras = Prisma.PaymentGetPayload<{
   include: {
     transactions: true;
     servicePayments: true;
-    claim: true;
+    claim: {
+      include: {
+        serviceLines: true;
+      };
+    };
   };
-}>;
+}> & {
+  patientName: string;
+  paymentDate: Date;
+  paymentMethod: string;
+};
 
 export interface IStorage {
   // User methods
@@ -942,45 +944,79 @@ export const storage: IStorage = {
     id: number,
     userId: number
   ): Promise<PaymentWithExtras | null> {
-    return db.payment.findFirst({
+    const payment = await db.payment.findFirst({
       where: { id, userId },
       include: {
-        claim: true,
+        claim: {
+          include: {
+            serviceLines: true,
+          },
+        },
         transactions: true,
         servicePayments: true,
       },
     });
+
+    if (!payment) return null;
+
+    return {
+      ...payment,
+      patientName: payment.claim?.patientName ?? "",
+      paymentDate: payment.createdAt,
+      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+    };
   },
 
   async getPaymentsByClaimId(
     claimId: number,
     userId: number
   ): Promise<PaymentWithExtras | null> {
-    return db.payment.findFirst({
+    const payment = await db.payment.findFirst({
       where: { claimId, userId },
       include: {
-        claim: true,
+        claim: {
+          include: {
+            serviceLines: true,
+          },
+        },
         transactions: true,
         servicePayments: true,
       },
     });
+
+    if (!payment) return null;
+
+    return {
+      ...payment,
+      patientName: payment.claim?.patientName ?? "",
+      paymentDate: payment.createdAt,
+      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+    };
   },
 
   async getPaymentsByPatientId(
     patientId: number,
     userId: number
   ): Promise<PaymentWithExtras[]> {
-    return db.payment.findMany({
-      where: {
-        patientId,
-        userId,
-      },
+    const payments = await db.payment.findMany({
+      where: { patientId, userId },
       include: {
-        claim: true,
+        claim: {
+          include: {
+            serviceLines: true,
+          },
+        },
         transactions: true,
         servicePayments: true,
       },
     });
+
+    return payments.map((payment) => ({
+      ...payment,
+      patientName: payment.claim?.patientName ?? "",
+      paymentDate: payment.createdAt,
+      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+    }));
   },
 
   async getRecentPaymentsByUser(
@@ -988,17 +1024,28 @@ export const storage: IStorage = {
     limit: number,
     offset: number
   ): Promise<PaymentWithExtras[]> {
-    return db.payment.findMany({
+    const payments = await db.payment.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
       skip: offset,
       take: limit,
       include: {
-        claim: true,
+        claim: {
+          include: {
+            serviceLines: true,
+          },
+        },
         transactions: true,
         servicePayments: true,
       },
     });
+
+    return payments.map((payment) => ({
+      ...payment,
+      patientName: payment.claim?.patientName ?? "",
+      paymentDate: payment.createdAt,
+      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+    }));
   },
 
   async getPaymentsByDateRange(
@@ -1006,7 +1053,7 @@ export const storage: IStorage = {
     from: Date,
     to: Date
   ): Promise<PaymentWithExtras[]> {
-    return db.payment.findMany({
+    const payments = await db.payment.findMany({
       where: {
         userId,
         createdAt: {
@@ -1016,11 +1063,22 @@ export const storage: IStorage = {
       },
       orderBy: { createdAt: "desc" },
       include: {
-        claim: true,
+        claim: {
+          include: {
+            serviceLines: true,
+          },
+        },
         transactions: true,
         servicePayments: true,
       },
     });
+
+    return payments.map((payment) => ({
+      ...payment,
+      patientName: payment.claim?.patientName ?? "",
+      paymentDate: payment.createdAt,
+      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+    }));
   },
 
   async getTotalPaymentCountByUser(userId: number): Promise<number> {

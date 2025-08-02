@@ -334,6 +334,25 @@ export function PatientTable({
     return colorClasses[id % colorClasses.length];
   };
 
+  function getPageNumbers(current: number, total: number): (number | "...")[] {
+    const delta = 2;
+    const range: (number | "...")[] = [];
+    const left = Math.max(2, current - delta);
+    const right = Math.min(total - 1, current + delta);
+
+    range.push(1);
+    if (left > 2) range.push("...");
+
+    for (let i = left; i <= right; i++) {
+      range.push(i);
+    }
+
+    if (right < total - 1) range.push("...");
+    if (total > 1) range.push(total);
+
+    return range;
+  }
+
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
@@ -712,21 +731,26 @@ export function PatientTable({
                     }
                   />
                 </PaginationItem>
+                
+                {getPageNumbers(currentPage, totalPages).map((page, idx) => (
+                                  <PaginationItem key={idx}>
+                                    {page === "..." ? (
+                                      <span className="px-2 text-gray-500">...</span>
+                                    ) : (
+                                      <PaginationLink
+                                        href="#"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setCurrentPage(page as number);
+                                        }}
+                                        isActive={currentPage === page}
+                                      >
+                                        {page}
+                                      </PaginationLink>
+                                    )}
+                                  </PaginationItem>
+                                ))}
 
-                {Array.from({ length: totalPages }).map((_, i) => (
-                  <PaginationItem key={i}>
-                    <PaginationLink
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setCurrentPage(i + 1);
-                      }}
-                      isActive={currentPage === i + 1}
-                    >
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
                 <PaginationItem>
                   <PaginationNext
                     href="#"

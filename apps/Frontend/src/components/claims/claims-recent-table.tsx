@@ -35,7 +35,6 @@ import {
   StaffUncheckedCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
-import { useAuth } from "@/hooks/use-auth";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -117,6 +116,10 @@ export default function ClaimsRecentTable({
       onSelectClaim(isSelected ? null : claim);
     }
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [patientId]);
 
   const getClaimsQueryKey = () =>
     patientId
@@ -243,8 +246,9 @@ export default function ClaimsRecentTable({
 
   const totalPages = useMemo(
     () => Math.ceil((claimsData?.totalCount || 0) / claimsPerPage),
-    [claimsData]
+    [claimsData?.totalCount, claimsPerPage]
   );
+
   const startItem = offset + 1;
   const endItem = Math.min(offset + claimsPerPage, claimsData?.totalCount || 0);
 
@@ -315,264 +319,286 @@ export default function ClaimsRecentTable({
     );
   };
 
-  return (
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {allowCheckbox && <TableHead>Select</TableHead>}
-                <TableHead>Claim ID</TableHead>
-                <TableHead>Patient Name</TableHead>
-                <TableHead>Submission Date</TableHead>
-                <TableHead>Insurance Provider</TableHead>
-                <TableHead>Member ID</TableHead>
-                <TableHead>Total Billed</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    <LoadingScreen />
-                  </TableCell>
-                </TableRow>
-              ) : isError ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center py-8 text-red-500"
-                  >
-                    Error loading claims.
-                  </TableCell>
-                </TableRow>
-              ) : (claimsData?.claims ?? []).length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    No claims found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                claimsData?.claims.map((claim) => (
-                  <TableRow key={claim.id} className="hover:bg-gray-50">
-                    {allowCheckbox && (
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedClaimId === claim.id}
-                          onCheckedChange={() => handleSelectClaim(claim)}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <div className="text-sm font-medium text-gray-900">
-                        CML-{claim.id!.toString().padStart(4, "0")}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Avatar
-                          className={`h-10 w-10 ${getAvatarColor(claim.patientId)}`}
-                        >
-                          <AvatarFallback className="text-white">
-                            {getInitialsFromName(claim.patientName)}
-                          </AvatarFallback>
-                        </Avatar>
+  function getPageNumbers(current: number, total: number): (number | "...")[] {
+    const delta = 2;
+    const range: (number | "...")[] = [];
+    const left = Math.max(2, current - delta);
+    const right = Math.min(total - 1, current + delta);
 
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {claim.patientName}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            DOB: {formatDateToHumanReadable(claim.dateOfBirth)}
-                          </div>
+    range.push(1);
+    if (left > 2) range.push("...");
+
+    for (let i = left; i <= right; i++) {
+      range.push(i);
+    }
+
+    if (right < total - 1) range.push("...");
+    if (total > 1) range.push(total);
+
+    return range;
+  }
+
+  return (
+    <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {allowCheckbox && <TableHead>Select</TableHead>}
+              <TableHead>Claim ID</TableHead>
+              <TableHead>Patient Name</TableHead>
+              <TableHead>Submission Date</TableHead>
+              <TableHead>Insurance Provider</TableHead>
+              <TableHead>Member ID</TableHead>
+              <TableHead>Total Billed</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  <LoadingScreen />
+                </TableCell>
+              </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-8 text-red-500"
+                >
+                  Error loading claims.
+                </TableCell>
+              </TableRow>
+            ) : (claimsData?.claims ?? []).length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  No claims found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              claimsData?.claims.map((claim) => (
+                <TableRow key={claim.id} className="hover:bg-gray-50">
+                  {allowCheckbox && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedClaimId === claim.id}
+                        onCheckedChange={() => handleSelectClaim(claim)}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <div className="text-sm font-medium text-gray-900">
+                      CML-{claim.id!.toString().padStart(4, "0")}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <Avatar
+                        className={`h-10 w-10 ${getAvatarColor(claim.patientId)}`}
+                      >
+                        <AvatarFallback className="text-white">
+                          {getInitialsFromName(claim.patientName)}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {claim.patientName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          DOB: {formatDateToHumanReadable(claim.dateOfBirth)}
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">
-                        {formatDateToHumanReadable(claim.createdAt!)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">
-                        {claim.insuranceProvider ?? "Not specified"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">
-                        {claim.memberId ?? "Not specified"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">
-                        ${getTotalBilled(claim).toFixed(2)}
-                      </div>
-                    </TableCell>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-900">
+                      {formatDateToHumanReadable(claim.createdAt!)}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-900">
+                      {claim.insuranceProvider ?? "Not specified"}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-900">
+                      {claim.memberId ?? "Not specified"}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-900">
+                      ${getTotalBilled(claim).toFixed(2)}
+                    </div>
+                  </TableCell>
 
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const { label, color, icon } = getStatusInfo(
-                            claim.status
-                          );
-                          return (
-                            <span
-                              className={`px-2 py-1 text-xs font-medium rounded-full ${color}`}
-                            >
-                              <span className="flex items-center">
-                                {icon}
-                                {label}
-                              </span>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const { label, color, icon } = getStatusInfo(
+                          claim.status
+                        );
+                        return (
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded-full ${color}`}
+                          >
+                            <span className="flex items-center">
+                              {icon}
+                              {label}
                             </span>
-                          );
-                        })()}
-                      </div>
-                    </TableCell>
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </TableCell>
 
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        {allowDelete && (
-                          <Button
-                            onClick={() => {
-                              handleDeleteClaim(claim);
-                            }}
-                            className="text-red-600 hover:text-red-900"
-                            aria-label="Delete Staff"
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <Delete />
-                          </Button>
-                        )}
-                        {allowEdit && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              handleEditClaim(claim);
-                            }}
-                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {allowView && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              handleViewClaim(claim);
-                            }}
-                            className="text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end space-x-2">
+                      {allowDelete && (
+                        <Button
+                          onClick={() => {
+                            handleDeleteClaim(claim);
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                          aria-label="Delete Staff"
+                          variant="ghost"
+                          size="icon"
+                        >
+                          <Delete />
+                        </Button>
+                      )}
+                      {allowEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            handleEditClaim(claim);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {allowView && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            handleViewClaim(claim);
+                          }}
+                          className="text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-        <DeleteConfirmationDialog
-          isOpen={isDeleteClaimOpen}
-          onConfirm={handleConfirmDeleteClaim}
-          onCancel={() => setIsDeleteClaimOpen(false)}
-          entityName={currentClaim?.patientName}
+      <DeleteConfirmationDialog
+        isOpen={isDeleteClaimOpen}
+        onConfirm={handleConfirmDeleteClaim}
+        onCancel={() => setIsDeleteClaimOpen(false)}
+        entityName={currentClaim?.patientName}
+      />
+
+      {isViewClaimOpen && currentClaim && (
+        <ClaimViewModal
+          isOpen={isViewClaimOpen}
+          onClose={() => setIsViewClaimOpen(false)}
+          onOpenChange={(open) => setIsViewClaimOpen(open)}
+          onEditClaim={(claim) => handleEditClaim(claim)}
+          claim={currentClaim}
         />
+      )}
 
-        {isViewClaimOpen && currentClaim && (
-          <ClaimViewModal
-            isOpen={isViewClaimOpen}
-            onClose={() => setIsViewClaimOpen(false)}
-            onOpenChange={(open) => setIsViewClaimOpen(open)}
-            onEditClaim={(claim) => handleEditClaim(claim)}
-            claim={currentClaim}
-          />
-        )}
+      {isEditClaimOpen && currentClaim && (
+        <ClaimEditModal
+          isOpen={isEditClaimOpen}
+          onClose={() => setIsEditClaimOpen(false)}
+          onOpenChange={(open) => setIsEditClaimOpen(open)}
+          claim={currentClaim}
+          onSave={(updatedClaim) => {
+            updateClaimMutation.mutate(updatedClaim);
+          }}
+        />
+      )}
 
-        {isEditClaimOpen && currentClaim && (
-          <ClaimEditModal
-            isOpen={isEditClaimOpen}
-            onClose={() => setIsEditClaimOpen(false)}
-            onOpenChange={(open) => setIsEditClaimOpen(open)}
-            claim={currentClaim}
-            onSave={(updatedClaim) => {
-              updateClaimMutation.mutate(updatedClaim);
-            }}
-          />
-        )}
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="bg-white px-4 py-3 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground mb-2 sm:mb-0 whitespace-nowrap">
+              Showing {startItem}–{endItem} of {claimsData?.totalCount || 0}{" "}
+              results
+            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (currentPage > 1) setCurrentPage(currentPage - 1);
+                    }}
+                    className={
+                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                    }
+                  />
+                </PaginationItem>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-3 border-t border-gray-200">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm text-muted-foreground mb-2 sm:mb-0 whitespace-nowrap">
-                Showing {startItem}–{endItem} of {claimsData?.totalCount || 0}{" "}
-                results
-              </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (currentPage > 1) setCurrentPage(currentPage - 1);
-                      }}
-                      className={
-                        currentPage === 1
-                          ? "pointer-events-none opacity-50"
-                          : ""
-                      }
-                    />
-                  </PaginationItem>
-
-                  {Array.from({ length: totalPages }).map((_, i) => (
-                    <PaginationItem key={i}>
+                {getPageNumbers(currentPage, totalPages).map((page, idx) => (
+                  <PaginationItem key={idx}>
+                    {page === "..." ? (
+                      <span className="px-2 text-gray-500">...</span>
+                    ) : (
                       <PaginationLink
                         href="#"
                         onClick={(e) => {
                           e.preventDefault();
-                          setCurrentPage(i + 1);
+                          setCurrentPage(page as number);
                         }}
-                        isActive={currentPage === i + 1}
+                        isActive={currentPage === page}
                       >
-                        {i + 1}
+                        {page}
                       </PaginationLink>
-                    </PaginationItem>
-                  ))}
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (currentPage < totalPages)
-                          setCurrentPage(currentPage + 1);
-                      }}
-                      className={
-                        currentPage === totalPages
-                          ? "pointer-events-none opacity-50"
-                          : ""
-                      }
-                    />
+                    )}
                   </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+                ))}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (currentPage < totalPages)
+                        setCurrentPage(currentPage + 1);
+                    }}
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
   );
 }

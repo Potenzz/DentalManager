@@ -7,7 +7,8 @@ import multer from "multer";
 import { forwardToSeleniumClaimAgent } from "../services/seleniumClaimClient";
 import path from "path";
 import axios from "axios";
-import fs from "fs";
+import { Prisma } from "@repo/db/generated/prisma";
+import { Decimal } from "@prisma/client/runtime/library";
 
 const router = Router();
 
@@ -284,8 +285,36 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
       userId: req.user!.id,
     });
 
-    const newClaim = await storage.createClaim(parsedClaim);
-    res.status(201).json(newClaim);
+    // Step 1: Calculate total billed from service lines
+    const serviceLinesCreateInput = (
+      parsedClaim.serviceLines as Prisma.ServiceLineCreateNestedManyWithoutClaimInput
+    )?.create;
+    const lines = Array.isArray(serviceLinesCreateInput)
+      ? (serviceLinesCreateInput as unknown as { amount: number }[])
+      : [];
+    const totalBilled = lines.reduce(
+      (sum, line) => sum + (line.amount ?? 0),
+      0
+    );
+
+    // Step 2: Create claim (with service lines)
+    const claim = await storage.createClaim(parsedClaim);
+
+    // Step 3: Create empty payment
+    await storage.createPayment({
+      patientId: claim.patientId,
+      userId: req.user!.id,
+      claimId: claim.id,
+      totalBilled: new Decimal(totalBilled),
+      totalPaid: new Decimal(0),
+      totalDue: new Decimal(totalBilled),
+      status: "PENDING",
+      notes: null,
+      paymentMethod: null,
+      receivedDate: null,
+    });
+
+    res.status(201).json(claim);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
