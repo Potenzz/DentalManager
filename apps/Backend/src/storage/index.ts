@@ -9,12 +9,14 @@ import {
   PdfFileUncheckedCreateInputObjectSchema,
   PdfGroupUncheckedCreateInputObjectSchema,
   PdfCategorySchema,
-  PaymentUncheckedCreateInputObjectSchema,
-  PaymentTransactionCreateInputObjectSchema,
-  ServiceLinePaymentCreateInputObjectSchema,
 } from "@repo/db/usedSchemas";
 import { z } from "zod";
-import { Prisma } from "@repo/db/generated/prisma";
+import {
+  InsertPayment,
+  Payment,
+  PaymentWithExtras,
+  UpdatePayment,
+} from "@repo/db/types";
 
 //creating types out of schema auto generated.
 type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
@@ -157,50 +159,6 @@ export interface ClaimPdfMetadata {
   filename: string;
   uploadedAt: Date;
 }
-
-// Base Payment type
-type Payment = z.infer<typeof PaymentUncheckedCreateInputObjectSchema>;
-type PaymentTransaction = z.infer<
-  typeof PaymentTransactionCreateInputObjectSchema
->;
-type ServiceLinePayment = z.infer<
-  typeof ServiceLinePaymentCreateInputObjectSchema
->;
-
-const insertPaymentSchema = (
-  PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-type InsertPayment = z.infer<typeof insertPaymentSchema>;
-
-const updatePaymentSchema = (
-  PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .partial();
-type UpdatePayment = z.infer<typeof updatePaymentSchema>;
-
-type PaymentWithExtras = Prisma.PaymentGetPayload<{
-  include: {
-    transactions: true;
-    servicePayments: true;
-    claim: {
-      include: {
-        serviceLines: true;
-      };
-    };
-  };
-}> & {
-  patientName: string;
-  paymentDate: Date;
-  paymentMethod: string;
-};
 
 export interface IStorage {
   // User methods
@@ -952,8 +910,16 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: true,
-        servicePayments: true,
+        transactions: {
+          include: {
+            serviceLinePayments: {
+              include: {
+                serviceLine: true,
+              },
+            },
+          },
+        },
+        updatedBy: true,
       },
     });
 
@@ -979,8 +945,16 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: true,
-        servicePayments: true,
+        transactions: {
+          include: {
+            serviceLinePayments: {
+              include: {
+                serviceLine: true,
+              },
+            },
+          },
+        },
+        updatedBy: true,
       },
     });
 
@@ -1006,8 +980,16 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: true,
-        servicePayments: true,
+        transactions: {
+          include: {
+            serviceLinePayments: {
+              include: {
+                serviceLine: true,
+              },
+            },
+          },
+        },
+        updatedBy: true,
       },
     });
 
@@ -1035,8 +1017,16 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: true,
-        servicePayments: true,
+        transactions: {
+          include: {
+            serviceLinePayments: {
+              include: {
+                serviceLine: true,
+              },
+            },
+          },
+        },
+        updatedBy: true,
       },
     });
 
@@ -1068,8 +1058,16 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: true,
-        servicePayments: true,
+        transactions: {
+          include: {
+            serviceLinePayments: {
+              include: {
+                serviceLine: true,
+              },
+            },
+          },
+        },
+        updatedBy: true,
       },
     });
 

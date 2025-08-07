@@ -29,83 +29,22 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  PaymentUncheckedCreateInputObjectSchema,
-  PaymentTransactionCreateInputObjectSchema,
-  ServiceLinePaymentCreateInputObjectSchema,
-  ClaimUncheckedCreateInputObjectSchema,
-  ClaimStatusSchema,
-  StaffUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
-import { z } from "zod";
 import { DeleteConfirmationDialog } from "../ui/deleteDialog";
 import PaymentViewModal from "./payment-view-modal";
 import PaymentEditModal from "./payment-edit-modal";
-import { Prisma } from "@repo/db/generated/prisma";
 import LoadingScreen from "../ui/LoadingScreen";
-
-type Payment = z.infer<typeof PaymentUncheckedCreateInputObjectSchema>;
-type PaymentTransaction = z.infer<
-  typeof PaymentTransactionCreateInputObjectSchema
->;
-type ServiceLinePayment = z.infer<
-  typeof ServiceLinePaymentCreateInputObjectSchema
->;
-
-const insertPaymentSchema = (
-  PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-type InsertPayment = z.infer<typeof insertPaymentSchema>;
-
-const updatePaymentSchema = (
-  PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .partial();
-type UpdatePayment = z.infer<typeof updatePaymentSchema>;
-
-type PaymentWithExtras = Prisma.PaymentGetPayload<{
-  include: {
-    claim: { include: { serviceLines: true } };
-    servicePayments: true;
-    transactions: true;
-  };
-}> & {
-  patientName: string;
-  paymentDate: Date;
-  paymentMethod: string;
-};
+import {
+  ClaimStatus,
+  ClaimWithServiceLines,
+  Payment,
+  PaymentWithExtras,
+} from "@repo/db/types";
+import EditPaymentModal from "./payment-edit-modal";
 
 interface PaymentApiResponse {
   payments: PaymentWithExtras[];
   totalCount: number;
 }
-
-//creating types out of schema auto generated.
-type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
-export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
-type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
-
-type ClaimWithServiceLines = Claim & {
-  serviceLines: {
-    id: number;
-    claimId: number;
-    procedureCode: string;
-    procedureDate: Date;
-    oralCavityArea: string | null;
-    toothNumber: string | null;
-    toothSurface: string | null;
-    billedAmount: number;
-  }[];
-  staff: Staff | null;
-};
 
 interface PaymentsRecentTableProps {
   allowEdit?: boolean;
@@ -179,7 +118,7 @@ export default function PaymentsRecentTable({
   });
 
   const updatePaymentMutation = useMutation({
-    mutationFn: async (payment: Payment) => {
+    mutationFn: async (payment: PaymentWithExtras) => {
       const response = await apiRequest("PUT", `/api/claims/${payment.id}`, {
         data: payment,
       });
@@ -424,12 +363,14 @@ export default function PaymentsRecentTable({
                   .claim as ClaimWithServiceLines;
 
                 const totalBilled = getTotalBilled(claim);
-                const totalPaid = (
-                  payment as PaymentWithExtras
-                ).servicePayments.reduce(
-                  (sum, sp) => sum + (sp.paidAmount?.toNumber?.() ?? 0),
-                  0
-                );
+
+                const totalPaid = (payment as PaymentWithExtras).transactions
+                  .flatMap((tx) => tx.serviceLinePayments)
+                  .reduce(
+                    (sum, sp) => sum + (sp.paidAmount?.toNumber?.() ?? 0),
+                    0
+                  );
+
                 const outstanding = totalBilled - totalPaid;
 
                 return (
@@ -539,19 +480,19 @@ export default function PaymentsRecentTable({
           onEditClaim={(payment) => handleEditPayment(payment)}
           payment={currentPayment}
         />
-      )}
+      )} */}
 
       {isEditPaymentOpen && currentPayment && (
-        <ClaimPaymentModal
+        <EditPaymentModal
           isOpen={isEditPaymentOpen}
-          onClose={() => setIsEditPaymentOpen(false)}
           onOpenChange={(open) => setIsEditPaymentOpen(open)}
+          onClose={() => setIsEditPaymentOpen(false)}
           payment={currentPayment}
-          onSave={(updatedPayment) => {
+          onEditServiceLine={(updatedPayment) => {
             updatePaymentMutation.mutate(updatedPayment);
           }}
         />
-      )} */}
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (

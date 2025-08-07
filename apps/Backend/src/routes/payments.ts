@@ -202,6 +202,27 @@ router.get("/filter", async (req: Request, res: Response): Promise<any> => {
   }
 });
 
+// GET /api/payments/:id
+router.get("/:id", async (req: Request, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const id = parseIntOrError(req.params.id, "Payment ID");
+
+    const payment = await storage.getPaymentById(userId, id);
+    if (!payment)
+      return res.status(404).json({ message: "Payment not found" });
+
+    res.status(200).json(payment);
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : "Failed to retrieve payment";
+    res.status(500).json({ message });
+  }
+});
+
+
 // POST /api/payments/:claimId
 router.post("/:claimId", async (req: Request, res: Response): Promise<any> => {
   try {

@@ -14,7 +14,8 @@
     "./client": "./src/index.ts",
     "./shared/schemas" : "./shared/schemas/index.ts",
     "./usedSchemas" : "./usedSchemas/index.ts",
-    "./generated/prisma" : "./generated/prisma/index.d.ts"
+    "./generated/prisma" : "./generated/prisma/index.d.ts",
+    "./types" : "./types/index.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.10.0",

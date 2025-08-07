@@ -55,6 +55,7 @@ model Patient {
   appointments      Appointment[]
   claims            Claim[]
   groups            PdfGroup[]
+  payment           Payment[]
 
   @@index([insuranceId])
   @@index([createdAt])
@@ -135,10 +136,12 @@ model ServiceLine {
   toothNumber    String?
   toothSurface   String?
   billedAmount   Float
+  totalPaid      Decimal           @default(0.00) @db.Decimal(10, 2)
+  totalAdjusted  Decimal           @default(0.00) @db.Decimal(10, 2)
   status         ServiceLineStatus @default(UNPAID)
 
   claim           Claim                @relation(fields: [claimId], references: [id], onDelete: Cascade)
-  servicePayments ServiceLinePayment[]
+  serviceLineTransactions ServiceLineTransaction[]
 }
 
 enum ServiceLineStatus {
@@ -196,57 +199,45 @@ enum PdfCategory {
 
 model Payment {
   id            Int            @id @default(autoincrement())
+  claimId       Int            @unique
   patientId     Int
   userId        Int
-  claimId       Int            @unique
   updatedById   Int?
   totalBilled   Decimal        @db.Decimal(10, 2)
   totalPaid     Decimal        @default(0.00) @db.Decimal(10, 2)
   totalDue      Decimal        @db.Decimal(10, 2)
   status        PaymentStatus  @default(PENDING)
-  receivedDate  DateTime?
-  paymentMethod PaymentMethod?
   notes         String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  claim        Claim                @relation(fields: [claimId], references: [id], onDelete: Cascade)
-  updatedBy    User?                @relation("PaymentUpdatedBy", fields: [updatedById], references: [id])
-  transactions PaymentTransaction[]
+  claim        Claim                     @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  patient      Patient                   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  updatedBy    User?                     @relation("PaymentUpdatedBy", fields: [updatedById], references: [id])
+  transactions ServiceLineTransaction[]
 
   @@index([id])
   @@index([claimId])
   @@index([patientId])
 }
 
-model PaymentTransaction {
-  id                  Int                  @id @default(autoincrement())
-  paymentId           Int
-  amount              Decimal              @db.Decimal(10, 2)
-  method              PaymentMethod
-  transactionId       String?
-  receivedDate        DateTime
-  payerName           String?
-  notes               String?
-  createdAt           DateTime             @default(now())
-  payment             Payment              @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  serviceLinePayments ServiceLinePayment[]
+model ServiceLineTransaction {
+  id             Int           @id @default(autoincrement())
+  paymentId      Int
+  serviceLineId  Int
+  transactionId  String?
+  paidAmount     Decimal       @db.Decimal(10, 2)
+  adjustedAmount Decimal       @default(0.00) @db.Decimal(10, 2)
+  method         PaymentMethod
+  receivedDate   DateTime
+  payerName      String?
+  notes          String?
+  createdAt      DateTime      @default(now())
+
+  payment     Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  serviceLine ServiceLine @relation(fields: [serviceLineId], references: [id], onDelete: Cascade)
 
   @@index([paymentId])
-}
-
-model ServiceLinePayment {
-  id             Int     @id @default(autoincrement())
-  transactionId  Int
-  serviceLineId  Int
-  paidAmount     Decimal @db.Decimal(10, 2)
-  adjustedAmount Decimal @default(0.00) @db.Decimal(10, 2)
-  notes          String?
-
-  transaction PaymentTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  serviceLine ServiceLine        @relation(fields: [serviceLineId], references: [id], onDelete: Cascade)
-
-  @@index([transactionId])
   @@index([serviceLineId])
 }
 
