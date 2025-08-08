@@ -1,12 +1,11 @@
 import {
   PaymentUncheckedCreateInputObjectSchema,
-  PaymentTransactionCreateInputObjectSchema,
-  ServiceLinePaymentCreateInputObjectSchema,
   ClaimUncheckedCreateInputObjectSchema,
+  ServiceLineTransactionCreateInputObjectSchema,
   ClaimStatusSchema,
   StaffUncheckedCreateInputObjectSchema,
   PaymentMethodSchema,
-  PaymentStatusSchema
+  PaymentStatusSchema,
 } from "@repo/db/usedSchemas";
 import { Prisma } from "@repo/db/generated/prisma";
 import { z } from "zod";
@@ -18,42 +17,27 @@ import { Decimal } from "decimal.js";
 export type Payment = z.infer<typeof PaymentUncheckedCreateInputObjectSchema>;
 
 // Zod input type for creating a transaction
-export type PaymentTransactionInput = z.infer<
-  typeof PaymentTransactionCreateInputObjectSchema
+export type ServiceLineTransactionInput = z.infer<
+  typeof ServiceLineTransactionCreateInputObjectSchema
 >;
 
 // Prisma output type for single transaction (fetched with includes)
-export type PaymentTransactionRecord = Prisma.PaymentTransactionGetPayload<{
-  include: {
-    serviceLinePayments: {
-      include: { serviceLine: true };
+export type ServiceLineTransactionRecord =
+  Prisma.ServiceLineTransactionGetPayload<{
+    include: {
+      serviceLine: true;
     };
-  };
-}>;
+  }>;
 
-// Type for ServiceLinePayment input (used for updates/creates)
-export type ServiceLinePayment = z.infer<
-  typeof ServiceLinePaymentCreateInputObjectSchema
->;
-
-// Enum for payment 
+// Enum for payment
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
-export type PaymentMethod = z.infer<typeof PaymentMethodSchema>
+export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 
 // ✅ Runtime arrays (used in code logic / map / select options)
 export const paymentStatusOptions = PaymentStatusSchema.options;
 export const paymentMethodOptions = PaymentMethodSchema.options;
 
-
 // ========== INPUT TYPES ==========
-
-// Used to update individual service line payment
-export type PartialServicePaymentInput = {
-  id: number;
-  paidAmount: Decimal;
-  adjustedAmount: Decimal;
-  notes: string | null;
-};
 
 // For creating a new payment
 export const insertPaymentSchema = (
@@ -78,8 +62,7 @@ export type UpdatePayment = z.infer<typeof updatePaymentSchema>;
 
 // Input for updating a payment with new transactions + updated service payments
 export type UpdatePaymentInput = {
-  newTransactions: PaymentTransactionInput[];
-  servicePayments: PartialServicePaymentInput[];
+  newTransactions: ServiceLineTransactionInput[];
   totalPaid: Decimal;
   totalDue: Decimal;
   status: PaymentStatus;
@@ -95,13 +78,9 @@ export type PaymentWithExtras = Prisma.PaymentGetPayload<{
         serviceLines: true;
       };
     };
-    transactions: {
+    serviceLineTransactions: {
       include: {
-        serviceLinePayments: {
-          include: {
-            serviceLine: true;
-          };
-        };
+        serviceLine: true;
       };
     };
     updatedBy: true;
@@ -140,7 +119,7 @@ export type NewTransactionPayload = {
   payerName?: string;
   notes?: string;
   receivedDate: Date;
-  serviceLinePayments: {
+  serviceLineTransactions: {
     serviceLineId: number;
     paidAmount: number;
     adjustedAmount: number;

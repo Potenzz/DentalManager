@@ -215,7 +215,7 @@ model Payment {
   claim        Claim                    @relation(fields: [claimId], references: [id], onDelete: Cascade)
   patient      Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   updatedBy    User?                    @relation("PaymentUpdatedBy", fields: [updatedById], references: [id])
-  transactions ServiceLineTransaction[]
+  serviceLineTransactions ServiceLineTransaction[]
 
   @@index([id])
   @@index([claimId])

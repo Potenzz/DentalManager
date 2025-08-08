@@ -910,13 +910,9 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: {
+        serviceLineTransactions: {
           include: {
-            serviceLinePayments: {
-              include: {
-                serviceLine: true,
-              },
-            },
+            serviceLine: true,
           },
         },
         updatedBy: true,
@@ -929,7 +925,7 @@ export const storage: IStorage = {
       ...payment,
       patientName: payment.claim?.patientName ?? "",
       paymentDate: payment.createdAt,
-      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+      paymentMethod: payment.serviceLineTransactions[0]?.method ?? "OTHER",
     };
   },
 
@@ -945,13 +941,9 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: {
+        serviceLineTransactions: {
           include: {
-            serviceLinePayments: {
-              include: {
-                serviceLine: true,
-              },
-            },
+            serviceLine: true,
           },
         },
         updatedBy: true,
@@ -964,7 +956,7 @@ export const storage: IStorage = {
       ...payment,
       patientName: payment.claim?.patientName ?? "",
       paymentDate: payment.createdAt,
-      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+      paymentMethod: payment.serviceLineTransactions[0]?.method ?? "OTHER",
     };
   },
 
@@ -980,13 +972,9 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: {
+        serviceLineTransactions: {
           include: {
-            serviceLinePayments: {
-              include: {
-                serviceLine: true,
-              },
-            },
+            serviceLine: true,
           },
         },
         updatedBy: true,
@@ -997,7 +985,7 @@ export const storage: IStorage = {
       ...payment,
       patientName: payment.claim?.patientName ?? "",
       paymentDate: payment.createdAt,
-      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+      paymentMethod: payment.serviceLineTransactions[0]?.method ?? "OTHER",
     }));
   },
 
@@ -1017,13 +1005,9 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: {
+        serviceLineTransactions: {
           include: {
-            serviceLinePayments: {
-              include: {
-                serviceLine: true,
-              },
-            },
+            serviceLine: true,
           },
         },
         updatedBy: true,
@@ -1034,7 +1018,7 @@ export const storage: IStorage = {
       ...payment,
       patientName: payment.claim?.patientName ?? "",
       paymentDate: payment.createdAt,
-      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+      paymentMethod: payment.serviceLineTransactions[0]?.method ?? "OTHER",
     }));
   },
 
@@ -1058,13 +1042,9 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
-        transactions: {
+        serviceLineTransactions: {
           include: {
-            serviceLinePayments: {
-              include: {
-                serviceLine: true,
-              },
-            },
+            serviceLine: true,
           },
         },
         updatedBy: true,
@@ -1075,7 +1055,7 @@ export const storage: IStorage = {
       ...payment,
       patientName: payment.claim?.patientName ?? "",
       paymentDate: payment.createdAt,
-      paymentMethod: payment.transactions[0]?.method ?? "OTHER",
+      paymentMethod: payment.serviceLineTransactions[0]?.method ?? "OTHER",
     }));
   },
 
