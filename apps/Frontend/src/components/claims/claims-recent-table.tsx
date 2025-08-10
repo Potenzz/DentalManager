@@ -282,7 +282,7 @@ export default function ClaimsRecentTable({
 
   const getTotalBilled = (claim: ClaimWithServiceLines) => {
     return claim.serviceLines.reduce(
-      (sum, line) => sum + (line.totalBilled?.toNumber() || 0),
+      (sum, line) => sum + Number(line.totalBilled || 0),
       0
     );
   };

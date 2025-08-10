@@ -183,7 +183,7 @@ export default function ClaimViewModal({
                         )}
                         <p>
                           <span className="text-gray-500">Billed Amount:</span>{" "}
-                          ${line.totalBilled.toFixed(2)}
+                          ${Number(line.totalBilled).toFixed(2)}
                         </p>
                       </div>
                     ))}
@@ -191,7 +191,8 @@ export default function ClaimViewModal({
                       Total Billed Amount: $
                       {claim.serviceLines
                         .reduce(
-                          (total, line) => total + line.totalBilled?.toNumber(),
+                          (total, line) =>
+                            total + Number(line.totalBilled || 0),
                           0
                         )
                         .toFixed(2)}
