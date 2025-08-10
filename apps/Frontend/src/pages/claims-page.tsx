@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useMutation} from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import {
@@ -12,13 +12,7 @@ import {
 import { ClaimForm } from "@/components/claims/claim-form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  PatientUncheckedCreateInputObjectSchema,
-  AppointmentUncheckedCreateInputObjectSchema,
-  ClaimUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
 import { parse } from "date-fns";
-import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
@@ -27,58 +21,16 @@ import {
   clearTaskStatus,
 } from "@/redux/slices/seleniumClaimSubmitTaskSlice";
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
-import { formatLocalDate} from "@/utils/dateUtils";
+import { formatLocalDate } from "@/utils/dateUtils";
 import ClaimsRecentTable from "@/components/claims/claims-recent-table";
 import ClaimsOfPatientModal from "@/components/claims/claims-of-patient-table";
-
-//creating types out of schema auto generated.
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
-type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
-
-const insertAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-
-const updateAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .partial();
-type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
-
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
+import {
+  Claim,
+  InsertAppointment,
+  InsertPatient,
+  UpdateAppointment,
+  UpdatePatient,
+} from "@repo/db/types";
 
 export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

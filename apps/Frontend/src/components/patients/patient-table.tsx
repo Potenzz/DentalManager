@@ -18,8 +18,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import LoadingScreen from "../ui/LoadingScreen";
@@ -39,25 +37,7 @@ import { useDebounce } from "use-debounce";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "../ui/checkbox";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
+import { Patient, UpdatePatient } from "@repo/db/types";
 
 interface PatientApiResponse {
   patients: Patient[];
@@ -114,7 +94,7 @@ export function PatientTable({
   const handleSelectPatient = (patient: Patient) => {
     const isSelected = selectedPatientId === patient.id;
     const newSelectedId = isSelected ? null : patient.id;
-    setSelectedPatientId(newSelectedId);
+    setSelectedPatientId(Number(newSelectedId));
 
     if (onSelectPatient) {
       onSelectPatient(isSelected ? null : patient);
@@ -258,7 +238,7 @@ export function PatientTable({
     if (currentPatient && user) {
       const { id, ...sanitizedPatient } = patient;
       updatePatientMutation.mutate({
-        id: currentPatient.id,
+        id: Number(currentPatient.id),
         patient: sanitizedPatient,
       });
     } else {
@@ -288,7 +268,7 @@ export function PatientTable({
 
   const handleConfirmDeletePatient = async () => {
     if (currentPatient) {
-      deletePatientMutation.mutate(currentPatient.id);
+      deletePatientMutation.mutate(Number(currentPatient.id));
     } else {
       toast({
         title: "Error",
@@ -424,7 +404,7 @@ export function PatientTable({
                   <TableCell>
                     <div className="flex items-center">
                       <Avatar
-                        className={`h-10 w-10 ${getAvatarColor(patient.id)}`}
+                        className={`h-10 w-10 ${getAvatarColor(Number(patient.id))}`}
                       >
                         <AvatarFallback className="text-white">
                           {getInitials(patient.firstName, patient.lastName)}
@@ -436,7 +416,7 @@ export function PatientTable({
                           {patient.firstName} {patient.lastName}
                         </div>
                         <div className="text-sm text-gray-500">
-                          PID-{patient.id.toString().padStart(4, "0")}
+                          PID-{patient.id?.toString().padStart(4, "0")}
                         </div>
                       </div>
                     </div>
@@ -505,16 +485,16 @@ export function PatientTable({
                         </Button>
                       )}
                       {allowNewClaim && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onNewClaim?.(patient.id)}
-                        className="text-green-600 hover:text-green-800 hover:bg-green-50"
-                        aria-label="New Claim"
-                      >
-                      <FileCheck className="h-5 w-5" />
-                      </Button>
-                    )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onNewClaim?.(Number(patient.id))}
+                          className="text-green-600 hover:text-green-800 hover:bg-green-50"
+                          aria-label="New Claim"
+                        >
+                          <FileCheck className="h-5 w-5" />
+                        </Button>
+                      )}
                       {allowView && (
                         <Button
                           variant="ghost"
@@ -558,7 +538,7 @@ export function PatientTable({
                     {currentPatient.firstName} {currentPatient.lastName}
                   </h3>
                   <p className="text-gray-500">
-                    Patient ID: {currentPatient.id.toString().padStart(4, "0")}
+                    Patient ID: {currentPatient.id?.toString().padStart(4, "0")}
                   </p>
                 </div>
               </div>
@@ -587,8 +567,10 @@ export function PatientTable({
                             : "text-red-600"
                         } font-medium`}
                       >
-                        {currentPatient.status.charAt(0).toUpperCase() +
-                          currentPatient.status.slice(1)}
+                        {currentPatient.status
+                          ? currentPatient.status.charAt(0).toUpperCase() +
+                            currentPatient.status.slice(1)
+                          : "Unknown"}
                       </span>
                     </p>
                   </div>
@@ -706,7 +688,7 @@ export function PatientTable({
         isOpen={isDeletePatientOpen}
         onConfirm={handleConfirmDeletePatient}
         onCancel={() => setIsDeletePatientOpen(false)}
-        entityName={currentPatient?.name}
+        entityName={currentPatient?.firstName}
       />
 
       {/* Pagination */}
@@ -731,25 +713,25 @@ export function PatientTable({
                     }
                   />
                 </PaginationItem>
-                
+
                 {getPageNumbers(currentPage, totalPages).map((page, idx) => (
-                                  <PaginationItem key={idx}>
-                                    {page === "..." ? (
-                                      <span className="px-2 text-gray-500">...</span>
-                                    ) : (
-                                      <PaginationLink
-                                        href="#"
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          setCurrentPage(page as number);
-                                        }}
-                                        isActive={currentPage === page}
-                                      >
-                                        {page}
-                                      </PaginationLink>
-                                    )}
-                                  </PaginationItem>
-                                ))}
+                  <PaginationItem key={idx}>
+                    {page === "..." ? (
+                      <span className="px-2 text-gray-500">...</span>
+                    ) : (
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(page as number);
+                        }}
+                        isActive={currentPage === page}
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
 
                 <PaginationItem>
                   <PaginationNext

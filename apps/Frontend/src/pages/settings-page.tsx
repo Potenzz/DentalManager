@@ -5,16 +5,13 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { StaffTable } from "@/components/staffs/staff-table";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
-import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StaffForm } from "@/components/staffs/staff-form";
 import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 import { CredentialTable } from "@/components/settings/insuranceCredTable";
 import { useAuth } from "@/hooks/use-auth";
+import { Staff } from "@repo/db/types";
 
-// Correctly infer Staff type from zod schema
-type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
 export default function SettingsPage() {
   const { toast } = useToast();

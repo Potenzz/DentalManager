@@ -11,26 +11,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Eye, Trash, Download, FolderOpen } from "lucide-react";
-import {
-  PatientUncheckedCreateInputObjectSchema,
-  PdfFileUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
 import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 import { PatientTable } from "@/components/patients/patient-table";
-import { z } from "zod";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopAppBar } from "@/components/layout/top-app-bar";
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const PdfFileSchema =
-  PdfFileUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>;
-type PdfFile = z.infer<typeof PdfFileSchema>;
+import { Patient, PdfFile } from "@repo/db/types";
 
 export default function DocumentsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -44,11 +29,10 @@ export default function DocumentsPage() {
   const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
 
   useEffect(() => {
-  setSelectedGroupId(null);
-  setFileBlobUrl(null);
-  setSelectedPdfId(null);
-}, [selectedPatient]);
-
+    setSelectedGroupId(null);
+    setFileBlobUrl(null);
+    setSelectedPdfId(null);
+  }, [selectedPatient]);
 
   const { data: groups = [] } = useQuery({
     queryKey: ["groups", selectedPatient?.id],
@@ -99,7 +83,7 @@ export default function DocumentsPage() {
 
   const handleConfirmDeletePdf = () => {
     if (currentPdf) {
-      deletePdfMutation.mutate(currentPdf.id);
+      deletePdfMutation.mutate(Number(currentPdf.id));
     } else {
       toast({
         title: "Error",

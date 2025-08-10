@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, addDays, startOfToday, addMinutes } from "date-fns";
-import {
-  parseLocalDate,
-  formatLocalDate,
-} from "@/utils/dateUtils";
+import { parseLocalDate, formatLocalDate } from "@/utils/dateUtils";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
@@ -19,12 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  AppointmentUncheckedCreateInputObjectSchema,
-  PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -40,35 +32,12 @@ import { Menu, Item, useContextMenu } from "react-contexify";
 import "react-contexify/ReactContexify.css";
 import { useLocation } from "wouter";
 import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
-
-//creating types out of schema auto generated.
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
-
-const insertAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-
-const updateAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
+import {
+  Appointment,
+  InsertAppointment,
+  Patient,
+  UpdateAppointment,
+} from "@repo/db/types";
 
 // Define types for scheduling
 interface TimeSlot {
@@ -287,7 +256,11 @@ export default function AppointmentsPage() {
   // Create/upsert appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointment: InsertAppointment) => {
-      const res = await apiRequest("POST", "/api/appointments/upsert", appointment);
+      const res = await apiRequest(
+        "POST",
+        "/api/appointments/upsert",
+        appointment
+      );
       return await res.json();
     },
     onSuccess: () => {
@@ -436,8 +409,8 @@ export default function AppointmentsPage() {
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
   const selectedDateAppointments = appointments.filter((appointment) => {
-    const dateObj = parseLocalDate(appointment.date)
-    return formatLocalDate(dateObj) === formatLocalDate(selectedDate); 
+    const dateObj = parseLocalDate(appointment.date);
+    return formatLocalDate(dateObj) === formatLocalDate(selectedDate);
   });
 
   // Process appointments for the scheduler view
@@ -466,8 +439,8 @@ export default function AppointmentsPage() {
         ...apt,
         patientName,
         staffId,
-        status: apt.status ?? null, 
-        date: formatLocalDate(parseLocalDate(apt.date))
+        status: apt.status ?? null,
+        date: formatLocalDate(parseLocalDate(apt.date)),
       };
 
       return processed;

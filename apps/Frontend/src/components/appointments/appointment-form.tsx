@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -33,41 +33,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useDebounce } from "use-debounce";
 import {
-  AppointmentUncheckedCreateInputObjectSchema,
-  PatientUncheckedCreateInputObjectSchema,
-  StaffUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
-
-import { z } from "zod";
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
-type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
-
-const insertAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  userId: true,
-});
-type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-
-const updateAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
+  Appointment,
+  InsertAppointment,
+  insertAppointmentSchema,
+  Patient,
+  Staff,
+  UpdateAppointment,
+} from "@repo/db/types";
 
 interface AppointmentFormProps {
   appointment?: Appointment;
@@ -211,7 +183,7 @@ export function AppointmentForm({
       const term = debouncedSearchTerm.toLowerCase();
       setFilteredPatients(
         patients.filter((p) =>
-          `${p.firstName} ${p.lastName} ${p.phone} ${p.dob}`
+          `${p.firstName} ${p.lastName} ${p.phone} ${p.dateOfBirth}`
             .toLowerCase()
             .includes(term)
         )
@@ -351,7 +323,7 @@ export function AppointmentForm({
                         filteredPatients.map((patient) => (
                           <SelectItem
                             key={patient.id}
-                            value={patient.id.toString()}
+                            value={patient.id?.toString() ?? ""}
                           >
                             <div className="flex flex-col">
                               <span className="font-medium">
@@ -435,7 +407,7 @@ export function AppointmentForm({
                       selected={field.value}
                       onSelect={(date) => {
                         if (date) {
-                          field.onChange(date); 
+                          field.onChange(date);
                         }
                       }}
                       disabled={(date: Date) =>

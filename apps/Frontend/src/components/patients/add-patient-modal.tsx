@@ -14,39 +14,10 @@ import {
   DialogContent,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { PatientForm, PatientFormRef } from "./patient-form"; 
-import { useToast } from "@/hooks/use-toast";
+import { PatientForm, PatientFormRef } from "./patient-form";
 import { X, Calendar } from "lucide-react";
 import { useLocation } from "wouter";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-import { z } from "zod";
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
-
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
+import { InsertPatient, Patient, UpdatePatient } from "@repo/db/types";
 
 interface AddPatientModalProps {
   open: boolean;
@@ -108,12 +79,11 @@ export const AddPatientModal = forwardRef<
   };
 
   const handleSaveAndSchedule = () => {
-  setSaveAndSchedule(true);
-  if (patientFormRef.current) {
-    patientFormRef.current.submit();
-  }
-};
-
+    setSaveAndSchedule(true);
+    if (patientFormRef.current) {
+      patientFormRef.current.submit();
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

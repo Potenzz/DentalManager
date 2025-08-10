@@ -13,10 +13,8 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { CalendarIcon, CheckCircle, LoaderCircleIcon } from "lucide-react";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
 import { PatientTable } from "@/components/patients/patient-table";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
@@ -34,22 +32,7 @@ import {
 } from "@/redux/slices/seleniumEligibilityCheckTaskSlice";
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  userId: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
+import { InsertPatient, Patient } from "@repo/db/types";
 
 export default function InsuranceEligibilityPage() {
   const { user } = useAuth();

@@ -1,7 +1,5 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { UserUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -16,41 +14,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { CheckCircle, Torus } from "lucide-react";
 import { CheckedState } from "@radix-ui/react-checkbox";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { useLocation } from "wouter";
-
-const insertUserSchema = (
-  UserUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).pick({
-  username: true,
-  password: true,
-});
-
-const loginSchema = (insertUserSchema as unknown as z.ZodObject<any>).extend({
-  rememberMe: z.boolean().optional(),
-});
-
-const registerSchema = (insertUserSchema as unknown as z.ZodObject<any>)
-  .extend({
-    confirmPassword: z.string().min(6, {
-      message: "Password must be at least 6 characters long",
-    }),
-    agreeTerms: z.literal(true, {
-      errorMap: () => ({
-        message: "You must agree to the terms and conditions",
-      }),
-    }),
-  })
-  .refine((data: any) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
-
-type LoginFormValues = z.infer<typeof loginSchema>;
-type RegisterFormValues = z.infer<typeof registerSchema>;
+import {
+  LoginFormValues,
+  loginSchema,
+  RegisterFormValues,
+  registerSchema,
+} from "@repo/db/types";
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<string>("login");

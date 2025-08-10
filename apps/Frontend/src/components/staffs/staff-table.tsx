@@ -1,15 +1,7 @@
 import React, { useState } from "react";
-import { z } from "zod";
-import { StaffUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { Button } from "../ui/button";
 import { Delete, Edit } from "lucide-react";
-
-type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
-
-const staffCreateSchema = StaffUncheckedCreateInputObjectSchema;
-const staffUpdateSchema = (
-  StaffUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).partial();
+import { Staff } from "@repo/db/types";
 
 interface StaffTableProps {
   staff: Staff[];
@@ -20,7 +12,6 @@ interface StaffTableProps {
   onDelete: (staff: Staff) => void;
   onView: (staff: Staff) => void;
 }
-
 
 export function StaffTable({
   staff,
@@ -151,15 +142,13 @@ export function StaffTable({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                       <Button
-                        onClick={() =>
-                          staff !== undefined && onDelete(staff)
-                        }
+                        onClick={() => staff !== undefined && onDelete(staff)}
                         className="text-red-600 hover:text-red-900"
                         aria-label="Delete Staff"
                         variant="ghost"
                         size="icon"
                       >
-                        <Delete/>
+                        <Delete />
                       </Button>
                       <Button
                         onClick={() => staff.id !== undefined && onEdit(staff)}
@@ -170,7 +159,6 @@ export function StaffTable({
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      
                     </td>
                   </tr>
                 );
@@ -235,7 +223,9 @@ export function StaffTable({
                   if (currentPage < totalPages) setCurrentPage(currentPage + 1);
                 }}
                 className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${
-                  currentPage === totalPages ? "pointer-events-none opacity-50" : ""
+                  currentPage === totalPages
+                    ? "pointer-events-none opacity-50"
+                    : ""
                 }`}
               >
                 Next

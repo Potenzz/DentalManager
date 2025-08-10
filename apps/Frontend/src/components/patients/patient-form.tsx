@@ -1,7 +1,5 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Form,
@@ -32,34 +30,14 @@ import { format } from "date-fns";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  userId: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
-
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
+import {
+  InsertPatient,
+  insertPatientSchema,
+  Patient,
+  UpdatePatient,
+  updatePatientSchema,
+} from "@repo/db/types";
+import { z } from "zod";
 
 interface PatientFormProps {
   patient?: Patient;

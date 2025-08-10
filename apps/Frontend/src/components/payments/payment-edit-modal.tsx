@@ -6,11 +6,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { formatDateToHumanReadable } from "@/utils/dateUtils";
+import {
+  formatDateToHumanReadable,
+  formatLocalDate,
+  parseLocalDate,
+} from "@/utils/dateUtils";
 import React, { useState } from "react";
-import { paymentStatusOptions, PaymentWithExtras } from "@repo/db/types";
-import { PaymentStatus, PaymentMethod } from "@repo/db/types";
-
+import {
+  PaymentStatus,
+  paymentStatusOptions,
+  PaymentMethod,
+  paymentMethodOptions,
+  PaymentWithExtras,
+  NewTransactionPayload,
+} from "@repo/db/types";
 import {
   Select,
   SelectContent,
@@ -26,7 +35,7 @@ type PaymentEditModalProps = {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onClose: () => void;
-  onEditServiceLine: (updatedPayment: PaymentWithExtras) => void;
+  onEditServiceLine: (payload: NewTransactionPayload) => void;
   payment: PaymentWithExtras | null;
 };
 
@@ -40,142 +49,87 @@ export default function PaymentEditModal({
   if (!payment) return null;
 
   const [expandedLineId, setExpandedLineId] = useState<number | null>(null);
-  const [updatedPaidAmounts, setUpdatedPaidAmounts] = useState<
-    Record<number, number>
-  >({});
-  const [updatedAdjustedAmounts, setUpdatedAdjustedAmounts] = useState<
-    Record<number, number>
-  >({});
-  const [updatedNotes, setUpdatedNotes] = useState<Record<number, string>>({});
-  const [updatedPaymentStatus, setUpdatedPaymentStatus] =
-    useState<PaymentStatus>(payment?.status ?? "PENDING");
-  const [updatedTransactions, setUpdatedTransactions] = useState(
-    () => payment?.transactions ?? []
+  const [paymentStatus, setPaymentStatus] = React.useState<PaymentStatus>(
+    payment.status
   );
-
-    type DraftPaymentData = {
-    paidAmount: number;
-    adjustedAmount?: number;
-    notes?: string;
-    paymentStatus?: PaymentStatus;
-    payerName?: string;
-    method: PaymentMethod;
-    receivedDate: string;
-  };
-
-  
-
-  const [serviceLineDrafts, setServiceLineDrafts] = useState<Record<number, any>>({});
-
-
-  const totalPaid = payment.transactions.reduce(
-    (sum, tx) =>
-      sum +
-      tx.serviceLinePayments.reduce((s, sp) => s + Number(sp.paidAmount), 0),
-    0
-  );
-
-  const totalBilled = payment.claim.serviceLines.reduce(
-    (sum, line) => sum + line.billedAmount,
-    0
-  );
-
-  const totalDue = totalBilled - totalPaid;
+  const [formState, setFormState] = useState(() => {
+    return {
+      serviceLineId: 0,
+      transactionId: "",
+      paidAmount: 0,
+      adjustedAmount: 0,
+      method: paymentMethodOptions[1] as PaymentMethod,
+      receivedDate: formatLocalDate(new Date()),
+      payerName: "",
+      notes: "",
+    };
+  });
 
   const handleEditServiceLine = (lineId: number) => {
-    setExpandedLineId(lineId === expandedLineId ? null : lineId);
-  };
-
-  const handleFieldChange = (lineId: number, field: string, value: any) => {
-    setServiceLineDrafts((prev) => ({
-      ...prev,
-      [lineId]: {
-        ...prev[lineId],
-        [field]: value,
-      },
-    }));
-  };
-
-  // const handleSavePayment = (lineId: number) => {
-  //   const newPaidAmount = updatedPaidAmounts[lineId];
-  //   const newAdjustedAmount = updatedAdjustedAmounts[lineId] ?? 0;
-  //   const newNotes = updatedNotes[lineId] ?? "";
-
-  //   if (newPaidAmount == null || isNaN(newPaidAmount)) return;
-
-  //   const updatedTxs = updatedTransactions.map((tx) => ({
-  //     ...tx,
-  //     serviceLinePayments: tx.serviceLinePayments.map((sp) =>
-  //       sp.serviceLineId === lineId
-  //         ? {
-  //             ...sp,
-  //             paidAmount: new Decimal(newPaidAmount),
-  //             adjustedAmount: new Decimal(newAdjustedAmount),
-  //             notes: newNotes,
-  //           }
-  //         : sp
-  //     ),
-  //   }));
-
-  //   const updatedPayment: PaymentWithExtras = {
-  //     ...payment,
-  //     transactions: updatedTxs,
-  //     status: updatedPaymentStatus,
-  //   };
-
-  //   setUpdatedTransactions(updatedTxs);
-  //   onEditServiceLine(updatedPayment);
-  //   setExpandedLineId(null);
-  // };
-
-  const handleSavePayment = async (lineId: number) => {
-    const data = serviceLineDrafts[lineId];
-    if (!data || !data.paidAmount || !data.method || !data.receivedDate) {
-      console.log("please fill al")
+    if (expandedLineId === lineId) {
+      // Closing current line
+      setExpandedLineId(null);
       return;
     }
 
-    const transactionPayload = {
+    // Find line data
+    const line = payment.claim.serviceLines.find((sl) => sl.id === lineId);
+    if (!line) return;
+
+    // updating form to show its data, while expanding.
+    setFormState({
+      serviceLineId: line.id,
+      transactionId: "",
+      paidAmount: Number(line.totalDue) > 0 ? Number(line.totalDue) : 0,
+      adjustedAmount: 0,
+      method: paymentMethodOptions[1] as PaymentMethod,
+      receivedDate: formatLocalDate(new Date()),
+      payerName: "",
+      notes: "",
+    });
+
+    setExpandedLineId(lineId);
+  };
+
+  const updateField = (field: string, value: any) => {
+    setFormState((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSavePayment = async () => {
+    if (!formState.serviceLineId) {
+      toast({ title: "Error", description: "No service line selected." });
+      return;
+    }
+
+    const payload: NewTransactionPayload = {
       paymentId: payment.id,
-      amount: data.paidAmount + (data.adjustedAmount ?? 0),
-      method: data.method,
-      payerName: data.payerName,
-      notes: data.notes,
-      receivedDate: new Date(data.receivedDate),
-      serviceLinePayments: [
+      status: paymentStatus,
+      serviceLineTransactions: [
         {
-          serviceLineId: lineId,
-          paidAmount: data.paidAmount,
-          adjustedAmount: data.adjustedAmount ?? 0,
-          notes: data.notes,
+          serviceLineId: formState.serviceLineId,
+          transactionId: formState.transactionId || undefined,
+          paidAmount: Number(formState.paidAmount),
+          adjustedAmount: Number(formState.adjustedAmount) || 0,
+          method: formState.method,
+          receivedDate: parseLocalDate(formState.receivedDate),
+          payerName: formState.payerName || undefined,
+          notes: formState.notes || undefined,
         },
       ],
     };
 
     try {
-      await onEditServiceLine(transactionPayload);
+      await onEditServiceLine(payload);
       setExpandedLineId(null);
       onClose();
     } catch (err) {
-      console.log(err)
+      console.error(err);
+      toast({ title: "Error", description: "Failed to save payment." });
     }
   };
-
-
-  const renderInput = (label: string, type: string, lineId: number, field: string, step?: string) => (
-    <div className="space-y-1">
-      <label className="text-sm font-medium">{label}</label>
-      <Input
-        type={type}
-        step={step}
-        value={serviceLineDrafts[lineId]?.[field] ?? ""}
-        onChange={(e) =>
-          handleFieldChange(lineId, field, type === "number" ? parseFloat(e.target.value) : e.target.value)
-        }
-      />
-    </div>
-  );
-
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -200,6 +154,10 @@ export default function PaymentEditModal({
               Service Date:{" "}
               {formatDateToHumanReadable(payment.claim.serviceDate)}
             </p>
+            <p>
+              <span className="text-gray-500">Notes:</span>{" "}
+              {payment.notes || "N/A"}
+            </p>
           </div>
 
           {/* Payment Summary */}
@@ -209,22 +167,22 @@ export default function PaymentEditModal({
               <div className="mt-2 space-y-1">
                 <p>
                   <span className="text-gray-500">Total Billed:</span> $
-                  {totalBilled.toFixed(2)}
+                  {payment.totalBilled.toNumber().toFixed(2)}
                 </p>
                 <p>
                   <span className="text-gray-500">Total Paid:</span> $
-                  {totalPaid.toFixed(2)}
+                  {payment.totalPaid.toNumber().toFixed(2)}
                 </p>
                 <p>
                   <span className="text-gray-500">Total Due:</span> $
-                  {totalDue.toFixed(2)}
+                  {payment.totalDue.toNumber().toFixed(2)}
                 </p>
                 <div className="pt-2">
                   <label className="text-sm text-gray-600">Status</label>
                   <Select
-                    value={updatedPaymentStatus}
+                    value={paymentStatus}
                     onValueChange={(value: PaymentStatus) =>
-                      setUpdatedPaymentStatus(value)
+                      setPaymentStatus(value)
                     }
                   >
                     <SelectTrigger>
@@ -246,18 +204,16 @@ export default function PaymentEditModal({
               <h4 className="font-medium text-gray-900">Metadata</h4>
               <div className="mt-2 space-y-1">
                 <p>
-                  <span className="text-gray-500">Received Date:</span>{" "}
-                  {payment.receivedDate
-                    ? formatDateToHumanReadable(payment.receivedDate)
+                  <span className="text-gray-500">Created At:</span>{" "}
+                  {payment.createdAt
+                    ? formatDateToHumanReadable(payment.createdAt)
                     : "N/A"}
                 </p>
                 <p>
-                  <span className="text-gray-500">Method:</span>{" "}
-                  {payment.paymentMethod ?? "N/A"}
-                </p>
-                <p>
-                  <span className="text-gray-500">Notes:</span>{" "}
-                  {payment.notes || "N/A"}
+                  <span className="text-gray-500">Last Upadated At:</span>{" "}
+                  {payment.updatedAt
+                    ? formatDateToHumanReadable(payment.updatedAt)
+                    : "N/A"}
                 </p>
               </div>
             </div>
@@ -270,22 +226,6 @@ export default function PaymentEditModal({
               {payment.claim.serviceLines.length > 0 ? (
                 <>
                   {payment.claim.serviceLines.map((line) => {
-                    const linePayments = payment.transactions.flatMap((tx) =>
-                      tx.serviceLinePayments.filter(
-                        (sp) => sp.serviceLineId === line.id
-                      )
-                    );
-
-                    const paidAmount = linePayments.reduce(
-                      (sum, sp) => sum + Number(sp.paidAmount),
-                      0
-                    );
-                    const adjusted = linePayments.reduce(
-                      (sum, sp) => sum + Number(sp.adjustedAmount),
-                      0
-                    );
-                    const due = line.billedAmount - paidAmount;
-
                     return (
                       <div
                         key={line.id}
@@ -297,19 +237,19 @@ export default function PaymentEditModal({
                         </p>
                         <p>
                           <span className="text-gray-500">Billed:</span> $
-                          {line.billedAmount.toFixed(2)}
+                          {line.totalBilled.toFixed(2)}
                         </p>
                         <p>
                           <span className="text-gray-500">Paid:</span> $
-                          {paidAmount.toFixed(2)}
+                          {line.totalPaid.toFixed(2)}
                         </p>
                         <p>
                           <span className="text-gray-500">Adjusted:</span> $
-                          {adjusted.toFixed(2)}
+                          {line.totalAdjusted.toFixed(2)}
                         </p>
                         <p>
                           <span className="text-gray-500">Due:</span> $
-                          {due.toFixed(2)}
+                          {line.totalDue.toFixed(2)}
                         </p>
 
                         <div className="pt-2">
@@ -337,12 +277,12 @@ export default function PaymentEditModal({
                                 type="number"
                                 step="0.01"
                                 placeholder="Paid Amount"
-                                defaultValue={paidAmount}
+                                defaultValue={formState.paidAmount}
                                 onChange={(e) =>
-                                  setUpdatedPaidAmounts({
-                                    ...updatedPaidAmounts,
-                                    [line.id]: parseFloat(e.target.value),
-                                  })
+                                  updateField(
+                                    "paidAmount",
+                                    parseFloat(e.target.value)
+                                  )
                                 }
                               />
                             </div>
@@ -358,12 +298,65 @@ export default function PaymentEditModal({
                                 type="number"
                                 step="0.01"
                                 placeholder="Adjusted Amount"
-                                defaultValue={adjusted}
+                                defaultValue={formState.adjustedAmount}
                                 onChange={(e) =>
-                                  setUpdatedAdjustedAmounts({
-                                    ...updatedAdjustedAmounts,
-                                    [line.id]: parseFloat(e.target.value),
-                                  })
+                                  updateField(
+                                    "adjustedAmount",
+                                    parseFloat(e.target.value)
+                                  )
+                                }
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-sm font-medium">
+                                Payment Method
+                              </label>
+                              <Select
+                                value={formState.method}
+                                onValueChange={(value: PaymentMethod) =>
+                                  updateField("method", value)
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {paymentMethodOptions.map((methodOption) => (
+                                    <SelectItem
+                                      key={methodOption}
+                                      value={methodOption}
+                                    >
+                                      {methodOption}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-sm font-medium">
+                                Received Date
+                              </label>
+                              <Input
+                                type="date"
+                                value={formState.receivedDate}
+                                onChange={(e) =>
+                                  updateField("receivedDate", e.target.value)
+                                }
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-sm font-medium">
+                                Payer Name
+                              </label>
+                              <Input
+                                type="text"
+                                placeholder="Payer Name"
+                                value={formState.payerName}
+                                onChange={(e) =>
+                                  updateField("payerName", e.target.value)
                                 }
                               />
                             </div>
@@ -380,16 +373,13 @@ export default function PaymentEditModal({
                                 type="text"
                                 placeholder="Notes"
                                 onChange={(e) =>
-                                  setUpdatedNotes({
-                                    ...updatedNotes,
-                                    [line.id]: e.target.value,
-                                  })
+                                  updateField("notes", e.target.value)
                                 }
                               />
                             </div>
                             <Button
                               size="sm"
-                              onClick={() => handleSavePayment(line.id)}
+                              onClick={() => handleSavePayment()}
                             >
                               Save
                             </Button>
@@ -409,8 +399,8 @@ export default function PaymentEditModal({
           <div>
             <h4 className="font-medium text-gray-900 pt-6">All Transactions</h4>
             <div className="mt-2 space-y-2">
-              {payment.transactions.length > 0 ? (
-                payment.transactions.map((tx) => (
+              {payment.serviceLineTransactions.length > 0 ? (
+                payment.serviceLineTransactions.map((tx) => (
                   <div
                     key={tx.id}
                     className="border p-3 rounded-md bg-white shadow-sm"
@@ -420,18 +410,27 @@ export default function PaymentEditModal({
                       {formatDateToHumanReadable(tx.receivedDate)}
                     </p>
                     <p>
-                      <span className="text-gray-500">Amount:</span> $
-                      {Number(tx.amount).toFixed(2)}
+                      <span className="text-gray-500">Paid Amount:</span> $
+                      {Number(tx.paidAmount).toFixed(2)}
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Adjusted Amount:</span> $
+                      {Number(tx.adjustedAmount).toFixed(2)}
                     </p>
                     <p>
                       <span className="text-gray-500">Method:</span> {tx.method}
                     </p>
-                    {tx.serviceLinePayments.map((sp) => (
-                      <p key={sp.id} className="text-sm text-gray-600 ml-2">
-                        • Applied ${Number(sp.paidAmount).toFixed(2)} to service
-                        line ID {sp.serviceLineId}
+                    {tx.payerName && (
+                      <p>
+                        <span className="text-gray-500">Payer Name:</span>{" "}
+                        {tx.payerName}
                       </p>
-                    ))}
+                    )}
+                    {tx.notes && (
+                      <p>
+                        <span className="text-gray-500">Notes:</span> {tx.notes}
+                      </p>
+                    )}
                   </div>
                 ))
               ) : (

@@ -135,7 +135,7 @@ model ServiceLine {
   oralCavityArea String?
   toothNumber    String?
   toothSurface   String?
-  billedAmount   Float
+  totalBilled    Decimal           @db.Decimal(10, 2)
   totalPaid      Decimal           @default(0.00) @db.Decimal(10, 2)
   totalAdjusted  Decimal           @default(0.00) @db.Decimal(10, 2)
   totalDue       Decimal           @default(0.00) @db.Decimal(10, 2)
@@ -212,9 +212,9 @@ model Payment {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  claim        Claim                    @relation(fields: [claimId], references: [id], onDelete: Cascade)
-  patient      Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  updatedBy    User?                    @relation("PaymentUpdatedBy", fields: [updatedById], references: [id])
+  claim                   Claim                    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  patient                 Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  updatedBy               User?                    @relation("PaymentUpdatedBy", fields: [updatedById], references: [id])
   serviceLineTransactions ServiceLineTransaction[]
 
   @@index([id])

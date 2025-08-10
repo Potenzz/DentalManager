@@ -1,8 +1,6 @@
 import { useState } from "react";
 import ClaimsRecentTable from "./claims-recent-table";
 import { PatientTable } from "../patients/patient-table";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-import { z } from "zod";
 import {
   Card,
   CardContent,
@@ -10,19 +8,15 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
+import { Patient } from "@repo/db/types";
 
 interface ClaimsOfPatientModalProps {
   onNewClaim?: (patientId: number) => void;
 }
 
-export default function ClaimsOfPatientModal({ onNewClaim }: ClaimsOfPatientModalProps) {
+export default function ClaimsOfPatientModal({
+  onNewClaim,
+}: ClaimsOfPatientModalProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [claimsPage, setClaimsPage] = useState(1);

@@ -20,12 +20,12 @@ interface CredentialsModalProps {
   isLoading?: boolean;
 }
 
-export function CredentialsModal({ 
-  isOpen, 
-  onClose, 
-  onSubmit, 
+export function CredentialsModal({
+  isOpen,
+  onClose,
+  onSubmit,
   providerName,
-  isLoading = false 
+  isLoading = false,
 }: CredentialsModalProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -51,10 +51,11 @@ export function CredentialsModal({
         <DialogHeader>
           <DialogTitle>Insurance Portal Login</DialogTitle>
           <DialogDescription>
-            Enter your credentials for {providerName} insurance portal to check patient eligibility automatically.
+            Enter your credentials for {providerName} insurance portal to check
+            patient eligibility automatically.
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
@@ -68,7 +69,7 @@ export function CredentialsModal({
               disabled={isLoading}
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <div className="relative">
@@ -97,7 +98,7 @@ export function CredentialsModal({
               </Button>
             </div>
           </div>
-          
+
           <DialogFooter className="flex gap-2">
             <Button
               type="button"

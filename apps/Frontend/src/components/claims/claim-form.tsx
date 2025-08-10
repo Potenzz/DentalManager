@@ -18,14 +18,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  PatientUncheckedCreateInputObjectSchema,
-  AppointmentUncheckedCreateInputObjectSchema,
-  ClaimUncheckedCreateInputObjectSchema,
-  ClaimStatusSchema,
-  StaffUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
-import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { MultipleFileUploadZone } from "../file-upload/multiple-file-upload-zone";
@@ -37,57 +29,16 @@ import {
 } from "@/components/ui/tooltip";
 import procedureCodes from "../../assets/data/procedureCodes.json";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
-
-//creating types out of schema auto generated.
-
-const insertAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-
-const updateAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
-
-type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
-
-interface ServiceLine {
-  procedureCode: string;
-  procedureDate: string; // YYYY-MM-DD
-  oralCavityArea?: string;
-  toothNumber?: string;
-  toothSurface?: string;
-  billedAmount: number;
-}
+import {
+  Claim,
+  InputServiceLine,
+  InsertAppointment,
+  Patient,
+  Staff,
+  UpdateAppointment,
+  UpdatePatient,
+} from "@repo/db/types";
+import { Decimal } from "decimal.js";
 
 interface ClaimFormData {
   patientId: number;
@@ -102,7 +53,7 @@ interface ClaimFormData {
   insuranceProvider: string;
   insuranceSiteKey?: string;
   status: string; // default "pending"
-  serviceLines: ServiceLine[];
+  serviceLines: InputServiceLine[];
   claimId?: number;
 }
 
@@ -116,9 +67,6 @@ interface ClaimFormProps {
   onHandleForMHSelenium: (data: ClaimFormData) => void;
   onClose: () => void;
 }
-
-export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
-type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
 
 export function ClaimForm({
   patientId,
@@ -207,16 +155,21 @@ export function ClaimForm({
   }, [serviceDate]);
 
   // Determine patient date of birth format - required as date extracted from pdfs has different format.
-  const formatDOB = (dob: string | undefined) => {
+  const formatDOB = (dob: string | Date | undefined) => {
     if (!dob) return "";
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) return dob; // already MM/DD/YYYY
-    if (/^\d{4}-\d{2}-\d{2}/.test(dob)) {
-      const datePart = dob?.split("T")[0]; // safe optional chaining
-      if (!datePart) return "";
-      const [year, month, day] = datePart.split("-");
+
+    const normalized = formatLocalDate(parseLocalDate(dob));
+
+    // If it's already MM/DD/YYYY, leave it alone
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) return normalized;
+
+    // If it's yyyy-MM-dd, swap order to MM/DD/YYYY
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      const [year, month, day] = normalized.split("-");
       return `${month}/${day}/${year}`;
     }
-    return dob;
+
+    return normalized;
   };
 
   // MAIN FORM INITIAL STATE
@@ -226,7 +179,7 @@ export function ClaimForm({
     userId: Number(user?.id),
     staffId: Number(staff?.id),
     patientName: `${patient?.firstName} ${patient?.lastName}`.trim(),
-    memberId: patient?.insuranceId,
+    memberId: patient?.insuranceId ?? "",
     dateOfBirth: formatDOB(patient?.dateOfBirth),
     remarks: "",
     serviceDate: serviceDate,
@@ -239,7 +192,9 @@ export function ClaimForm({
       oralCavityArea: "",
       toothNumber: "",
       toothSurface: "",
-      billedAmount: 0,
+      totalBilled: new Decimal(0),
+      totalAdjusted: new Decimal(0),
+      totalPaid: new Decimal(0),
     })),
     uploadedFiles: [],
   });
@@ -251,10 +206,10 @@ export function ClaimForm({
         `${patient.firstName || ""} ${patient.lastName || ""}`.trim();
       setForm((prev) => ({
         ...prev,
+        patientId: Number(patient.id),
         patientName: fullName,
         dateOfBirth: formatDOB(patient.dateOfBirth),
         memberId: patient.insuranceId || "",
-        patientId: patient.id,
       }));
     }
   }, [patient]);
@@ -266,16 +221,16 @@ export function ClaimForm({
 
   const updateServiceLine = (
     index: number,
-    field: keyof ServiceLine,
+    field: keyof InputServiceLine,
     value: any
   ) => {
     const updatedLines = [...form.serviceLines];
 
     if (updatedLines[index]) {
-      if (field === "billedAmount") {
+      if (field === "totalBilled") {
         const num = typeof value === "string" ? parseFloat(value) : value;
         const rounded = Math.round((isNaN(num) ? 0 : num) * 100) / 100;
-        updatedLines[index][field] = rounded;
+        updatedLines[index][field] = new Decimal(rounded);
       } else {
         updatedLines[index][field] = value;
       }
@@ -672,16 +627,20 @@ export function ClaimForm({
                     type="number"
                     step="0.01"
                     placeholder="$0.00"
-                    value={line.billedAmount === 0 ? "" : line.billedAmount}
+                    value={
+                      line.totalBilled?.toNumber() === 0
+                        ? ""
+                        : line.totalBilled?.toNumber()
+                    }
                     onChange={(e) => {
-                      updateServiceLine(i, "billedAmount", e.target.value);
+                      updateServiceLine(i, "totalBilled", e.target.value);
                     }}
                     onBlur={(e) => {
                       const val = parseFloat(e.target.value);
                       const rounded = Math.round(val * 100) / 100;
                       updateServiceLine(
                         i,
-                        "billedAmount",
+                        "totalBilled",
                         isNaN(rounded) ? 0 : rounded
                       );
                     }}
@@ -702,7 +661,9 @@ export function ClaimForm({
                         oralCavityArea: "",
                         toothNumber: "",
                         toothSurface: "",
-                        billedAmount: 0,
+                        totalBilled: new Decimal(0),
+                        totalAdjusted: new Decimal(0),
+                        totalPaid: new Decimal(0),
                       },
                     ],
                   }))

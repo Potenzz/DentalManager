@@ -1,8 +1,8 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Upload, File, X, FilePlus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import React, { useState, useRef, useCallback } from "react";
+import { Upload, File, X, FilePlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface FileUploadZoneProps {
   onFileUpload: (file: File) => void;
@@ -10,10 +10,10 @@ interface FileUploadZoneProps {
   acceptedFileTypes?: string;
 }
 
-export function FileUploadZone({ 
-  onFileUpload, 
-  isUploading, 
-  acceptedFileTypes = "application/pdf" 
+export function FileUploadZone({
+  onFileUpload,
+  isUploading,
+  acceptedFileTypes = "application/pdf",
 }: FileUploadZoneProps) {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
@@ -32,13 +32,16 @@ export function FileUploadZone({
     setIsDragging(false);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragging) {
-      setIsDragging(true);
-    }
-  }, [isDragging]);
+  const handleDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isDragging) {
+        setIsDragging(true);
+      }
+    },
+    [isDragging]
+  );
 
   const validateFile = (file: File) => {
     // Check file type
@@ -46,49 +49,55 @@ export function FileUploadZone({
       toast({
         title: "Invalid file type",
         description: "Please upload a PDF file.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return false;
     }
-    
+
     // Check file size (limit to 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
         description: "File size should be less than 5MB.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return false;
     }
-    
+
     return true;
   };
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      
-      if (validateFile(file)) {
-        setUploadedFile(file);
-        onFileUpload(file);
-      }
-    }
-  }, [onFileUpload, acceptedFileTypes, toast]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      
-      if (validateFile(file)) {
-        setUploadedFile(file);
-        onFileUpload(file);
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        const file = e.dataTransfer.files[0];
+
+        if (validateFile(file)) {
+          setUploadedFile(file);
+          onFileUpload(file);
+        }
       }
-    }
-  }, [onFileUpload, acceptedFileTypes, toast]);
+    },
+    [onFileUpload, acceptedFileTypes, toast]
+  );
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+
+        if (validateFile(file)) {
+          setUploadedFile(file);
+          onFileUpload(file);
+        }
+      }
+    },
+    [onFileUpload, acceptedFileTypes, toast]
+  );
 
   const handleBrowseClick = () => {
     if (fileInputRef.current) {
@@ -109,11 +118,13 @@ export function FileUploadZone({
         onChange={handleFileSelect}
         accept={acceptedFileTypes}
       />
-      
+
       <div
         className={cn(
           "border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-center transition-colors",
-          isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25",
+          isDragging
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/25",
           uploadedFile ? "bg-success/5" : "hover:bg-muted/40",
           isUploading && "opacity-50 cursor-not-allowed"
         )}
@@ -135,7 +146,7 @@ export function FileUploadZone({
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
               <File className="h-12 w-12 text-primary" />
-              <button 
+              <button
                 className="absolute -top-2 -right-2 bg-background rounded-full p-1 shadow-sm border"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -166,9 +177,9 @@ export function FileUploadZone({
                 Or click to browse files
               </p>
             </div>
-            <Button 
-              type="button" 
-              variant="secondary" 
+            <Button
+              type="button"
+              variant="secondary"
               onClick={(e) => {
                 e.stopPropagation();
                 handleBrowseClick();

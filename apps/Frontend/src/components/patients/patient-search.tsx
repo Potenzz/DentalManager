@@ -85,25 +85,25 @@ export function PatientSearch({
         <div className="relative flex-1">
           {searchBy === "dob" ? (
             <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSearch();
-                        }}
-                    className={cn(
-                      "w-full pl-3 pr-20 text-left font-normal",
-                      !searchTerm && "text-muted-foreground"
-                    )}
-                  >
-                    {searchTerm ? (
-                      format(new Date(searchTerm), "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSearch();
+                  }}
+                  className={cn(
+                    "w-full pl-3 pr-20 text-left font-normal",
+                    !searchTerm && "text-muted-foreground"
+                  )}
+                >
+                  {searchTerm ? (
+                    format(new Date(searchTerm), "PPP")
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
               <PopoverContent className="w-auto p-4">
                 <Calendar
                   mode="single"

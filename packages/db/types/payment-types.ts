@@ -91,38 +91,18 @@ export type PaymentWithExtras = Prisma.PaymentGetPayload<{
   paymentMethod: string;
 };
 
-// Claim model with embedded service lines
-export type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
-export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
-
-export type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
-
-export type ClaimWithServiceLines = Claim & {
-  serviceLines: {
-    id: number;
-    claimId: number;
-    procedureCode: string;
-    procedureDate: Date;
-    oralCavityArea: string | null;
-    toothNumber: string | null;
-    toothSurface: string | null;
-    billedAmount: number;
-    status: string;
-  }[];
-  staff: Staff | null;
-};
 
 export type NewTransactionPayload = {
   paymentId: number;
-  amount: number;
-  method: PaymentMethod;
-  payerName?: string;
-  notes?: string;
-  receivedDate: Date;
+  status: PaymentStatus;
   serviceLineTransactions: {
     serviceLineId: number;
+    transactionId?: string;
     paidAmount: number;
-    adjustedAmount: number;
+    adjustedAmount?: number;
+    method: PaymentMethod;
+    receivedDate: Date;
+    payerName?: string;
     notes?: string;
   }[];
 };

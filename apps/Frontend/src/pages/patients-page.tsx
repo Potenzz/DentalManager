@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PatientTable } from "@/components/patients/patient-table";
@@ -15,28 +15,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { z } from "zod";
 import useExtractPdfData from "@/hooks/use-extractPdfData";
 import { useLocation } from "wouter";
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  userId: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
+import { InsertPatient, Patient } from "@repo/db/types";
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
@@ -104,7 +87,6 @@ export default function PatientsPage() {
   };
 
   const isLoading = addPatientMutation.isPending;
-
 
   // File upload handling
   const handleFileUpload = (file: File) => {

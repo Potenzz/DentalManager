@@ -27,42 +27,13 @@ import {
 import { Link } from "wouter";
 import { z } from "zod";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
-
-//creating types out of schema auto generated.
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
-
-const insertAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-
-const updateAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .partial();
-type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
+import {
+  Appointment,
+  InsertAppointment,
+  InsertPatient,
+  Patient,
+  UpdateAppointment,
+} from "@repo/db/types";
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
@@ -156,7 +127,11 @@ export default function Dashboard() {
   // Create/upsert appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: async (appointment: InsertAppointment) => {
-      const res = await apiRequest("POST", "/api/appointments/upsert", appointment);
+      const res = await apiRequest(
+        "POST",
+        "/api/appointments/upsert",
+        appointment
+      );
       return await res.json();
     },
     onSuccess: () => {

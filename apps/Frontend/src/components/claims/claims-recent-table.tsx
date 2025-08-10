@@ -28,45 +28,13 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { DeleteConfirmationDialog } from "../ui/deleteDialog";
-import {
-  PatientUncheckedCreateInputObjectSchema,
-  ClaimUncheckedCreateInputObjectSchema,
-  ClaimStatusSchema,
-  StaffUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
-import { z } from "zod";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
 import ClaimViewModal from "./claim-view-modal";
 import ClaimEditModal from "./claim-edit-modal";
-
-//creating types out of schema auto generated.
-type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
-export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
-type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
-
-type ClaimWithServiceLines = Claim & {
-  serviceLines: {
-    id: number;
-    claimId: number;
-    procedureCode: string;
-    procedureDate: Date;
-    oralCavityArea: string | null;
-    toothNumber: string | null;
-    toothSurface: string | null;
-    billedAmount: number;
-  }[];
-  staff: Staff | null;
-};
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
+import { Claim, ClaimStatus, ClaimWithServiceLines } from "@repo/db/types";
 
 interface ClaimApiResponse {
   claims: ClaimWithServiceLines[];
@@ -314,7 +282,7 @@ export default function ClaimsRecentTable({
 
   const getTotalBilled = (claim: ClaimWithServiceLines) => {
     return claim.serviceLines.reduce(
-      (sum, line) => sum + (line.billedAmount || 0),
+      (sum, line) => sum + (line.totalBilled?.toNumber() || 0),
       0
     );
   };

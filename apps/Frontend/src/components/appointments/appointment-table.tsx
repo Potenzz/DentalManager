@@ -25,20 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  AppointmentUncheckedCreateInputObjectSchema,
-  PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
-
-import { z } from "zod";
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
+import { Appointment, Patient } from "@repo/db/types";
 
 interface AppointmentTableProps {
   appointments: Appointment[];

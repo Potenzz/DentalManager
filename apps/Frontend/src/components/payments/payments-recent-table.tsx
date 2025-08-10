@@ -31,12 +31,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { DeleteConfirmationDialog } from "../ui/deleteDialog";
 import PaymentViewModal from "./payment-view-modal";
-import PaymentEditModal from "./payment-edit-modal";
 import LoadingScreen from "../ui/LoadingScreen";
 import {
   ClaimStatus,
   ClaimWithServiceLines,
-  Payment,
+  NewTransactionPayload,
   PaymentWithExtras,
 } from "@repo/db/types";
 import EditPaymentModal from "./payment-edit-modal";
@@ -118,10 +117,14 @@ export default function PaymentsRecentTable({
   });
 
   const updatePaymentMutation = useMutation({
-    mutationFn: async (payment: PaymentWithExtras) => {
-      const response = await apiRequest("PUT", `/api/claims/${payment.id}`, {
-        data: payment,
-      });
+    mutationFn: async (data: NewTransactionPayload) => {
+      const response = await apiRequest(
+        "PUT",
+        `/api/claims/${data.paymentId}`,
+        {
+          data: data,
+        }
+      );
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Failed to update Payment");
@@ -288,13 +291,6 @@ export default function PaymentsRecentTable({
     }
   };
 
-  const getTotalBilled = (claim: ClaimWithServiceLines) => {
-    return claim.serviceLines.reduce(
-      (sum, line) => sum + (line.billedAmount || 0),
-      0
-    );
-  };
-
   function getPageNumbers(current: number, total: number): (number | "...")[] {
     const delta = 2;
     const range: (number | "...")[] = [];
@@ -359,19 +355,9 @@ export default function PaymentsRecentTable({
               </TableRow>
             ) : (
               paymentsData?.payments.map((payment) => {
-                const claim = (payment as PaymentWithExtras)
-                  .claim as ClaimWithServiceLines;
-
-                const totalBilled = getTotalBilled(claim);
-
-                const totalPaid = (payment as PaymentWithExtras).transactions
-                  .flatMap((tx) => tx.serviceLinePayments)
-                  .reduce(
-                    (sum, sp) => sum + (sp.paidAmount?.toNumber?.() ?? 0),
-                    0
-                  );
-
-                const outstanding = totalBilled - totalPaid;
+                const totalBilled = payment.totalBilled.toNumber();
+                const totalPaid = payment.totalPaid.toNumber();
+                const totalDue = payment.totalDue.toNumber();
 
                 return (
                   <TableRow key={payment.id}>
@@ -401,9 +387,9 @@ export default function PaymentsRecentTable({
                         </span>
                         <span>
                           <strong>Total Due:</strong>{" "}
-                          {outstanding > 0 ? (
+                          {totalDue > 0 ? (
                             <span className="text-yellow-600">
-                              ${outstanding.toFixed(2)}
+                              ${totalDue.toFixed(2)}
                             </span>
                           ) : (
                             <span className="text-green-600">Settled</span>

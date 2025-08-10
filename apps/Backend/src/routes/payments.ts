@@ -2,73 +2,8 @@ import { Router } from "express";
 import { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
-import {
-  ClaimUncheckedCreateInputObjectSchema,
-  PaymentUncheckedCreateInputObjectSchema,
-  PaymentTransactionCreateInputObjectSchema,
-  ServiceLinePaymentCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
-import { Prisma } from "@repo/db/generated/prisma";
 import { ZodError } from "zod";
-
-// Base Payment type
-type Payment = z.infer<typeof PaymentUncheckedCreateInputObjectSchema>;
-type PaymentTransaction = z.infer<
-  typeof PaymentTransactionCreateInputObjectSchema
->;
-type ServiceLinePayment = z.infer<
-  typeof ServiceLinePaymentCreateInputObjectSchema
->;
-
-const insertPaymentSchema = (
-  PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-type InsertPayment = z.infer<typeof insertPaymentSchema>;
-
-const updatePaymentSchema = (
-  PaymentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .partial();
-type UpdatePayment = z.infer<typeof updatePaymentSchema>;
-
-type PaymentWithExtras = Prisma.PaymentGetPayload<{
-  include: {
-    transactions: true;
-    servicePayments: true;
-    claim: true;
-  };
-}>;
-
-// Claim schema
-const ClaimSchema = (
-  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-type InsertClaim = z.infer<typeof ClaimSchema>;
-
-const updateClaimSchema = (
-  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .partial();
-
-type UpdateClaim = z.infer<typeof updateClaimSchema>;
+import { insertPaymentSchema, updatePaymentSchema } from "@repo/db/types";
 
 const paymentFilterSchema = z.object({
   from: z.string().datetime(),

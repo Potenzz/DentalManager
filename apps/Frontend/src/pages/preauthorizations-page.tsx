@@ -6,10 +6,9 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-// import { Patient, Appointment } from "@repo/db/shared/schemas";
-import { Patient, Appointment } from "@repo/db/shared/schemas";
 import { Plus, ClipboardCheck, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { Appointment, Patient } from "@repo/db/types";
 
 export default function PreAuthorizationsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -138,7 +137,7 @@ export default function PreAuthorizationsPage() {
                         key={patient.id} 
                         className="py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
                         onClick={() => {
-                          setSelectedPatient(patient.id);
+                          setSelectedPatient(Number(patient.id));
                           handleNewPreAuth(
                             patient.id, 
                             dentalProcedures[Math.floor(Math.random() * 3)].name

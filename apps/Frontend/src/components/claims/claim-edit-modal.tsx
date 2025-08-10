@@ -15,29 +15,7 @@ import {
 } from "@/components/ui/select";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
 import React, { useState } from "react";
-import { z } from "zod";
-import {
-  ClaimUncheckedCreateInputObjectSchema,
-  StaffUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
-import { ClaimStatus } from "./claims-recent-table";
-
-type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
-type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
-
-type ClaimWithServiceLines = Claim & {
-  serviceLines: {
-    id: number;
-    claimId: number;
-    procedureCode: string;
-    procedureDate: Date;
-    oralCavityArea: string | null;
-    toothNumber: string | null;
-    toothSurface: string | null;
-    billedAmount: number;
-  }[];
-  staff: Staff | null;
-};
+import { ClaimStatus, ClaimWithServiceLines } from "@repo/db/types";
 
 type ClaimEditModalProps = {
   isOpen: boolean;
@@ -223,14 +201,17 @@ export default function ClaimEditModal({
                       )}
                       <p>
                         <span className="text-gray-500">Billed Amount:</span> $
-                        {line.billedAmount.toFixed(2)}
+                        {line.totalBilled.toFixed(2)}
                       </p>
                     </div>
                   ))}
                   <div className="text-right font-semibold text-gray-900 pt-2 border-t mt-4">
                     Total Billed Amount: $
                     {claim.serviceLines
-                      .reduce((total, line) => total + line.billedAmount, 0)
+                      .reduce(
+                        (total, line) => total + line.totalBilled?.toNumber(),
+                        0
+                      )
                       .toFixed(2)}
                   </div>
                 </>

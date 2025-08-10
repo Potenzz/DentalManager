@@ -1,164 +1,28 @@
 import { prisma as db } from "@repo/db/client";
+import { PdfCategory } from "@repo/db/generated/prisma";
 import {
-  AppointmentUncheckedCreateInputObjectSchema,
-  PatientUncheckedCreateInputObjectSchema,
-  UserUncheckedCreateInputObjectSchema,
-  StaffUncheckedCreateInputObjectSchema,
-  ClaimUncheckedCreateInputObjectSchema,
-  InsuranceCredentialUncheckedCreateInputObjectSchema,
-  PdfFileUncheckedCreateInputObjectSchema,
-  PdfGroupUncheckedCreateInputObjectSchema,
-  PdfCategorySchema,
-} from "@repo/db/usedSchemas";
-import { z } from "zod";
-import {
+  Appointment,
+  Claim,
+  ClaimWithServiceLines,
+  InsertAppointment,
+  InsertClaim,
+  InsertInsuranceCredential,
+  InsertPatient,
   InsertPayment,
+  InsertUser,
+  InsuranceCredential,
+  Patient,
   Payment,
   PaymentWithExtras,
+  PdfFile,
+  PdfGroup,
+  Staff,
+  UpdateAppointment,
+  UpdateClaim,
+  UpdatePatient,
   UpdatePayment,
+  User,
 } from "@repo/db/types";
-
-//creating types out of schema auto generated.
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
-
-const insertAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-
-const updateAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .partial();
-type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
-
-//patient types
-type Patient = z.infer<typeof PatientUncheckedCreateInputObjectSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
-
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
-
-//user types
-type User = z.infer<typeof UserUncheckedCreateInputObjectSchema>;
-
-const insertUserSchema = (
-  UserUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).pick({
-  username: true,
-  password: true,
-});
-
-const loginSchema = (insertUserSchema as unknown as z.ZodObject<any>).extend({
-  rememberMe: z.boolean().optional(),
-});
-
-const registerSchema = (insertUserSchema as unknown as z.ZodObject<any>)
-  .extend({
-    confirmPassword: z.string().min(6, {
-      message: "Password must be at least 6 characters long",
-    }),
-    agreeTerms: z.literal(true, {
-      errorMap: () => ({
-        message: "You must agree to the terms and conditions",
-      }),
-    }),
-  })
-  .refine((data: any) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
-
-type InsertUser = z.infer<typeof insertUserSchema>;
-type LoginFormValues = z.infer<typeof loginSchema>;
-type RegisterFormValues = z.infer<typeof registerSchema>;
-
-// staff types:
-type Staff = z.infer<typeof StaffUncheckedCreateInputObjectSchema>;
-
-// Claim typse:
-const insertClaimSchema = (
-  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-type InsertClaim = z.infer<typeof insertClaimSchema>;
-
-const updateClaimSchema = (
-  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .partial();
-type UpdateClaim = z.infer<typeof updateClaimSchema>;
-
-type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
-
-// InsuraneCreds types:
-type InsuranceCredential = z.infer<
-  typeof InsuranceCredentialUncheckedCreateInputObjectSchema
->;
-
-const insertInsuranceCredentialSchema = (
-  InsuranceCredentialUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({ id: true });
-
-type InsertInsuranceCredential = z.infer<
-  typeof insertInsuranceCredentialSchema
->;
-
-type ClaimWithServiceLines = Claim & {
-  serviceLines: {
-    id: number;
-    claimId: number;
-    procedureCode: string;
-    procedureDate: Date;
-    oralCavityArea: string | null;
-    toothNumber: string | null;
-    toothSurface: string | null;
-    billedAmount: number;
-  }[];
-  staff: Staff | null;
-};
-
-// Pdf types:
-type PdfGroup = z.infer<typeof PdfGroupUncheckedCreateInputObjectSchema>;
-type PdfFile = z.infer<typeof PdfFileUncheckedCreateInputObjectSchema>;
-type PdfCategory = z.infer<typeof PdfCategorySchema>;
-
-export interface ClaimPdfMetadata {
-  id: number;
-  filename: string;
-  uploadedAt: Date;
-}
 
 export interface IStorage {
   // User methods
