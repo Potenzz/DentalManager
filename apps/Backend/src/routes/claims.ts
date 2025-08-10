@@ -2,45 +2,19 @@ import { Router } from "express";
 import { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
-import { ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
 import multer from "multer";
 import { forwardToSeleniumClaimAgent } from "../services/seleniumClaimClient";
 import path from "path";
 import axios from "axios";
 import { Prisma } from "@repo/db/generated/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
+import {
+  ExtendedClaimSchema,
+  InputServiceLine,
+  updateClaimSchema,
+} from "@repo/db/types";
 
 const router = Router();
-
-// Define Zod schemas
-const ClaimSchema = (
-  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-type InsertClaim = z.infer<typeof ClaimSchema>;
-
-const updateClaimSchema = (
-  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .partial();
-
-type UpdateClaim = z.infer<typeof updateClaimSchema>;
-
-// Extend the schema to inject `userId` manually (since it's not passed by the client)
-const ExtendedClaimSchema = (
-  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).extend({
-  userId: z.number(),
-});
 
 // Routes
 const multerStorage = multer.memoryStorage(); // NO DISK
@@ -277,6 +251,14 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
 router.post("/", async (req: Request, res: Response): Promise<any> => {
   try {
     if (Array.isArray(req.body.serviceLines)) {
+      req.body.serviceLines = req.body.serviceLines.map(
+        (line: InputServiceLine) => ({
+          ...line,
+          totalBilled: Number(line.totalBilled),
+          totalAdjusted: Number(line.totalAdjusted),
+          totalPaid: Number(line.totalPaid),
+        })
+      );
       req.body.serviceLines = { create: req.body.serviceLines };
     }
 
@@ -290,10 +272,12 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
       parsedClaim.serviceLines as Prisma.ServiceLineCreateNestedManyWithoutClaimInput
     )?.create;
     const lines = Array.isArray(serviceLinesCreateInput)
-      ? (serviceLinesCreateInput as unknown as { amount: number }[])
+      ? (serviceLinesCreateInput as unknown as {
+          totalBilled: number | string;
+        }[])
       : [];
     const totalBilled = lines.reduce(
-      (sum, line) => sum + (line.amount ?? 0),
+      (sum, line) => sum + Number(line.totalBilled ?? 0),
       0
     );
 
@@ -302,16 +286,14 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
 
     // Step 3: Create empty payment
     await storage.createPayment({
+      claimId: claim.id,
       patientId: claim.patientId,
       userId: req.user!.id,
-      claimId: claim.id,
       totalBilled: new Decimal(totalBilled),
       totalPaid: new Decimal(0),
       totalDue: new Decimal(totalBilled),
       status: "PENDING",
-      notes: null,
-      paymentMethod: null,
-      receivedDate: null,
+      notes: "",
     });
 
     res.status(201).json(claim);

@@ -21,7 +21,15 @@ export const updateClaimSchema = (
     updatedAt: true,
   })
   .partial();
+  
 export type UpdateClaim = z.infer<typeof updateClaimSchema>;
+
+// Extend the schema to inject `userId` manually (since it's not passed by the client)
+export const ExtendedClaimSchema = (
+  ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
+).extend({
+  userId: z.number(),
+});
 
 export type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
 export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
