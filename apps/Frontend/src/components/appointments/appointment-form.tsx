@@ -121,6 +121,7 @@ export function AppointmentForm({
   // Format the date and times for the form
   const defaultValues: Partial<Appointment> = appointment
     ? {
+        userId: user?.id, 
         patientId: appointment.patientId,
         title: appointment.title,
         date:
@@ -139,6 +140,7 @@ export function AppointmentForm({
       }
     : parsedStoredData
       ? {
+          userId: user?.id, 
           patientId: Number(parsedStoredData.patientId),
           date: parsedStoredData.date
             ? typeof parsedStoredData.date === "string"
@@ -157,7 +159,8 @@ export function AppointmentForm({
               ? parsedStoredData.staff
               : (staffMembers?.[0]?.id ?? undefined),
         }
-      : {
+      : { 
+          userId: user?.id ?? 0, 
           date: new Date(),
           title: "",
           startTime: "09:00",
@@ -262,6 +265,7 @@ export function AppointmentForm({
 
     onSubmit({
       ...data,
+      userId: Number(user?.id),
       title,
       notes,
       patientId,
