@@ -26,9 +26,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@radix-ui/react-select";
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import Decimal from "decimal.js";
 import { toast } from "@/hooks/use-toast";
 
 type PaymentEditModalProps = {
@@ -47,7 +46,7 @@ export default function PaymentEditModal({
   onEditServiceLine,
 }: PaymentEditModalProps) {
   if (!payment) return null;
-
+  
   const [expandedLineId, setExpandedLineId] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = React.useState<PaymentStatus>(
     payment.status
@@ -167,15 +166,15 @@ export default function PaymentEditModal({
               <div className="mt-2 space-y-1">
                 <p>
                   <span className="text-gray-500">Total Billed:</span> $
-                  {payment.totalBilled.toNumber().toFixed(2)}
+                  {Number(payment.totalBilled || 0).toFixed(2)}
                 </p>
                 <p>
                   <span className="text-gray-500">Total Paid:</span> $
-                  {payment.totalPaid.toNumber().toFixed(2)}
+                  {Number(payment.totalPaid || 0).toFixed(2)}
                 </p>
                 <p>
                   <span className="text-gray-500">Total Due:</span> $
-                  {payment.totalDue.toNumber().toFixed(2)}
+                  {Number(payment.totalDue || 0).toFixed(2)}
                 </p>
                 <div className="pt-2">
                   <label className="text-sm text-gray-600">Status</label>
@@ -237,19 +236,19 @@ export default function PaymentEditModal({
                         </p>
                         <p>
                           <span className="text-gray-500">Billed:</span> $
-                          {line.totalBilled.toFixed(2)}
+                          {Number(line.totalBilled || 0).toFixed(2)}
                         </p>
                         <p>
                           <span className="text-gray-500">Paid:</span> $
-                          {line.totalPaid.toFixed(2)}
+                          {Number(line.totalPaid || 0).toFixed(2)}
                         </p>
                         <p>
                           <span className="text-gray-500">Adjusted:</span> $
-                          {line.totalAdjusted.toFixed(2)}
+                          {Number(line.totalAdjusted || 0).toFixed(2)}
                         </p>
                         <p>
                           <span className="text-gray-500">Due:</span> $
-                          {line.totalDue.toFixed(2)}
+                          {Number(line.totalDue || 0).toFixed(2)}
                         </p>
 
                         <div className="pt-2">
@@ -265,7 +264,7 @@ export default function PaymentEditModal({
                         </div>
 
                         {expandedLineId === line.id && (
-                          <div className="mt-3 space-y-2">
+                          <div className="mt-3 space-y-4">
                             <div className="space-y-1">
                               <label
                                 htmlFor={`paid-${line.id}`}
@@ -315,11 +314,14 @@ export default function PaymentEditModal({
                               <Select
                                 value={formState.method}
                                 onValueChange={(value: PaymentMethod) =>
-                                  updateField("method", value)
+                                  setFormState((prev) => ({
+                                    ...prev,
+                                    method: value,
+                                  }))
                                 }
                               >
                                 <SelectTrigger>
-                                  <SelectValue />
+                                  <SelectValue placeholder="Select a payment method" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {paymentMethodOptions.map((methodOption) => (
@@ -381,7 +383,7 @@ export default function PaymentEditModal({
                               size="sm"
                               onClick={() => handleSavePayment()}
                             >
-                              Save
+                              Update
                             </Button>
                           </div>
                         )}

@@ -355,9 +355,9 @@ export default function PaymentsRecentTable({
               </TableRow>
             ) : (
               paymentsData?.payments.map((payment) => {
-                const totalBilled = payment.totalBilled.toNumber();
-                const totalPaid = payment.totalPaid.toNumber();
-                const totalDue = payment.totalDue.toNumber();
+                const totalBilled = Number(payment.totalBilled || 0);
+                const totalPaid = Number(payment.totalPaid || 0);
+                const totalDue = Number(payment.totalDue || 0);
 
                 return (
                   <TableRow key={payment.id}>
@@ -379,8 +379,8 @@ export default function PaymentsRecentTable({
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <span>
-                          <strong>Total Billed:</strong> $
-                          {totalBilled.toFixed(2)}
+                          <strong>Total Billed:</strong> $ 
+                          {Number(totalBilled).toFixed(2)}
                         </span>
                         <span>
                           <strong>Total Paid:</strong> ${totalPaid.toFixed(2)}
@@ -454,7 +454,7 @@ export default function PaymentsRecentTable({
         isOpen={isDeletePaymentOpen}
         onConfirm={handleConfirmDeletePayment}
         onCancel={() => setIsDeletePaymentOpen(false)}
-        entityName={String(currentPayment?.claimId)}
+        entityName={`ClaimID : ${currentPayment?.claimId}`}
       />
 
       {/* /will hanlde both modal later */}

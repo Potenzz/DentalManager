@@ -221,7 +221,7 @@ router.delete("/:id", async (req: Request, res: Response): Promise<any> => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const id = parseIntOrError(req.params.id, "Payment ID");
-    await storage.deletePayment(userId, id);
+    await storage.deletePayment(id, userId);
 
     res.status(200).json({ message: "Payment deleted successfully" });
   } catch (err: unknown) {
