@@ -120,7 +120,7 @@ export default function PaymentsRecentTable({
     mutationFn: async (data: NewTransactionPayload) => {
       const response = await apiRequest(
         "PUT",
-        `/api/claims/${data.paymentId}`,
+        `/api/payments/${data.paymentId}`,
         {
           data: data,
         }

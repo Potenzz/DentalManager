@@ -199,18 +199,19 @@ enum PdfCategory {
 }
 
 model Payment {
-  id          Int           @id @default(autoincrement())
-  claimId     Int           @unique
-  patientId   Int
-  userId      Int
-  updatedById Int?
-  totalBilled Decimal       @db.Decimal(10, 2)
-  totalPaid   Decimal       @default(0.00) @db.Decimal(10, 2)
-  totalDue    Decimal       @db.Decimal(10, 2)
-  status      PaymentStatus @default(PENDING)
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id            Int           @id @default(autoincrement())
+  claimId       Int           @unique
+  patientId     Int
+  userId        Int
+  updatedById   Int?
+  totalBilled   Decimal       @db.Decimal(10, 2)
+  totalPaid     Decimal       @default(0.00) @db.Decimal(10, 2)
+  totalAdjusted Decimal       @default(0.00) @db.Decimal(10, 2)
+  totalDue      Decimal       @db.Decimal(10, 2)
+  status        PaymentStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   claim                   Claim                    @relation(fields: [claimId], references: [id], onDelete: Cascade)
   patient                 Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)

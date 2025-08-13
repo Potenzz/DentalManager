@@ -3,7 +3,14 @@ import { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
 import { ZodError } from "zod";
-import { insertPaymentSchema, updatePaymentSchema } from "@repo/db/types";
+import {
+  insertPaymentSchema,
+  NewTransactionPayload,
+  newTransactionPayloadSchema,
+  updatePaymentSchema,
+} from "@repo/db/types";
+import Decimal from "decimal.js";
+import { prisma } from "@repo/db/client";
 
 const paymentFilterSchema = z.object({
   from: z.string().datetime(),
@@ -146,8 +153,7 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
     const id = parseIntOrError(req.params.id, "Payment ID");
 
     const payment = await storage.getPaymentById(userId, id);
-    if (!payment)
-      return res.status(404).json({ message: "Payment not found" });
+    if (!payment) return res.status(404).json({ message: "Payment not found" });
 
     res.status(200).json(payment);
   } catch (err: unknown) {
@@ -156,7 +162,6 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
     res.status(500).json({ message });
   }
 });
-
 
 // POST /api/payments/:claimId
 router.post("/:claimId", async (req: Request, res: Response): Promise<any> => {
@@ -194,9 +199,11 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const id = parseIntOrError(req.params.id, "Payment ID");
+    const paymentId = parseIntOrError(req.params.id, "Payment ID");
 
-    const validated = updatePaymentSchema.safeParse(req.body);
+    const validated = newTransactionPayloadSchema.safeParse(
+      req.body.data as NewTransactionPayload
+    );
     if (!validated.success) {
       return res.status(400).json({
         message: "Validation failed",
@@ -204,9 +211,97 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
       });
     }
 
-    const updated = await storage.updatePayment(id, validated.data, userId);
+    const { status, serviceLineTransactions } = validated.data;
 
-    res.status(200).json(updated);
+    // Wrap everything in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create all new service line transactions
+      for (const txn of serviceLineTransactions) {
+        await tx.serviceLineTransaction.create({
+          data: {
+            paymentId,
+            serviceLineId: txn.serviceLineId,
+            transactionId: txn.transactionId,
+            paidAmount: new Decimal(txn.paidAmount || 0),
+            adjustedAmount: new Decimal(txn.adjustedAmount || 0),
+            method: txn.method,
+            receivedDate: txn.receivedDate,
+            payerName: txn.payerName,
+            notes: txn.notes,
+          },
+        });
+
+        // 2. Recalculate that specific service line's totals
+        const aggLine = await tx.serviceLineTransaction.aggregate({
+          _sum: {
+            paidAmount: true,
+            adjustedAmount: true,
+          },
+          where: { serviceLineId: txn.serviceLineId },
+        });
+
+        const serviceLine = await tx.serviceLine.findUniqueOrThrow({
+          where: { id: txn.serviceLineId },
+          select: { totalBilled: true },
+        });
+
+        const totalPaid = aggLine._sum.paidAmount || new Decimal(0);
+        const totalAdjusted = aggLine._sum.adjustedAmount || new Decimal(0);
+        const totalDue = serviceLine.totalBilled
+          .minus(totalPaid)
+          .minus(totalAdjusted);
+
+        await tx.serviceLine.update({
+          where: { id: txn.serviceLineId },
+          data: {
+            totalPaid,
+            totalAdjusted,
+            totalDue,
+            status:
+              totalDue.lte(0) && totalPaid.gt(0)
+                ? "PAID"
+                : totalPaid.gt(0)
+                  ? "PARTIALLY_PAID"
+                  : "UNPAID",
+          },
+        });
+      }
+
+      // 3. Recalculate payment totals
+      const aggPayment = await tx.serviceLineTransaction.aggregate({
+        _sum: {
+          paidAmount: true,
+          adjustedAmount: true,
+        },
+        where: { paymentId },
+      });
+
+      const payment = await tx.payment.findUniqueOrThrow({
+        where: { id: paymentId },
+        select: { totalBilled: true },
+      });
+
+      const totalPaid = aggPayment._sum.paidAmount || new Decimal(0);
+      const totalAdjusted = aggPayment._sum.adjustedAmount || new Decimal(0);
+      const totalDue = payment.totalBilled
+        .minus(totalPaid)
+        .minus(totalAdjusted);
+
+      const updatedPayment = await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          totalPaid,
+          totalAdjusted,
+          totalDue,
+          status,
+          updatedById: userId,
+        },
+      });
+
+      return updatedPayment;
+    });
+
+    res.status(200).json(result);
   } catch (err: unknown) {
     const message =
       err instanceof Error ? err.message : "Failed to update payment";

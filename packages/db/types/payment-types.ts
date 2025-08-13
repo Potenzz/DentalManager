@@ -60,14 +60,6 @@ export const updatePaymentSchema = (
   .partial();
 export type UpdatePayment = z.infer<typeof updatePaymentSchema>;
 
-// Input for updating a payment with new transactions + updated service payments
-export type UpdatePaymentInput = {
-  newTransactions: ServiceLineTransactionInput[];
-  totalPaid: Decimal;
-  totalDue: Decimal;
-  status: PaymentStatus;
-};
-
 // ========== EXTENDED TYPES ==========
 
 // Payment with full nested data
@@ -91,18 +83,21 @@ export type PaymentWithExtras = Prisma.PaymentGetPayload<{
   paymentMethod: string;
 };
 
+export const newTransactionPayloadSchema = z.object({
+  paymentId: z.number(),
+  status: PaymentStatusSchema,
+  serviceLineTransactions: z.array(
+    z.object({
+      serviceLineId: z.number(),
+      transactionId: z.string().optional(),
+      paidAmount: z.number(),
+      adjustedAmount: z.number().optional(),
+      method: PaymentMethodSchema,
+      receivedDate: z.coerce.date(),
+      payerName: z.string().optional(),
+      notes: z.string().optional(),
+    })
+  ),
+});
 
-export type NewTransactionPayload = {
-  paymentId: number;
-  status: PaymentStatus;
-  serviceLineTransactions: {
-    serviceLineId: number;
-    transactionId?: string;
-    paidAmount: number;
-    adjustedAmount?: number;
-    method: PaymentMethod;
-    receivedDate: Date;
-    payerName?: string;
-    notes?: string;
-  }[];
-};
+export type NewTransactionPayload = z.infer<typeof newTransactionPayloadSchema>;
