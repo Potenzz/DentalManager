@@ -11,6 +11,7 @@ import {
 } from "@repo/db/types";
 import Decimal from "decimal.js";
 import { prisma } from "@repo/db/client";
+import { PaymentStatusSchema } from "@repo/db/types";
 
 const paymentFilterSchema = z.object({
   from: z.string().datetime(),
@@ -74,8 +75,8 @@ router.get(
       const parsedClaimId = parseIntOrError(req.params.claimId, "Claim ID");
 
       const payments = await storage.getPaymentsByClaimId(
-        userId,
-        parsedClaimId
+        parsedClaimId,
+        userId
       );
       if (!payments)
         return res.status(404).json({ message: "No payments found for claim" });
@@ -102,8 +103,8 @@ router.get(
       );
 
       const payments = await storage.getPaymentsByPatientId(
-        userId,
-        parsedPatientId
+        parsedPatientId,
+        userId
       );
 
       if (!payments)
@@ -152,7 +153,7 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
 
     const id = parseIntOrError(req.params.id, "Payment ID");
 
-    const payment = await storage.getPaymentById(userId, id);
+    const payment = await storage.getPaymentById(id, userId);
     if (!payment) return res.status(404).json({ message: "Payment not found" });
 
     res.status(200).json(payment);
@@ -308,6 +309,34 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
     res.status(500).json({ message });
   }
 });
+
+// PATCH /api/payments/:id/status
+router.patch(
+  "/:id/status",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const paymentId = parseIntOrError(req.params.id, "Payment ID");
+
+      const status = PaymentStatusSchema.parse(req.body.data.status);
+
+      const updatedPayment = await prisma.payment.update({
+        where: { id: paymentId },
+        data: { status, updatedById: userId },
+      });
+
+      res.json(updatedPayment);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update payment status";
+      res.status(500).json({ message });
+    }
+  }
+);
 
 // DELETE /api/payments/:id
 router.delete("/:id", async (req: Request, res: Response): Promise<any> => {

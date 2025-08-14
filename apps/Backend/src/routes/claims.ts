@@ -7,7 +7,7 @@ import { forwardToSeleniumClaimAgent } from "../services/seleniumClaimClient";
 import path from "path";
 import axios from "axios";
 import { Prisma } from "@repo/db/generated/prisma";
-import { Decimal } from "@prisma/client/runtime/library";
+import { Decimal } from "decimal.js";
 import {
   ExtendedClaimSchema,
   InputServiceLine,
@@ -255,8 +255,9 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
         (line: InputServiceLine) => ({
           ...line,
           totalBilled: Number(line.totalBilled),
-          totalAdjusted: Number(line.totalAdjusted),
-          totalPaid: Number(line.totalPaid),
+          totalAdjusted: 0,
+          totalPaid: 0,
+          totalDue: Number(line.totalBilled),
         })
       );
       req.body.serviceLines = { create: req.body.serviceLines };

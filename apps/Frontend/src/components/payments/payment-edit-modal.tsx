@@ -29,12 +29,16 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import { X } from "lucide-react";
 
 type PaymentEditModalProps = {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onClose: () => void;
   onEditServiceLine: (payload: NewTransactionPayload) => void;
+  isUpdatingServiceLine?: boolean;
+  onUpdateStatus: (paymentId: number, status: PaymentStatus) => void;
+  isUpdatingStatus?: boolean;
   payment: PaymentWithExtras | null;
 };
 
@@ -44,9 +48,12 @@ export default function PaymentEditModal({
   onClose,
   payment,
   onEditServiceLine,
+  isUpdatingServiceLine,
+  onUpdateStatus,
+  isUpdatingStatus,
 }: PaymentEditModalProps) {
   if (!payment) return null;
-  
+
   const [expandedLineId, setExpandedLineId] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = React.useState<PaymentStatus>(
     payment.status
@@ -99,7 +106,56 @@ export default function PaymentEditModal({
 
   const handleSavePayment = async () => {
     if (!formState.serviceLineId) {
-      toast({ title: "Error", description: "No service line selected." });
+      toast({
+        title: "Error",
+        description: "No service line selected.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const paidAmount = Number(formState.paidAmount) || 0;
+    const adjustedAmount = Number(formState.adjustedAmount) || 0;
+
+    if (paidAmount < 0 || adjustedAmount < 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Amounts cannot be negative.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (paidAmount === 0 && adjustedAmount === 0) {
+      toast({
+        title: "Invalid Amount",
+        description:
+          "Either paid or adjusted amount must be greater than zero.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const line = payment.claim.serviceLines.find(
+      (sl) => sl.id === formState.serviceLineId
+    );
+    if (!line) {
+      toast({
+        title: "Error",
+        description: "Selected service line not found.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const dueAmount = Number(line.totalDue);
+    if (paidAmount > dueAmount) {
+      toast({
+        title: "Invalid Payment",
+        description: `Paid amount ($${paidAmount.toFixed(
+          2
+        )}) cannot exceed due amount ($${dueAmount.toFixed(2)}).`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -114,70 +170,148 @@ export default function PaymentEditModal({
           adjustedAmount: Number(formState.adjustedAmount) || 0,
           method: formState.method,
           receivedDate: parseLocalDate(formState.receivedDate),
-          payerName: formState.payerName || undefined,
-          notes: formState.notes || undefined,
+          payerName: formState.payerName?.trim() || undefined,
+          notes: formState.notes?.trim() || undefined,
         },
       ],
     };
 
     try {
       await onEditServiceLine(payload);
+      toast({
+        title: "Success",
+        description: "Payment Transaction added successfully.",
+      });
       setExpandedLineId(null);
-      onClose();
     } catch (err) {
       console.error(err);
       toast({ title: "Error", description: "Failed to save payment." });
     }
   };
 
+  const handlePayFullDue = async (
+    line: (typeof payment.claim.serviceLines)[0]
+  ) => {
+    if (!line || !payment) {
+      toast({
+        title: "Error",
+        description: "Service line or payment data missing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const dueAmount = Number(line.totalDue);
+    if (isNaN(dueAmount) || dueAmount <= 0) {
+      toast({
+        title: "No Due",
+        description: "This service line has no outstanding balance.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const payload: NewTransactionPayload = {
+      paymentId: payment.id,
+      status: paymentStatus,
+      serviceLineTransactions: [
+        {
+          serviceLineId: line.id,
+          paidAmount: dueAmount,
+          adjustedAmount: 0,
+          method: paymentMethodOptions[1] as PaymentMethod, // Maybe make dynamic later
+          receivedDate: new Date(),
+        },
+      ],
+    };
+
+    try {
+      await onEditServiceLine(payload);
+      toast({
+        title: "Success",
+        description: `Full due amount ($${dueAmount.toFixed(
+          2
+        )}) paid for ${line.procedureCode}`,
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: "Failed to update payment.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Payment</DialogTitle>
-          <DialogDescription>
-            View and manage payments applied to service lines.
-          </DialogDescription>
-        </DialogHeader>
+        <div className="relative">
+          <DialogHeader>
+            <DialogTitle>Edit Payment</DialogTitle>
+            <DialogDescription>
+              View and manage payments applied to service lines.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
+          {/* Close button in top-right */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="absolute right-0 top-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-6">
           {/* Claim + Patient Info */}
-          <div className="space-y-1">
-            <h3 className="text-xl font-semibold">
+          <div className="space-y-2 border-b border-gray-200 pb-4">
+            <h3 className="text-2xl font-bold text-gray-900">
               {payment.claim.patientName}
             </h3>
-            <p className="text-gray-500">
-              Claim ID: {payment.claimId.toString().padStart(4, "0")}
-            </p>
-            <p className="text-gray-500">
-              Service Date:{" "}
-              {formatDateToHumanReadable(payment.claim.serviceDate)}
-            </p>
-            <p>
-              <span className="text-gray-500">Notes:</span>{" "}
-              {payment.notes || "N/A"}
-            </p>
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-medium">
+                Claim #{payment.claimId.toString().padStart(4, "0")}
+              </span>
+              <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-medium">
+                Service Date:{" "}
+                {formatDateToHumanReadable(payment.claim.serviceDate)}
+              </span>
+            </div>
           </div>
 
-          {/* Payment Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {/* Payment Summary + Metadata */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Payment Info */}
             <div>
-              <h4 className="font-medium text-gray-900">Payment Info</h4>
-              <div className="mt-2 space-y-1">
+              <h4 className="font-semibold text-gray-900">Payment Info</h4>
+              <div className="mt-2 space-y-1 text-sm">
                 <p>
-                  <span className="text-gray-500">Total Billed:</span> $
-                  {Number(payment.totalBilled || 0).toFixed(2)}
+                  <span className="text-gray-500">Total Billed:</span>{" "}
+                  <span className="font-medium">
+                    ${Number(payment.totalBilled || 0).toFixed(2)}
+                  </span>
                 </p>
                 <p>
-                  <span className="text-gray-500">Total Paid:</span> $
-                  {Number(payment.totalPaid || 0).toFixed(2)}
+                  <span className="text-gray-500">Total Paid:</span>{" "}
+                  <span className="font-medium text-green-600">
+                    ${Number(payment.totalPaid || 0).toFixed(2)}
+                  </span>
                 </p>
                 <p>
-                  <span className="text-gray-500">Total Due:</span> $
-                  {Number(payment.totalDue || 0).toFixed(2)}
+                  <span className="text-gray-500">Total Due:</span>{" "}
+                  <span className="font-medium text-red-600">
+                    ${Number(payment.totalDue || 0).toFixed(2)}
+                  </span>
                 </p>
-                <div className="pt-2">
-                  <label className="text-sm text-gray-600">Status</label>
+
+                {/* Status Selector */}
+                <div className="pt-3">
+                  <label className="block text-sm text-gray-600 mb-1">
+                    Payment Status
+                  </label>
                   <Select
                     value={paymentStatus}
                     onValueChange={(value: PaymentStatus) =>
@@ -196,12 +330,23 @@ export default function PaymentEditModal({
                     </SelectContent>
                   </Select>
                 </div>
+
+                <Button
+                  size="sm"
+                  disabled={isUpdatingStatus}
+                  onClick={() =>
+                    payment && onUpdateStatus(payment.id, paymentStatus)
+                  }
+                >
+                  {isUpdatingStatus ? "Updating..." : "Update Status"}
+                </Button>
               </div>
             </div>
 
+            {/* Metadata */}
             <div>
-              <h4 className="font-medium text-gray-900">Metadata</h4>
-              <div className="mt-2 space-y-1">
+              <h4 className="font-semibold text-gray-900">Metadata</h4>
+              <div className="mt-2 space-y-1 text-sm">
                 <p>
                   <span className="text-gray-500">Created At:</span>{" "}
                   {payment.createdAt
@@ -209,7 +354,7 @@ export default function PaymentEditModal({
                     : "N/A"}
                 </p>
                 <p>
-                  <span className="text-gray-500">Last Upadated At:</span>{" "}
+                  <span className="text-gray-500">Last Updated At:</span>{" "}
                   {payment.updatedAt
                     ? formatDateToHumanReadable(payment.updatedAt)
                     : "N/A"}
@@ -221,176 +366,186 @@ export default function PaymentEditModal({
           {/* Service Lines Payments */}
           <div>
             <h4 className="font-medium text-gray-900 pt-4">Service Lines</h4>
-            <div className="mt-2 space-y-3">
+            <div className="mt-3 space-y-4">
               {payment.claim.serviceLines.length > 0 ? (
-                <>
-                  {payment.claim.serviceLines.map((line) => {
-                    return (
-                      <div
-                        key={line.id}
-                        className="border p-3 rounded-md bg-gray-50"
-                      >
+                payment.claim.serviceLines.map((line) => {
+                  const isExpanded = expandedLineId === line.id;
+
+                  return (
+                    <div
+                      key={line.id}
+                      className="border border-gray-200 p-4 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
+                    >
+                      {/* Top Info */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         <p>
                           <span className="text-gray-500">Procedure Code:</span>{" "}
-                          {line.procedureCode}
+                          <span className="font-medium">
+                            {line.procedureCode}
+                          </span>
                         </p>
                         <p>
-                          <span className="text-gray-500">Billed:</span> $
-                          {Number(line.totalBilled || 0).toFixed(2)}
+                          <span className="text-gray-500">Billed:</span>{" "}
+                          <span className="font-semibold">
+                            ${Number(line.totalBilled || 0).toFixed(2)}
+                          </span>
                         </p>
                         <p>
-                          <span className="text-gray-500">Paid:</span> $
-                          {Number(line.totalPaid || 0).toFixed(2)}
+                          <span className="text-gray-500">Paid:</span>{" "}
+                          <span className="font-semibold text-green-600">
+                            ${Number(line.totalPaid || 0).toFixed(2)}
+                          </span>
                         </p>
                         <p>
-                          <span className="text-gray-500">Adjusted:</span> $
-                          {Number(line.totalAdjusted || 0).toFixed(2)}
+                          <span className="text-gray-500">Adjusted:</span>{" "}
+                          <span className="font-semibold text-yellow-600">
+                            ${Number(line.totalAdjusted || 0).toFixed(2)}
+                          </span>
                         </p>
                         <p>
-                          <span className="text-gray-500">Due:</span> $
-                          {Number(line.totalDue || 0).toFixed(2)}
+                          <span className="text-gray-500">Due:</span>{" "}
+                          <span className="font-semibold text-red-600">
+                            ${Number(line.totalDue || 0).toFixed(2)}
+                          </span>
                         </p>
+                      </div>
 
-                        <div className="pt-2">
+                      {/* Action Buttons */}
+                      <div className="pt-4 flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditServiceLine(line.id)}
+                        >
+                          {isExpanded ? "Cancel" : "Pay Partially"}
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handlePayFullDue(line)}
+                        >
+                          Pay Full Due
+                        </Button>
+                      </div>
+
+                      {/* Expanded Partial Payment Form */}
+                      {isExpanded && (
+                        <div className="mt-4 p-4 border-t border-gray-200 bg-gray-50 rounded-lg space-y-4">
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium">
+                              Paid Amount
+                            </label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Paid Amount"
+                              defaultValue={formState.paidAmount}
+                              onChange={(e) =>
+                                updateField(
+                                  "paidAmount",
+                                  parseFloat(e.target.value)
+                                )
+                              }
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium">
+                              Adjusted Amount
+                            </label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Adjusted Amount"
+                              defaultValue={formState.adjustedAmount}
+                              onChange={(e) =>
+                                updateField(
+                                  "adjustedAmount",
+                                  parseFloat(e.target.value)
+                                )
+                              }
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium">
+                              Payment Method
+                            </label>
+                            <Select
+                              value={formState.method}
+                              onValueChange={(value: PaymentMethod) =>
+                                setFormState((prev) => ({
+                                  ...prev,
+                                  method: value,
+                                }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a payment method" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {paymentMethodOptions.map((methodOption) => (
+                                  <SelectItem
+                                    key={methodOption}
+                                    value={methodOption}
+                                  >
+                                    {methodOption}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium">
+                              Received Date
+                            </label>
+                            <Input
+                              type="date"
+                              value={formState.receivedDate}
+                              onChange={(e) =>
+                                updateField("receivedDate", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium">
+                              Payer Name
+                            </label>
+                            <Input
+                              type="text"
+                              placeholder="Payer Name"
+                              value={formState.payerName}
+                              onChange={(e) =>
+                                updateField("payerName", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-sm font-medium">Notes</label>
+                            <Input
+                              type="text"
+                              placeholder="Notes"
+                              onChange={(e) =>
+                                updateField("notes", e.target.value)
+                              }
+                            />
+                          </div>
+
                           <Button
-                            variant="outline"
                             size="sm"
-                            onClick={() => handleEditServiceLine(line.id)}
+                            disabled={isUpdatingServiceLine}
+                            onClick={() => handleSavePayment()}
                           >
-                            {expandedLineId === line.id
-                              ? "Cancel"
-                              : "Edit Payments"}
+                            {isUpdatingStatus ? "Updating..." : "Update"}
                           </Button>
                         </div>
-
-                        {expandedLineId === line.id && (
-                          <div className="mt-3 space-y-4">
-                            <div className="space-y-1">
-                              <label
-                                htmlFor={`paid-${line.id}`}
-                                className="text-sm font-medium"
-                              >
-                                Paid Amount
-                              </label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="Paid Amount"
-                                defaultValue={formState.paidAmount}
-                                onChange={(e) =>
-                                  updateField(
-                                    "paidAmount",
-                                    parseFloat(e.target.value)
-                                  )
-                                }
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label
-                                htmlFor={`adjusted-${line.id}`}
-                                className="text-sm font-medium"
-                              >
-                                Adjusted Amount
-                              </label>
-                              <Input
-                                id={`adjusted-${line.id}`}
-                                type="number"
-                                step="0.01"
-                                placeholder="Adjusted Amount"
-                                defaultValue={formState.adjustedAmount}
-                                onChange={(e) =>
-                                  updateField(
-                                    "adjustedAmount",
-                                    parseFloat(e.target.value)
-                                  )
-                                }
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-sm font-medium">
-                                Payment Method
-                              </label>
-                              <Select
-                                value={formState.method}
-                                onValueChange={(value: PaymentMethod) =>
-                                  setFormState((prev) => ({
-                                    ...prev,
-                                    method: value,
-                                  }))
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a payment method" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {paymentMethodOptions.map((methodOption) => (
-                                    <SelectItem
-                                      key={methodOption}
-                                      value={methodOption}
-                                    >
-                                      {methodOption}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-sm font-medium">
-                                Received Date
-                              </label>
-                              <Input
-                                type="date"
-                                value={formState.receivedDate}
-                                onChange={(e) =>
-                                  updateField("receivedDate", e.target.value)
-                                }
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-sm font-medium">
-                                Payer Name
-                              </label>
-                              <Input
-                                type="text"
-                                placeholder="Payer Name"
-                                value={formState.payerName}
-                                onChange={(e) =>
-                                  updateField("payerName", e.target.value)
-                                }
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label
-                                htmlFor={`notes-${line.id}`}
-                                className="text-sm font-medium"
-                              >
-                                Notes
-                              </label>
-                              <Input
-                                id={`notes-${line.id}`}
-                                type="text"
-                                placeholder="Notes"
-                                onChange={(e) =>
-                                  updateField("notes", e.target.value)
-                                }
-                              />
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleSavePayment()}
-                            >
-                              Update
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
                 <p className="text-gray-500">No service lines available.</p>
               )}
@@ -400,39 +555,82 @@ export default function PaymentEditModal({
           {/* Transactions Overview */}
           <div>
             <h4 className="font-medium text-gray-900 pt-6">All Transactions</h4>
-            <div className="mt-2 space-y-2">
+            <div className="mt-4 space-y-3">
               {payment.serviceLineTransactions.length > 0 ? (
                 payment.serviceLineTransactions.map((tx) => (
                   <div
                     key={tx.id}
-                    className="border p-3 rounded-md bg-white shadow-sm"
+                    className="border border-gray-200 p-4 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
                   >
-                    <p>
-                      <span className="text-gray-500">Date:</span>{" "}
-                      {formatDateToHumanReadable(tx.receivedDate)}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Paid Amount:</span> $
-                      {Number(tx.paidAmount).toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Adjusted Amount:</span> $
-                      {Number(tx.adjustedAmount).toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Method:</span> {tx.method}
-                    </p>
-                    {tx.payerName && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                      {/* Transaction ID */}
+                      {tx.id && (
+                        <p>
+                          <span className="text-gray-500">Transaction ID:</span>{" "}
+                          <span className="font-medium">{tx.id}</span>
+                        </p>
+                      )}
+
+                      {/* Procedure Code */}
+                      {tx.serviceLine?.procedureCode && (
+                        <p>
+                          <span className="text-gray-500">Procedure Code:</span>{" "}
+                          <span className="font-medium">
+                            {tx.serviceLine.procedureCode}
+                          </span>
+                        </p>
+                      )}
+
+                      {/* Paid Amount */}
                       <p>
-                        <span className="text-gray-500">Payer Name:</span>{" "}
-                        {tx.payerName}
+                        <span className="text-gray-500">Paid Amount:</span>{" "}
+                        <span className="font-semibold text-green-600">
+                          ${Number(tx.paidAmount).toFixed(2)}
+                        </span>
                       </p>
-                    )}
-                    {tx.notes && (
+
+                      {/* Adjusted Amount */}
+                      {Number(tx.adjustedAmount) > 0 && (
+                        <p>
+                          <span className="text-gray-500">
+                            Adjusted Amount:
+                          </span>{" "}
+                          <span className="font-semibold text-yellow-600">
+                            ${Number(tx.adjustedAmount).toFixed(2)}
+                          </span>
+                        </p>
+                      )}
+
+                      {/* Date */}
                       <p>
-                        <span className="text-gray-500">Notes:</span> {tx.notes}
+                        <span className="text-gray-500">Date:</span>{" "}
+                        <span>
+                          {formatDateToHumanReadable(tx.receivedDate)}
+                        </span>
                       </p>
-                    )}
+
+                      {/* Method */}
+                      <p>
+                        <span className="text-gray-500">Method:</span>{" "}
+                        <span className="capitalize">{tx.method}</span>
+                      </p>
+
+                      {/* Payer Name */}
+                      {tx.payerName && tx.payerName.trim() !== "" && (
+                        <p className="md:col-span-2">
+                          <span className="text-gray-500">Payer Name:</span>{" "}
+                          <span>{tx.payerName}</span>
+                        </p>
+                      )}
+
+                      {/* Notes */}
+                      {tx.notes && tx.notes.trim() !== "" && (
+                        <p className="md:col-span-2">
+                          <span className="text-gray-500">Notes:</span>{" "}
+                          <span>{tx.notes}</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (
@@ -443,7 +641,7 @@ export default function PaymentEditModal({
 
           {/* Actions */}
           <div className="flex justify-end space-x-2 pt-6">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="default" onClick={onClose}>
               Close
             </Button>
           </div>

@@ -1,15 +1,11 @@
 import {
   PaymentUncheckedCreateInputObjectSchema,
-  ClaimUncheckedCreateInputObjectSchema,
   ServiceLineTransactionCreateInputObjectSchema,
-  ClaimStatusSchema,
-  StaffUncheckedCreateInputObjectSchema,
   PaymentMethodSchema,
   PaymentStatusSchema,
 } from "@repo/db/usedSchemas";
 import { Prisma } from "@repo/db/generated/prisma";
 import { z } from "zod";
-import { Decimal } from "decimal.js";
 
 // ========== BASIC TYPES ==========
 
@@ -30,6 +26,7 @@ export type ServiceLineTransactionRecord =
   }>;
 
 // Enum for payment
+export { PaymentStatusSchema };
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 

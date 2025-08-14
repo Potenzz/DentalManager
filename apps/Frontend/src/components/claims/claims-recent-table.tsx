@@ -364,7 +364,7 @@ export default function ClaimsRecentTable({
                   )}
                   <TableCell>
                     <div className="text-sm font-medium text-gray-900">
-                      CML-{claim.id!.toString().padStart(4, "0")}
+                      CLM-{claim.id!.toString().padStart(4, "0")}
                     </div>
                   </TableCell>
                   <TableCell>

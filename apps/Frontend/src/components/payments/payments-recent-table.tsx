@@ -16,6 +16,9 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  TrendingUp,
+  ThumbsDown,
+  DollarSign,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,15 +33,15 @@ import {
 } from "@/components/ui/pagination";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DeleteConfirmationDialog } from "../ui/deleteDialog";
-import PaymentViewModal from "./payment-view-modal";
 import LoadingScreen from "../ui/LoadingScreen";
 import {
   ClaimStatus,
-  ClaimWithServiceLines,
   NewTransactionPayload,
+  PaymentStatus,
   PaymentWithExtras,
 } from "@repo/db/types";
 import EditPaymentModal from "./payment-edit-modal";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface PaymentApiResponse {
   payments: PaymentWithExtras[];
@@ -47,7 +50,6 @@ interface PaymentApiResponse {
 
 interface PaymentsRecentTableProps {
   allowEdit?: boolean;
-  allowView?: boolean;
   allowDelete?: boolean;
   allowCheckbox?: boolean;
   onSelectPayment?: (payment: PaymentWithExtras | null) => void;
@@ -57,7 +59,6 @@ interface PaymentsRecentTableProps {
 
 export default function PaymentsRecentTable({
   allowEdit,
-  allowView,
   allowDelete,
   allowCheckbox,
   onSelectPayment,
@@ -66,7 +67,6 @@ export default function PaymentsRecentTable({
 }: PaymentsRecentTableProps) {
   const { toast } = useToast();
 
-  const [isViewPaymentOpen, setIsViewPaymentOpen] = useState(false);
   const [isEditPaymentOpen, setIsEditPaymentOpen] = useState(false);
   const [isDeletePaymentOpen, setIsDeletePaymentOpen] = useState(false);
 
@@ -131,21 +131,80 @@ export default function PaymentsRecentTable({
       }
       return response.json();
     },
-    onSuccess: () => {
-      setIsEditPaymentOpen(false);
+    onSuccess: async (updated, { paymentId }) => {
       toast({
         title: "Success",
         description: "Payment updated successfully!",
-        variant: "default",
       });
+
       queryClient.invalidateQueries({
         queryKey: getPaymentsQueryKey(),
       });
+
+      // Fetch updated payment and set into local state
+      const refreshedPayment = await apiRequest(
+        "GET",
+        `/api/payments/${paymentId}`
+      ).then((res) => res.json());
+
+      setCurrentPayment(refreshedPayment); // <-- keep modal in sync
     },
+
     onError: (error) => {
       toast({
         title: "Error",
         description: `Update failed: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePaymentStatusMutation = useMutation({
+    mutationFn: async ({
+      paymentId,
+      status,
+    }: {
+      paymentId: number;
+      status: PaymentStatus;
+    }) => {
+      const response = await apiRequest(
+        "PATCH",
+        `/api/payments/${paymentId}/status`,
+        {
+          data: { status },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update payment status");
+      }
+
+      return response.json();
+    },
+
+    onSuccess: async (updated, { paymentId }) => {
+      toast({
+        title: "Success",
+        description: "Payment Status updated successfully!",
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: getPaymentsQueryKey(),
+      });
+
+      // Fetch updated payment and set into local state
+      const refreshedPayment = await apiRequest(
+        "GET",
+        `/api/payments/${paymentId}`
+      ).then((res) => res.json());
+
+      setCurrentPayment(refreshedPayment); // <-- keep modal in sync
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Status update failed: ${error.message}`,
         variant: "destructive",
       });
     },
@@ -180,11 +239,6 @@ export default function PaymentsRecentTable({
   const handleEditPayment = (payment: PaymentWithExtras) => {
     setCurrentPayment(payment);
     setIsEditPaymentOpen(true);
-  };
-
-  const handleViewPayment = (payment: PaymentWithExtras) => {
-    setCurrentPayment(payment);
-    setIsViewPaymentOpen(true);
   };
 
   const handleDeletePayment = (payment: PaymentWithExtras) => {
@@ -231,7 +285,7 @@ export default function PaymentsRecentTable({
     paymentsData?.totalCount || 0
   );
 
-  const getInitialsFromName = (fullName: string) => {
+  const getInitials = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
     const filteredParts = parts.filter((part) => part.length > 0);
     if (filteredParts.length === 0) {
@@ -260,7 +314,7 @@ export default function PaymentsRecentTable({
     return colorClasses[id % colorClasses.length];
   };
 
-  const getStatusInfo = (status?: ClaimStatus) => {
+  const getStatusInfo = (status?: PaymentStatus) => {
     switch (status) {
       case "PENDING":
         return {
@@ -268,22 +322,35 @@ export default function PaymentsRecentTable({
           color: "bg-yellow-100 text-yellow-800",
           icon: <Clock className="h-3 w-3 mr-1" />,
         };
-      case "APPROVED":
+      case "PARTIALLY_PAID":
         return {
-          label: "Approved",
+          label: "Partially Paid",
+          color: "bg-blue-100 text-blue-800",
+          icon: <DollarSign className="h-3 w-3 mr-1" />,
+        };
+      case "PAID":
+        return {
+          label: "Paid",
           color: "bg-green-100 text-green-800",
           icon: <CheckCircle className="h-3 w-3 mr-1" />,
         };
-      case "CANCELLED":
+      case "OVERPAID":
         return {
-          label: "Cancelled",
+          label: "Overpaid",
+          color: "bg-purple-100 text-purple-800",
+          icon: <TrendingUp className="h-3 w-3 mr-1" />,
+        };
+      case "DENIED":
+        return {
+          label: "Denied",
           color: "bg-red-100 text-red-800",
-          icon: <AlertCircle className="h-3 w-3 mr-1" />,
+          icon: <ThumbsDown className="h-3 w-3 mr-1" />,
         };
       default:
         return {
           label: status
-            ? status.charAt(0).toUpperCase() + status.slice(1)
+            ? (status as string).charAt(0).toUpperCase() +
+              (status as string).slice(1).toLowerCase()
             : "Unknown",
           color: "bg-gray-100 text-gray-800",
           icon: <AlertCircle className="h-3 w-3 mr-1" />,
@@ -318,10 +385,11 @@ export default function PaymentsRecentTable({
             <TableRow>
               {allowCheckbox && <TableHead>Select</TableHead>}
               <TableHead>Payment ID</TableHead>
+              <TableHead>Claim ID</TableHead>
               <TableHead>Patient Name</TableHead>
               <TableHead>Amount</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Method</TableHead>
+              <TableHead>Claim Submitted on</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -374,12 +442,39 @@ export default function PaymentsRecentTable({
                         ? `PAY-${payment.id.toString().padStart(4, "0")}`
                         : "N/A"}
                     </TableCell>
-                    <TableCell>{payment.patientName}</TableCell>
+
+                    <TableCell>
+                      {typeof payment.claimId === "number"
+                        ? `CLM-${payment.claimId.toString().padStart(4, "0")}`
+                        : "N/A"}
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center">
+                        <Avatar
+                          className={`h-10 w-10 ${getAvatarColor(Number(payment.id))}`}
+                        >
+                          <AvatarFallback className="text-white">
+                            {getInitials(payment.patientName)}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {payment.patientName}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            PID-{payment.patientId?.toString().padStart(4, "0")}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+
                     {/* 💰 Billed / Paid / Due breakdown */}
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <span>
-                          <strong>Total Billed:</strong> $ 
+                          <strong>Total Billed:</strong> $
                           {Number(totalBilled).toFixed(2)}
                         </span>
                         <span>
@@ -400,7 +495,27 @@ export default function PaymentsRecentTable({
                     <TableCell>
                       {formatDateToHumanReadable(payment.paymentDate)}
                     </TableCell>
-                    <TableCell>{payment.paymentMethod}</TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const { label, color, icon } = getStatusInfo(
+                            payment.status
+                          );
+                          return (
+                            <span
+                              className={`px-2 py-1 text-xs font-medium rounded-full ${color}`}
+                            >
+                              <span className="flex items-center">
+                                {icon}
+                                {label}
+                              </span>
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </TableCell>
+
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
                         {allowDelete && (
@@ -428,18 +543,6 @@ export default function PaymentsRecentTable({
                             <Edit className="h-4 w-4" />
                           </Button>
                         )}
-                        {allowView && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              handleViewPayment(payment);
-                            }}
-                            className="text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -457,17 +560,6 @@ export default function PaymentsRecentTable({
         entityName={`ClaimID : ${currentPayment?.claimId}`}
       />
 
-      {/* /will hanlde both modal later */}
-      {/* {isViewPaymentOpen && currentPayment && (
-        <ClaimPaymentModal
-          isOpen={isViewPaymentOpen}
-          onClose={() => setIsViewPaymentOpen(false)}
-          onOpenChange={(open) => setIsViewPaymentOpen(open)}
-          onEditClaim={(payment) => handleEditPayment(payment)}
-          payment={currentPayment}
-        />
-      )} */}
-
       {isEditPaymentOpen && currentPayment && (
         <EditPaymentModal
           isOpen={isEditPaymentOpen}
@@ -477,6 +569,11 @@ export default function PaymentsRecentTable({
           onEditServiceLine={(updatedPayment) => {
             updatePaymentMutation.mutate(updatedPayment);
           }}
+          isUpdatingServiceLine={updatePaymentMutation.isPending}
+          onUpdateStatus={(paymentId, status) => {
+            updatePaymentStatusMutation.mutate({ paymentId, status });
+          }}
+          isUpdatingStatus={updatePaymentStatusMutation.isPending}
         />
       )}
 
