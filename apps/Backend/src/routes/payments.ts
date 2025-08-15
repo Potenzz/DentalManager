@@ -94,26 +94,30 @@ router.get(
   "/patient/:patientId",
   async (req: Request, res: Response): Promise<any> => {
     try {
-      const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const patientIdParam = req.params.patientId;
+      if (!patientIdParam) {
+        return res.status(400).json({ message: "Missing patientId" });
+      }
+      const patientId = parseInt(patientIdParam);
+      if (isNaN(patientId)) {
+        return res.status(400).json({ message: "Invalid patientId" });
+      }
+      const limit = parseInt(req.query.limit as string) || 10;
+      const offset = parseInt(req.query.offset as string) || 0;
 
-      const parsedPatientId = parseIntOrError(
-        req.params.patientId,
-        "Patient ID"
-      );
+      if (isNaN(patientId)) {
+        return res.status(400).json({ message: "Invalid patient ID" });
+      }
 
-      const payments = await storage.getPaymentsByPatientId(
-        parsedPatientId,
-        userId
-      );
+      const [payments, totalCount] = await Promise.all([
+        storage.getRecentPaymentsByPatientId(patientId, limit, offset),
+        storage.getTotalPaymentCountByPatient(patientId),
+      ]);
 
-      if (!payments)
-        return res.status(404).json({ message: "No payments found for claim" });
-
-      res.status(200).json(payments);
-    } catch (err) {
-      console.error("Failed to fetch patient payments:", err);
-      res.status(500).json({ message: "Failed to fetch patient payments" });
+      res.json({ payments, totalCount });
+    } catch (error) {
+      console.error("Failed to retrieve payments for patient:", error);
+      res.status(500).json({ message: "Failed to retrieve patient payments" });
     }
   }
 );

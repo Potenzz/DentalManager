@@ -48,6 +48,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import PaymentsRecentTable from "@/components/payments/payments-recent-table";
+import PaymentsOfPatientModal from "@/components/payments/payments-of-patient-table";
 
 export default function PaymentsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -357,6 +358,9 @@ export default function PaymentsPage() {
               <PaymentsRecentTable allowEdit allowDelete />
             </CardContent>
           </Card>
+          
+          {/* Recent Payments by Patients*/}
+          <PaymentsOfPatientModal/>
         </main>
       </div>
     </div>

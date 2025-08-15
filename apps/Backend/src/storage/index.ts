@@ -183,14 +183,16 @@ export interface IStorage {
   ): Promise<Payment>;
   deletePayment(id: number, userId: number): Promise<void>;
   getPaymentById(id: number, userId: number): Promise<PaymentWithExtras | null>;
+  getRecentPaymentsByPatientId(
+    patientId: number,
+    limit: number,
+    offset: number
+  ): Promise<PaymentWithExtras[] | null>;
+  getTotalPaymentCountByPatient(patientId: number): Promise<number>;
   getPaymentsByClaimId(
     claimId: number,
     userId: number
   ): Promise<PaymentWithExtras | null>;
-  getPaymentsByPatientId(
-    patientId: number,
-    userId: number
-  ): Promise<PaymentWithExtras[]>;
   getRecentPaymentsByUser(
     userId: number,
     limit: number,
@@ -762,6 +764,45 @@ export const storage: IStorage = {
     await db.payment.delete({ where: { id } });
   },
 
+  async getRecentPaymentsByPatientId(
+    patientId: number,
+    limit: number,
+    offset: number
+  ): Promise<PaymentWithExtras[]> {
+    const payments = await db.payment.findMany({
+      where: { claim: { patientId } },
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+      include: {
+        claim: {
+          include: {
+            serviceLines: true,
+          },
+        },
+        serviceLineTransactions: {
+          include: {
+            serviceLine: true,
+          },
+        },
+        updatedBy: true,
+      },
+    });
+
+    return payments.map((payment) => ({
+      ...payment,
+      patientName: payment.claim?.patientName ?? "",
+      paymentDate: payment.createdAt,
+      paymentMethod: payment.serviceLineTransactions[0]?.method ?? "OTHER",
+    }));
+  },
+
+  async getTotalPaymentCountByPatient(patientId: number): Promise<number> {
+    return db.payment.count({
+      where: { claim: { patientId } },
+    });
+  },
+
   async getPaymentById(
     id: number,
     userId: number
@@ -822,35 +863,6 @@ export const storage: IStorage = {
       paymentDate: payment.createdAt,
       paymentMethod: payment.serviceLineTransactions[0]?.method ?? "OTHER",
     };
-  },
-
-  async getPaymentsByPatientId(
-    patientId: number,
-    userId: number
-  ): Promise<PaymentWithExtras[]> {
-    const payments = await db.payment.findMany({
-      where: { patientId, userId },
-      include: {
-        claim: {
-          include: {
-            serviceLines: true,
-          },
-        },
-        serviceLineTransactions: {
-          include: {
-            serviceLine: true,
-          },
-        },
-        updatedBy: true,
-      },
-    });
-
-    return payments.map((payment) => ({
-      ...payment,
-      patientName: payment.claim?.patientName ?? "",
-      paymentDate: payment.createdAt,
-      paymentMethod: payment.serviceLineTransactions[0]?.method ?? "OTHER",
-    }));
   },
 
   async getRecentPaymentsByUser(

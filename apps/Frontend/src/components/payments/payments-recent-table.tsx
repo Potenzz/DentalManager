@@ -54,7 +54,7 @@ interface PaymentsRecentTableProps {
   allowCheckbox?: boolean;
   onSelectPayment?: (payment: PaymentWithExtras | null) => void;
   onPageChange?: (page: number) => void;
-  claimId?: number;
+  patientId?: number;
 }
 
 export default function PaymentsRecentTable({
@@ -63,7 +63,7 @@ export default function PaymentsRecentTable({
   allowCheckbox,
   onSelectPayment,
   onPageChange,
-  claimId,
+  patientId,
 }: PaymentsRecentTableProps) {
   const { toast } = useToast();
 
@@ -91,8 +91,8 @@ export default function PaymentsRecentTable({
   };
 
   const getPaymentsQueryKey = () =>
-    claimId
-      ? ["payments-recent", "claim", claimId, currentPage]
+    patientId
+      ? ["payments-recent", "patient", patientId, currentPage]
       : ["payments-recent", "global", currentPage];
 
   const {
@@ -102,8 +102,8 @@ export default function PaymentsRecentTable({
   } = useQuery<PaymentApiResponse>({
     queryKey: getPaymentsQueryKey(),
     queryFn: async () => {
-      const endpoint = claimId
-        ? `/api/payments/claim/${claimId}?limit=${paymentsPerPage}&offset=${offset}`
+      const endpoint = patientId
+        ? `/api/payments/patient/${patientId}?limit=${paymentsPerPage}&offset=${offset}`
         : `/api/payments/recent?limit=${paymentsPerPage}&offset=${offset}`;
 
       const res = await apiRequest("GET", endpoint);
@@ -272,7 +272,7 @@ export default function PaymentsRecentTable({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [claimId]);
+  }, [patientId]);
 
   const totalPages = useMemo(
     () => Math.ceil((paymentsData?.totalCount || 0) / paymentsPerPage),
@@ -412,7 +412,7 @@ export default function PaymentsRecentTable({
                   Error loading payments.
                 </TableCell>
               </TableRow>
-            ) : paymentsData?.payments.length === 0 ? (
+            ) : (paymentsData?.payments?.length ?? 0) === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={8}
