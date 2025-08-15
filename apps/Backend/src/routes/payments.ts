@@ -74,10 +74,7 @@ router.get(
 
       const parsedClaimId = parseIntOrError(req.params.claimId, "Claim ID");
 
-      const payments = await storage.getPaymentsByClaimId(
-        parsedClaimId,
-        userId
-      );
+      const payments = await storage.getPaymentsByClaimId(parsedClaimId);
       if (!payments)
         return res.status(404).json({ message: "No payments found for claim" });
 
@@ -138,7 +135,6 @@ router.get("/filter", async (req: Request, res: Response): Promise<any> => {
 
     const { from, to } = validated.data;
     const payments = await storage.getPaymentsByDateRange(
-      userId,
       new Date(from),
       new Date(to)
     );
@@ -157,7 +153,7 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
 
     const id = parseIntOrError(req.params.id, "Payment ID");
 
-    const payment = await storage.getPaymentById(id, userId);
+    const payment = await storage.getPaymentById(id);
     if (!payment) return res.status(404).json({ message: "Payment not found" });
 
     res.status(200).json(payment);
@@ -205,6 +201,9 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const paymentId = parseIntOrError(req.params.id, "Payment ID");
+    const paymentRecord = await storage.getPaymentById(paymentId);
+    if (!paymentRecord)
+      return res.status(404).json({ message: "Payment not found" });
 
     const validated = newTransactionPayloadSchema.safeParse(
       req.body.data as NewTransactionPayload
@@ -217,6 +216,33 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
     }
 
     const { status, serviceLineTransactions } = validated.data;
+
+    // validation if req is valid
+    for (const txn of serviceLineTransactions) {
+      const line = paymentRecord.claim.serviceLines.find(
+        (sl) => sl.id === txn.serviceLineId
+      );
+      if (!line)
+        return res
+          .status(400)
+          .json({ message: `Invalid service line: ${txn.serviceLineId}` });
+
+      const paidAmount = new Decimal(txn.paidAmount ?? 0);
+      const adjustedAmount = new Decimal(txn.adjustedAmount ?? 0);
+      if (paidAmount.lt(0) || adjustedAmount.lt(0)) {
+        return res.status(400).json({ message: "Amounts cannot be negative" });
+      }
+      if (paidAmount.eq(0) && adjustedAmount.eq(0)) {
+        return res
+          .status(400)
+          .json({ message: "Must provide a payment or adjustment" });
+      }
+      if (paidAmount.gt(line.totalDue)) {
+        return res.status(400).json({
+          message: `Paid amount exceeds due for service line ${txn.serviceLineId}`,
+        });
+      }
+    }
 
     // Wrap everything in a transaction
     const result = await prisma.$transaction(async (tx) => {

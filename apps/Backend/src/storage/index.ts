@@ -179,10 +179,9 @@ export interface IStorage {
   updatePayment(
     id: number,
     updates: UpdatePayment,
-    userId: number
   ): Promise<Payment>;
   deletePayment(id: number, userId: number): Promise<void>;
-  getPaymentById(id: number, userId: number): Promise<PaymentWithExtras | null>;
+  getPaymentById(id: number): Promise<PaymentWithExtras | null>;
   getRecentPaymentsByPatientId(
     patientId: number,
     limit: number,
@@ -191,7 +190,6 @@ export interface IStorage {
   getTotalPaymentCountByPatient(patientId: number): Promise<number>;
   getPaymentsByClaimId(
     claimId: number,
-    userId: number
   ): Promise<PaymentWithExtras | null>;
   getRecentPaymentsByUser(
     userId: number,
@@ -199,7 +197,6 @@ export interface IStorage {
     offset: number
   ): Promise<PaymentWithExtras[]>;
   getPaymentsByDateRange(
-    userId: number,
     from: Date,
     to: Date
   ): Promise<PaymentWithExtras[]>;
@@ -742,11 +739,10 @@ export const storage: IStorage = {
   async updatePayment(
     id: number,
     updates: UpdatePayment,
-    userId: number
   ): Promise<Payment> {
-    const existing = await db.payment.findFirst({ where: { id, userId } });
+    const existing = await db.payment.findFirst({ where: { id } });
     if (!existing) {
-      throw new Error("Not authorized or payment not found");
+      throw new Error("Payment not found");
     }
 
     return db.payment.update({
@@ -805,10 +801,9 @@ export const storage: IStorage = {
 
   async getPaymentById(
     id: number,
-    userId: number
   ): Promise<PaymentWithExtras | null> {
     const payment = await db.payment.findFirst({
-      where: { id, userId },
+      where: { id },
       include: {
         claim: {
           include: {
@@ -836,10 +831,9 @@ export const storage: IStorage = {
 
   async getPaymentsByClaimId(
     claimId: number,
-    userId: number
   ): Promise<PaymentWithExtras | null> {
     const payment = await db.payment.findFirst({
-      where: { claimId, userId },
+      where: { claimId },
       include: {
         claim: {
           include: {
@@ -899,13 +893,11 @@ export const storage: IStorage = {
   },
 
   async getPaymentsByDateRange(
-    userId: number,
     from: Date,
     to: Date
   ): Promise<PaymentWithExtras[]> {
     const payments = await db.payment.findMany({
       where: {
-        userId,
         createdAt: {
           gte: from,
           lte: to,
