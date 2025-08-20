@@ -579,7 +579,7 @@ export default function PaymentsRecentTable({
                               handleDeletePayment(payment);
                             }}
                             className="text-red-600 hover:text-red-900"
-                            aria-label="Delete Staff"
+                            aria-label="Delete Payment"
                             variant="ghost"
                             size="icon"
                           >
@@ -599,24 +599,28 @@ export default function PaymentsRecentTable({
                           </Button>
                         )}
                         {/* Pay Full Due */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePayAbsoluteFullDue(payment.id)}
-                        >
-                          Pay Full Due
-                        </Button>
+                        {payment.status !== "PAID" && (
+                          <Button
+                            variant="warning"
+                            size="sm"
+                            onClick={() => handlePayAbsoluteFullDue(payment.id)}
+                          >
+                            Pay Full Due
+                          </Button>
+                        )}
                         {/* Revert Full Due */}
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => {
-                            setRevertPaymentId(payment.id);
-                            setIsRevertOpen(true);
-                          }}
-                        >
-                          Revert Full Due
-                        </Button>
+                        {payment.status === "PAID" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setRevertPaymentId(payment.id);
+                              setIsRevertOpen(true);
+                            }}
+                          >
+                            Revert Full Due
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

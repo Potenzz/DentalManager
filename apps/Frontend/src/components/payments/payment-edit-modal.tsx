@@ -30,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { X } from "lucide-react";
+import { DateInput } from "@/components/ui/dateInput";
 
 type PaymentEditModalProps = {
   isOpen: boolean;
@@ -494,18 +495,23 @@ export default function PaymentEditModal({
                             </Select>
                           </div>
 
-                          <div className="space-y-1">
-                            <label className="text-sm font-medium">
-                              Received Date
-                            </label>
-                            <Input
-                              type="date"
-                              value={formState.receivedDate}
-                              onChange={(e) =>
-                                updateField("receivedDate", e.target.value)
+                          <DateInput
+                            label="Received Date"
+                            value={
+                              formState.receivedDate
+                                ? parseLocalDate(formState.receivedDate)
+                                : null
+                            }
+                            onChange={(date) => {
+                              if (date) {
+                                const localDate = formatLocalDate(date);
+                                updateField("receivedDate", localDate);
+                              } else {
+                                updateField("receivedDate", null);
                               }
-                            />
-                          </div>
+                            }}
+                            disableFuture
+                          />
 
                           <div className="space-y-1">
                             <label className="text-sm font-medium">

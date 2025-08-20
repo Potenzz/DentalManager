@@ -201,17 +201,19 @@ export default function ClaimEditModal({
                       )}
                       <p>
                         <span className="text-gray-500">Billed Amount:</span> $
-                        {line.totalBilled.toFixed(2)}
+                        {Number(line.totalBilled).toFixed(2)}
                       </p>
                     </div>
                   ))}
                   <div className="text-right font-semibold text-gray-900 pt-2 border-t mt-4">
                     Total Billed Amount: $
                     {claim.serviceLines
-                      .reduce(
-                        (total, line) => total + line.totalBilled?.toNumber(),
-                        0
-                      )
+                      .reduce((total, line) => {
+                        const billed = line.totalBilled
+                          ? parseFloat(line.totalBilled as any)
+                          : 0;
+                        return total + billed;
+                      }, 0)
                       .toFixed(2)}
                   </div>
                 </>

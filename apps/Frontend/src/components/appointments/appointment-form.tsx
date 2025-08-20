@@ -21,14 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { CalendarIcon, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Clock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useDebounce } from "use-debounce";
@@ -40,6 +33,7 @@ import {
   Staff,
   UpdateAppointment,
 } from "@repo/db/types";
+import { DateInputField } from "@/components/ui/dateInputField";
 
 interface AppointmentFormProps {
   appointment?: Appointment;
@@ -121,7 +115,7 @@ export function AppointmentForm({
   // Format the date and times for the form
   const defaultValues: Partial<Appointment> = appointment
     ? {
-        userId: user?.id, 
+        userId: user?.id,
         patientId: appointment.patientId,
         title: appointment.title,
         date:
@@ -140,7 +134,7 @@ export function AppointmentForm({
       }
     : parsedStoredData
       ? {
-          userId: user?.id, 
+          userId: user?.id,
           patientId: Number(parsedStoredData.patientId),
           date: parsedStoredData.date
             ? typeof parsedStoredData.date === "string"
@@ -159,8 +153,8 @@ export function AppointmentForm({
               ? parsedStoredData.staff
               : (staffMembers?.[0]?.id ?? undefined),
         }
-      : { 
-          userId: user?.id ?? 0, 
+      : {
+          userId: user?.id ?? 0,
           date: new Date(),
           title: "",
           startTime: "09:00",
@@ -379,50 +373,11 @@ export function AppointmentForm({
             )}
           />
 
-          <FormField
+          <DateInputField
             control={form.control}
             name="date"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                        disabled={isLoading}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-4">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={(date) => {
-                        if (date) {
-                          field.onChange(date);
-                        }
-                      }}
-                      disabled={(date: Date) =>
-                        date < new Date(new Date().setHours(0, 0, 0, 0))
-                      }
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
+            label="Date"
+            disablePast
           />
 
           <div className="grid grid-cols-2 gap-4">

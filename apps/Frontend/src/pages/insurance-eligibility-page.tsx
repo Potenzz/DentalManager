@@ -12,18 +12,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, CheckCircle, LoaderCircleIcon } from "lucide-react";
+import { CheckCircle, LoaderCircleIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { PatientTable } from "@/components/patients/patient-table";
-import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import {
@@ -33,6 +25,7 @@ import {
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import { InsertPatient, Patient } from "@repo/db/types";
+import { DateInput } from "@/components/ui/dateInput";
 
 export default function InsuranceEligibilityPage() {
   const { user } = useAuth();
@@ -54,7 +47,7 @@ export default function InsuranceEligibilityPage() {
 
   // Insurance eligibility check form fields
   const [memberId, setMemberId] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>();
+  const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
@@ -75,7 +68,7 @@ export default function InsuranceEligibilityPage() {
       setMemberId("");
       setFirstName("");
       setLastName("");
-      setDateOfBirth(undefined);
+      setDateOfBirth(null);
     }
   }, [selectedPatient]);
 
@@ -264,33 +257,12 @@ export default function InsuranceEligibilityPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="dob">Date of Birth</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full pl-3  text-left font-normal",
-                            !dateOfBirth && "text-muted-foreground"
-                          )}
-                        >
-                          {dateOfBirth ? (
-                            format(dateOfBirth, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-4">
-                        <Calendar
-                          mode="single"
-                          selected={dateOfBirth}
-                          onSelect={setDateOfBirth}
-                          disabled={(date) => date > new Date()}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <DateInput
+                      label="Date of Birth"
+                      value={dateOfBirth}
+                      onChange={setDateOfBirth}
+                      disableFuture
+                    />
                   </div>
 
                   <div className="space-y-2">

@@ -19,17 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useEffect, useMemo } from "react";
 import { forwardRef, useImperativeHandle } from "react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "../ui/calendar";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { Button } from "../ui/button";
-import { cn } from "@/lib/utils";
-import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
+import { formatLocalDate } from "@/utils/dateUtils";
 import {
   InsertPatient,
   insertPatientSchema,
@@ -38,6 +28,7 @@ import {
   updatePatientSchema,
 } from "@repo/db/types";
 import { z } from "zod";
+import { DateInputField } from "@/components/ui/dateInputField";
 
 interface PatientFormProps {
   patient?: Patient;
@@ -180,54 +171,11 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
                 )}
               />
 
-              <FormField
+              <DateInputField
                 control={form.control}
                 name="dateOfBirth"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date of Birth *</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(parseLocalDate(field.value), "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-4">
-                        <Calendar
-                          mode="single"
-                          selected={
-                            field.value
-                              ? parseLocalDate(field.value)
-                              : undefined
-                          }
-                          onSelect={(date) => {
-                            if (date) {
-                              const localDate = formatLocalDate(date); // keep yyyy-MM-dd
-                              field.onChange(localDate);
-                            }
-                          }}
-                          disabled={
-                            (date) => date > new Date() // Prevent future dates
-                          }
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                label="Date of Birth *"
+                disableFuture
               />
 
               <FormField
