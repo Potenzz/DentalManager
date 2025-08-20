@@ -161,7 +161,6 @@ export default function PaymentEditModal({
 
     const payload: NewTransactionPayload = {
       paymentId: payment.id,
-      status: paymentStatus,
       serviceLineTransactions: [
         {
           serviceLineId: formState.serviceLineId,
@@ -213,7 +212,6 @@ export default function PaymentEditModal({
 
     const payload: NewTransactionPayload = {
       paymentId: payment.id,
-      status: paymentStatus,
       serviceLineTransactions: [
         {
           serviceLineId: line.id,

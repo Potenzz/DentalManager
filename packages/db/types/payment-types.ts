@@ -82,7 +82,6 @@ export type PaymentWithExtras = Prisma.PaymentGetPayload<{
 
 export const newTransactionPayloadSchema = z.object({
   paymentId: z.number(),
-  status: PaymentStatusSchema,
   serviceLineTransactions: z.array(
     z.object({
       serviceLineId: z.number(),

@@ -7,11 +7,11 @@ import {
   insertPaymentSchema,
   NewTransactionPayload,
   newTransactionPayloadSchema,
-  updatePaymentSchema,
+  paymentMethodOptions,
 } from "@repo/db/types";
-import Decimal from "decimal.js";
 import { prisma } from "@repo/db/client";
 import { PaymentStatusSchema } from "@repo/db/types";
+import * as paymentService from "../services/paymentService";
 
 const paymentFilterSchema = z.object({
   from: z.string().datetime(),
@@ -201,9 +201,6 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const paymentId = parseIntOrError(req.params.id, "Payment ID");
-    const paymentRecord = await storage.getPaymentById(paymentId);
-    if (!paymentRecord)
-      return res.status(404).json({ message: "Payment not found" });
 
     const validated = newTransactionPayloadSchema.safeParse(
       req.body.data as NewTransactionPayload
@@ -215,130 +212,109 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
       });
     }
 
-    const { status, serviceLineTransactions } = validated.data;
+    const { serviceLineTransactions } = validated.data;
 
-    // validation if req is valid
-    for (const txn of serviceLineTransactions) {
-      const line = paymentRecord.claim.serviceLines.find(
-        (sl) => sl.id === txn.serviceLineId
-      );
-      if (!line)
-        return res
-          .status(400)
-          .json({ message: `Invalid service line: ${txn.serviceLineId}` });
+    const updatedPayment = await paymentService.updatePayment(
+      paymentId,
+      serviceLineTransactions,
+      userId
+    );
 
-      const paidAmount = new Decimal(txn.paidAmount ?? 0);
-      const adjustedAmount = new Decimal(txn.adjustedAmount ?? 0);
-      if (paidAmount.lt(0) || adjustedAmount.lt(0)) {
-        return res.status(400).json({ message: "Amounts cannot be negative" });
-      }
-      if (paidAmount.eq(0) && adjustedAmount.eq(0)) {
-        return res
-          .status(400)
-          .json({ message: "Must provide a payment or adjustment" });
-      }
-      if (paidAmount.gt(line.totalDue)) {
-        return res.status(400).json({
-          message: `Paid amount exceeds due for service line ${txn.serviceLineId}`,
-        });
-      }
-    }
-
-    // Wrap everything in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Create all new service line transactions
-      for (const txn of serviceLineTransactions) {
-        await tx.serviceLineTransaction.create({
-          data: {
-            paymentId,
-            serviceLineId: txn.serviceLineId,
-            transactionId: txn.transactionId,
-            paidAmount: new Decimal(txn.paidAmount || 0),
-            adjustedAmount: new Decimal(txn.adjustedAmount || 0),
-            method: txn.method,
-            receivedDate: txn.receivedDate,
-            payerName: txn.payerName,
-            notes: txn.notes,
-          },
-        });
-
-        // 2. Recalculate that specific service line's totals
-        const aggLine = await tx.serviceLineTransaction.aggregate({
-          _sum: {
-            paidAmount: true,
-            adjustedAmount: true,
-          },
-          where: { serviceLineId: txn.serviceLineId },
-        });
-
-        const serviceLine = await tx.serviceLine.findUniqueOrThrow({
-          where: { id: txn.serviceLineId },
-          select: { totalBilled: true },
-        });
-
-        const totalPaid = aggLine._sum.paidAmount || new Decimal(0);
-        const totalAdjusted = aggLine._sum.adjustedAmount || new Decimal(0);
-        const totalDue = serviceLine.totalBilled
-          .minus(totalPaid)
-          .minus(totalAdjusted);
-
-        await tx.serviceLine.update({
-          where: { id: txn.serviceLineId },
-          data: {
-            totalPaid,
-            totalAdjusted,
-            totalDue,
-            status:
-              totalDue.lte(0) && totalPaid.gt(0)
-                ? "PAID"
-                : totalPaid.gt(0)
-                  ? "PARTIALLY_PAID"
-                  : "UNPAID",
-          },
-        });
-      }
-
-      // 3. Recalculate payment totals
-      const aggPayment = await tx.serviceLineTransaction.aggregate({
-        _sum: {
-          paidAmount: true,
-          adjustedAmount: true,
-        },
-        where: { paymentId },
-      });
-
-      const payment = await tx.payment.findUniqueOrThrow({
-        where: { id: paymentId },
-        select: { totalBilled: true },
-      });
-
-      const totalPaid = aggPayment._sum.paidAmount || new Decimal(0);
-      const totalAdjusted = aggPayment._sum.adjustedAmount || new Decimal(0);
-      const totalDue = payment.totalBilled
-        .minus(totalPaid)
-        .minus(totalAdjusted);
-
-      const updatedPayment = await tx.payment.update({
-        where: { id: paymentId },
-        data: {
-          totalPaid,
-          totalAdjusted,
-          totalDue,
-          status,
-          updatedById: userId,
-        },
-      });
-
-      return updatedPayment;
-    });
-
-    res.status(200).json(result);
+    res.status(200).json(updatedPayment);
   } catch (err: unknown) {
     const message =
       err instanceof Error ? err.message : "Failed to update payment";
     res.status(500).json({ message });
   }
 });
+
+// PUT /api/payments/:id/pay-absolute-full-claim
+router.put(
+  "/:id/pay-absolute-full-claim",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const paymentId = parseIntOrError(req.params.id, "Payment ID");
+      const paymentRecord = await storage.getPaymentById(paymentId);
+      if (!paymentRecord) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      const serviceLineTransactions = paymentRecord.claim.serviceLines
+        .filter((line) => line.totalDue.gt(0))
+        .map((line) => ({
+          serviceLineId: line.id,
+          paidAmount: line.totalDue.toNumber(),
+          adjustedAmount: 0,
+          method: paymentMethodOptions[1],
+          receivedDate: new Date(),
+          notes: "Full claim payment",
+        }));
+
+      if (serviceLineTransactions.length === 0) {
+        return res.status(400).json({ message: "No outstanding balance" });
+      }
+
+      // Use updatePayment for consistency & validation
+      const updatedPayment = await paymentService.updatePayment(
+        paymentId,
+        serviceLineTransactions,
+        userId
+      );
+
+      res.status(200).json(updatedPayment);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Failed to pay full claim" });
+    }
+  }
+);
+
+// PUT /api/payments/:id/revert-full-claim
+router.put(
+  "/:id/revert-full-claim",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const paymentId = parseIntOrError(req.params.id, "Payment ID");
+      const paymentRecord = await storage.getPaymentById(paymentId);
+      if (!paymentRecord) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      // Build reversal transactions (negating what’s already paid/adjusted)
+      const serviceLineTransactions = paymentRecord.claim.serviceLines
+        .filter((line) => line.totalPaid.gt(0) || line.totalAdjusted.gt(0))
+        .map((line) => ({
+          serviceLineId: line.id,
+          paidAmount: line.totalPaid.negated().toNumber(), // negative to undo
+          adjustedAmount: line.totalAdjusted.negated().toNumber(),
+          method: paymentMethodOptions[4],
+          receivedDate: new Date(),
+          notes: "Reverted full claim",
+        }));
+
+      if (serviceLineTransactions.length === 0) {
+        return res.status(400).json({ message: "Nothing to revert" });
+      }
+
+      const updatedPayment = await paymentService.updatePayment(
+        paymentId,
+        serviceLineTransactions,
+        userId,
+        { isReversal: true }
+      );
+
+      res.status(200).json(updatedPayment);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Failed to revert claim payments" });
+    }
+  }
+);
 
 // PATCH /api/payments/:id/status
 router.patch(

@@ -42,6 +42,7 @@ import {
 } from "@repo/db/types";
 import EditPaymentModal from "./payment-edit-modal";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ConfirmationDialog } from "../ui/confirmationDialog";
 
 interface PaymentApiResponse {
   payments: PaymentWithExtras[];
@@ -80,6 +81,9 @@ export default function PaymentsRecentTable({
   const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(
     null
   );
+
+  const [isRevertOpen, setIsRevertOpen] = useState(false);
+  const [revertPaymentId, setRevertPaymentId] = useState<number | null>(null);
 
   const handleSelectPayment = (payment: PaymentWithExtras) => {
     const isSelected = selectedPaymentId === payment.id;
@@ -209,6 +213,57 @@ export default function PaymentsRecentTable({
       });
     },
   });
+
+  const fullPaymentMutation = useMutation({
+    mutationFn: async ({
+      paymentId,
+      type,
+    }: {
+      paymentId: number;
+      type: "pay" | "revert";
+    }) => {
+      const endpoint =
+        type === "pay"
+          ? `/api/payments/${paymentId}/pay-absolute-full-claim`
+          : `/api/payments/${paymentId}/revert-full-claim`;
+      const response = await apiRequest("PUT", endpoint);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update Payment");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Payment updated successfully!",
+      });
+      queryClient.invalidateQueries({ queryKey: getPaymentsQueryKey() });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: `Operation failed: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePayAbsoluteFullDue = (paymentId: number) => {
+    fullPaymentMutation.mutate({ paymentId, type: "pay" });
+  };
+
+  const handleRevert = () => {
+    if (!revertPaymentId) return;
+
+    fullPaymentMutation.mutate({
+      paymentId: revertPaymentId,
+      type: "revert",
+    });
+
+    setRevertPaymentId(null);
+    setIsRevertOpen(false);
+  };
 
   const deletePaymentMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -543,6 +598,25 @@ export default function PaymentsRecentTable({
                             <Edit className="h-4 w-4" />
                           </Button>
                         )}
+                        {/* Pay Full Due */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePayAbsoluteFullDue(payment.id)}
+                        >
+                          Pay Full Due
+                        </Button>
+                        {/* Revert Full Due */}
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            setRevertPaymentId(payment.id);
+                            setIsRevertOpen(true);
+                          }}
+                        >
+                          Revert Full Due
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -552,6 +626,17 @@ export default function PaymentsRecentTable({
           </TableBody>
         </Table>
       </div>
+
+      {/* Revert Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={isRevertOpen}
+        title="Confirm Revert"
+        message={`Do you want to revert all Service Line payments for Payment ID: ${revertPaymentId}?`}
+        confirmLabel="Revert"
+        confirmColor="bg-yellow-600 hover:bg-yellow-700"
+        onConfirm={handleRevert}
+        onCancel={() => setIsRevertOpen(false)}
+      />
 
       <DeleteConfirmationDialog
         isOpen={isDeletePaymentOpen}
