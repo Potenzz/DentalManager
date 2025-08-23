@@ -155,8 +155,14 @@ export default function ClaimsPage() {
       "GET",
       `/api/patients/by-insurance-id?insuranceId=${encodeURIComponent(insuranceId)}`
     );
-    if (!res.ok) throw new Error("Failed to fetch patient by insuranceId");
-    return res.json(); // returns patient object or null
+
+    if (!res.ok) {
+      throw new Error(
+        `Failed to fetch patient by insuranceId (status ${res.status})`
+      );
+    }
+
+    return res.json();
   };
 
   // workflow starts from there - this params are set by pdf extraction/patient page. then used in claim page here.

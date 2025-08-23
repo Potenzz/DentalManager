@@ -174,7 +174,7 @@ router.get("/by-insurance-id", async (req: Request, res: Response): Promise<any>
     if (patient) {
       return res.status(200).json(patient);
     } else {
-      return res.status(404).json(null);
+      return res.status(200).json(null);
     }
   } catch (err) {
     console.error("Failed to lookup patient:", err);
