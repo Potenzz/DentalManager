@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Sidebar } from "@/components/layout/sidebar";
 import {
@@ -7,32 +6,16 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  CardFooter,
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
 import {
-  AlertCircle,
   DollarSign,
-  ArrowDown,
   Upload,
   Image,
   X,
-  Trash2,
-  Save,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -40,13 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import PaymentsRecentTable from "@/components/payments/payments-recent-table";
 import PaymentsOfPatientModal from "@/components/payments/payments-of-patient-table";
 
@@ -56,7 +32,6 @@ export default function PaymentsPage() {
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [extractedPaymentData, setExtractedPaymentData] = useState<any[]>([]);
   const [editableData, setEditableData] = useState<any[]>([]);
 
   const { toast } = useToast();

@@ -8,6 +8,7 @@ import {
   Shield,
   CreditCard,
   FolderOpen,
+  Database,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -55,6 +56,11 @@ export function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps) {
       name: "Documents",
       path: "/documents",
       icon: <FolderOpen className="h-5 w-5" />,
+    },
+    {
+      name: "Backup Database",
+      path: "/database-management",
+      icon: <Database className="h-5 w-5" />,
     },
     {
       name: "Settings",

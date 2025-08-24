@@ -17,8 +17,13 @@ const PatientsPage = lazy(() => import("./pages/patients-page"));
 const SettingsPage = lazy(() => import("./pages/settings-page"));
 const ClaimsPage = lazy(() => import("./pages/claims-page"));
 const PaymentsPage = lazy(() => import("./pages/payments-page"));
-const InsuranceEligibilityPage = lazy(()=> import("./pages/insurance-eligibility-page"))
+const InsuranceEligibilityPage = lazy(
+  () => import("./pages/insurance-eligibility-page")
+);
 const DocumentPage = lazy(() => import("./pages/documents-page"));
+const DatabaseManagementPage = lazy(
+  () => import("./pages/database-management-page")
+);
 const NotFound = lazy(() => import("./pages/not-found"));
 
 function Router() {
@@ -32,9 +37,16 @@ function Router() {
       <ProtectedRoute path="/patients" component={() => <PatientsPage />} />
       <ProtectedRoute path="/settings" component={() => <SettingsPage />} />
       <ProtectedRoute path="/claims" component={() => <ClaimsPage />} />
-      <ProtectedRoute path="/insurance-eligibility" component={()=><InsuranceEligibilityPage/>}/>
+      <ProtectedRoute
+        path="/insurance-eligibility"
+        component={() => <InsuranceEligibilityPage />}
+      />
       <ProtectedRoute path="/payments" component={() => <PaymentsPage />} />
       <ProtectedRoute path="/documents" component={() => <DocumentPage />} />
+      <ProtectedRoute
+        path="/database-management"
+        component={() => <DatabaseManagementPage />}
+      />
       <Route path="/auth" component={() => <AuthPage />} />
       <Route component={() => <NotFound />} />
     </Switch>
