@@ -251,6 +251,28 @@ export function ClaimForm({
     setForm({ ...form, serviceLines: updatedLines });
   };
 
+  // Map Price function
+  const mapPrices = () => {
+    const updatedLines = form.serviceLines.map((line) => {
+      if (line.procedureCode && line.procedureCode.trim() !== "") {
+        const normalizedCode = line.procedureCode.toUpperCase().trim();
+        const procedureInfo = procedureCodes.find(
+          (p) => p["Procedure Code"].toUpperCase().trim() === normalizedCode
+        );
+
+        if (procedureInfo && procedureInfo.Price) {
+          return {
+            ...line,
+            totalBilled: new Decimal(parseFloat(procedureInfo.Price)),
+          };
+        }
+      }
+      return line;
+    });
+
+    setForm({ ...form, serviceLines: updatedLines });
+  };
+
   // FILE UPLOAD ZONE
   const [isUploading, setIsUploading] = useState(false);
 
@@ -549,7 +571,11 @@ export function ClaimForm({
                     placeholder="eg. D0120"
                     value={line.procedureCode}
                     onChange={(e) =>
-                      updateServiceLine(i, "procedureCode", e.target.value)
+                      updateServiceLine(
+                        i,
+                        "procedureCode",
+                        e.target.value.toUpperCase()
+                      )
                     }
                   />
 
@@ -676,7 +702,9 @@ export function ClaimForm({
                 <Button variant="outline">Child Prophy Codes</Button>
                 <Button variant="outline">Adult Prophy Codes</Button>
                 <Button variant="outline">Customized Group Codes</Button>
-                <Button variant="outline">Map Price</Button>
+                <Button variant="success" onClick={mapPrices}>
+                  Map Price
+                </Button>
               </div>
             </div>
 
@@ -711,7 +739,7 @@ export function ClaimForm({
               <div className="flex justify-between">
                 <Button
                   className="w-32"
-                  variant="outline"
+                  variant="warning"
                   onClick={handleMHSubmit}
                 >
                   MH

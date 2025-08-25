@@ -180,10 +180,10 @@ class AutomationMassHealth:
 
 
                 # Fill Fees if present
-                if proc.get("billedAmount"):
+                if proc.get("totalBilled"):
                     fees_xpath = "//input[@name='ProcedureFee']"
                     wait.until(EC.presence_of_element_located((By.XPATH, fees_xpath))).clear()
-                    self.driver.find_element(By.XPATH, fees_xpath).send_keys(proc["billedAmount"])
+                    self.driver.find_element(By.XPATH, fees_xpath).send_keys(proc["totalBilled"])
 
                 # Click "Add Procedure" button
                 add_proc_xpath = "//input[@type='submit' and @value='Add Procedure']"
