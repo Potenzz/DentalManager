@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatDateToHumanReadable } from "@/utils/dateUtils";
 
 export default function DatabaseManagementPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -136,7 +137,7 @@ export default function DatabaseManagementPage() {
                   <div className="text-sm text-gray-500">
                     Last backup:{" "}
                     {dbStatus?.lastBackup
-                      ? new Date(dbStatus.lastBackup).toLocaleString()
+                      ? formatDateToHumanReadable(dbStatus.lastBackup)
                       : "Never"}
                   </div>
                 </div>
