@@ -6,3 +6,5 @@ export * from "./payment-types";
 export * from "./pdf-types";
 export * from "./staff-types";
 export * from "./user-types";
+export * from "./databaseBackup-types";
+export * from "./notifications-types";

@@ -4,6 +4,7 @@ import path from "path";
 import os from "os";
 import fs from "fs";
 import { prisma } from "@repo/db/client";
+import { storage } from "../storage";
 
 const router = Router();
 
@@ -11,8 +12,13 @@ const router = Router();
  * Create a database backup
  */
 
-router.post("/backup", async (req: Request, res: Response) => {
+router.post("/backup", async (req: Request, res: Response): Promise<any> => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const fileName = `dental_backup_${Date.now()}.dump`;
     const tmpFile = path.join(os.tmpdir(), fileName);
 
@@ -56,8 +62,16 @@ router.post("/backup", async (req: Request, res: Response) => {
         const fileStream = fs.createReadStream(tmpFile);
         fileStream.pipe(res);
 
-        fileStream.on("close", () => {
+        fileStream.on("close", async () => {
           fs.unlink(tmpFile, () => {}); // cleanup temp file
+
+          // ✅ Then, in background, update DB
+          try {
+            await storage.createBackup(userId);
+            await storage.deleteNotificationsByType(userId, "BACKUP");
+          } catch (err) {
+            console.error("Backup saved but metadata update failed:", err);
+          }
         });
       } else {
         console.error("pg_dump failed:", errorMessage);
@@ -91,18 +105,25 @@ router.post("/backup", async (req: Request, res: Response) => {
 /**
  * Get database status (connected, size, records count)
  */
-router.get("/status", async (req: Request, res: Response) => {
+router.get("/status", async (req: Request, res: Response): Promise<any> => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const size = await prisma.$queryRawUnsafe<{ size: string }[]>(
       "SELECT pg_size_pretty(pg_database_size(current_database())) as size"
     );
 
-    const patientsCount = await prisma.patient.count();
+    const patientsCount = await storage.getTotalPatientCount();
+    const lastBackup = await storage.getLastBackup(userId);
 
     res.json({
       connected: true,
       size: size[0]?.size,
       patients: patientsCount,
+      lastBackup: lastBackup?.createdAt ?? null,
     });
   } catch (err) {
     console.error("Status error:", err);

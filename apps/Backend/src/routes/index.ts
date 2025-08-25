@@ -10,6 +10,7 @@ import documentsRoutes from "./documents";
 import insuranceEligibilityRoutes from "./insuranceEligibility";
 import paymentsRoutes from "./payments";
 import databaseManagementRoutes from "./database-management";
+import notificationsRoutes from "./notifications";
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use("/documents", documentsRoutes);
 router.use("/insuranceEligibility", insuranceEligibilityRoutes);
 router.use("/payments", paymentsRoutes);
 router.use("/database-management", databaseManagementRoutes);
+router.use("/notifications", notificationsRoutes);
 
 export default router;

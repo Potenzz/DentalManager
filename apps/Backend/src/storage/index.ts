@@ -4,6 +4,7 @@ import {
   Appointment,
   Claim,
   ClaimWithServiceLines,
+  DatabaseBackup,
   InsertAppointment,
   InsertClaim,
   InsertInsuranceCredential,
@@ -11,6 +12,8 @@ import {
   InsertPayment,
   InsertUser,
   InsuranceCredential,
+  Notification,
+  NotificationTypes,
   Patient,
   Payment,
   PaymentWithExtras,
@@ -27,6 +30,7 @@ import {
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
+  getUsers(limit: number, offset: number): Promise<User[]>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
@@ -176,10 +180,7 @@ export interface IStorage {
 
   // Payment methods:
   createPayment(data: InsertPayment): Promise<Payment>;
-  updatePayment(
-    id: number,
-    updates: UpdatePayment,
-  ): Promise<Payment>;
+  updatePayment(id: number, updates: UpdatePayment): Promise<Payment>;
   deletePayment(id: number, userId: number): Promise<void>;
   getPaymentById(id: number): Promise<PaymentWithExtras | null>;
   getRecentPaymentsByPatientId(
@@ -188,19 +189,41 @@ export interface IStorage {
     offset: number
   ): Promise<PaymentWithExtras[] | null>;
   getTotalPaymentCountByPatient(patientId: number): Promise<number>;
-  getPaymentsByClaimId(
-    claimId: number,
-  ): Promise<PaymentWithExtras | null>;
+  getPaymentsByClaimId(claimId: number): Promise<PaymentWithExtras | null>;
   getRecentPaymentsByUser(
     userId: number,
     limit: number,
     offset: number
   ): Promise<PaymentWithExtras[]>;
-  getPaymentsByDateRange(
-    from: Date,
-    to: Date
-  ): Promise<PaymentWithExtras[]>;
+  getPaymentsByDateRange(from: Date, to: Date): Promise<PaymentWithExtras[]>;
   getTotalPaymentCountByUser(userId: number): Promise<number>;
+
+  // Database Backup methods
+  createBackup(userId: number): Promise<DatabaseBackup>;
+  getLastBackup(userId: number): Promise<DatabaseBackup | null>;
+  getBackups(userId: number, limit?: number): Promise<DatabaseBackup[]>;
+  deleteBackups(userId: number): Promise<number>; // clears all for user
+
+  // Notification methods
+  createNotification(
+    userId: number,
+    type: NotificationTypes,
+    message: string
+  ): Promise<Notification>;
+  getNotifications(
+    userId: number,
+    limit?: number,
+    offset?: number
+  ): Promise<Notification[]>;
+  markNotificationRead(
+    userId: number,
+    notificationId: number
+  ): Promise<boolean>;
+  markAllNotificationsRead(userId: number): Promise<number>;
+  deleteNotificationsByType(
+    userId: number,
+    type: NotificationTypes
+  ): Promise<number>;
 }
 
 export const storage: IStorage = {
@@ -208,6 +231,10 @@ export const storage: IStorage = {
   async getUser(id: number): Promise<User | undefined> {
     const user = await db.user.findUnique({ where: { id } });
     return user ?? undefined;
+  },
+
+  async getUsers(limit: number, offset: number): Promise<User[]> {
+    return await db.user.findMany({ skip: offset, take: limit });
   },
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -736,10 +763,7 @@ export const storage: IStorage = {
     return db.payment.create({ data: payment as Payment });
   },
 
-  async updatePayment(
-    id: number,
-    updates: UpdatePayment,
-  ): Promise<Payment> {
+  async updatePayment(id: number, updates: UpdatePayment): Promise<Payment> {
     const existing = await db.payment.findFirst({ where: { id } });
     if (!existing) {
       throw new Error("Payment not found");
@@ -799,9 +823,7 @@ export const storage: IStorage = {
     });
   },
 
-  async getPaymentById(
-    id: number,
-  ): Promise<PaymentWithExtras | null> {
+  async getPaymentById(id: number): Promise<PaymentWithExtras | null> {
     const payment = await db.payment.findFirst({
       where: { id },
       include: {
@@ -830,7 +852,7 @@ export const storage: IStorage = {
   },
 
   async getPaymentsByClaimId(
-    claimId: number,
+    claimId: number
   ): Promise<PaymentWithExtras | null> {
     const payment = await db.payment.findFirst({
       where: { claimId },
@@ -929,5 +951,77 @@ export const storage: IStorage = {
 
   async getTotalPaymentCountByUser(userId: number): Promise<number> {
     return db.payment.count({ where: { userId } });
+  },
+
+  // ==============================
+  // Database Backup methods
+  // ==============================
+  async createBackup(userId) {
+    return await db.databaseBackup.create({ data: { userId } });
+  },
+
+  async getLastBackup(userId) {
+    return await db.databaseBackup.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+  },
+
+  async getBackups(userId, limit = 10) {
+    return await db.databaseBackup.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+  },
+
+  async deleteBackups(userId) {
+    const result = await db.databaseBackup.deleteMany({ where: { userId } });
+    return result.count;
+  },
+
+  // ==============================
+  // Notification methods
+  // ==============================
+  async createNotification(userId, type, message) {
+    return await db.notification.create({
+      data: { userId, type, message },
+    });
+  },
+
+  async getNotifications(
+    userId: number,
+    limit = 50,
+    offset = 0
+  ): Promise<Notification[]> {
+    return await db.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset,
+    });
+  },
+
+  async markNotificationRead(userId, notificationId) {
+    const result = await db.notification.updateMany({
+      where: { id: notificationId, userId },
+      data: { read: true },
+    });
+    return result.count > 0;
+  },
+
+  async markAllNotificationsRead(userId) {
+    const result = await db.notification.updateMany({
+      where: { userId },
+      data: { read: true },
+    });
+    return result.count;
+  },
+
+  async deleteNotificationsByType(userId, type) {
+    const result = await db.notification.deleteMany({
+      where: { userId, type },
+    });
+    return result.count;
   },
 };

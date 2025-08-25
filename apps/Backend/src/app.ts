@@ -6,6 +6,7 @@ import { apiLogger } from "./middlewares/logger.middleware";
 import authRoutes from "./routes/auth";
 import { authenticateJWT } from "./middlewares/auth.middleware";
 import dotenv from "dotenv";
+import { startBackupCron } from "./cron/backupCheck";
 
 dotenv.config();
 const FRONTEND_URL = process.env.FRONTEND_URL;
@@ -29,5 +30,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api", authenticateJWT, routes);
 
 app.use(errorHandler);
+
+//startig cron job
+startBackupCron();
 
 export default app;
