@@ -1,5 +1,5 @@
 import { Switch, Route } from "wouter";
-import React, { lazy } from "react";
+import React, { lazy, Suspense } from "react";
 import { Provider } from "react-redux";
 import { store } from "./redux/store";
 import { queryClient } from "./lib/queryClient";
@@ -9,6 +9,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import Dashboard from "./pages/dashboard";
+import LoadingScreen from "./components/ui/LoadingScreen";
 
 const AuthPage = lazy(() => import("./pages/auth-page"));
 const AppointmentsPage = lazy(() => import("./pages/appointments-page"));
@@ -61,7 +62,9 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <Toaster />
-            <Router />
+            <Suspense fallback={<LoadingScreen />}>
+              <Router />
+            </Suspense>
           </TooltipProvider>
         </AuthProvider>
       </QueryClientProvider>
