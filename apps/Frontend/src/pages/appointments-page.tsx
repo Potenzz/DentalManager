@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, addDays, startOfToday, addMinutes } from "date-fns";
 import { parseLocalDate, formatLocalDate } from "@/utils/dateUtils";
-import { TopAppBar } from "@/components/layout/top-app-bar";
-import { Sidebar } from "@/components/layout/sidebar";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
 import { Button } from "@/components/ui/button";
 import {
@@ -625,231 +623,212 @@ export default function AppointmentsPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar
-        isMobileOpen={isMobileMenuOpen}
-        setIsMobileOpen={setIsMobileMenuOpen}
-      />
+    <div className="">
+      <div className="container mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Appointment Schedule
+            </h1>
+            <p className="text-muted-foreground">
+              View and manage the dental practice schedule
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              setEditingAppointment(undefined);
+              setIsAddModalOpen(true);
+            }}
+            className="gap-1"
+            disabled={isLoading}
+          >
+            <Plus className="h-4 w-4" />
+            New Appointment
+          </Button>
+        </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopAppBar toggleMobileMenu={toggleMobileMenu} />
+        {/* Context Menu */}
+        <Menu id={APPOINTMENT_CONTEXT_MENU_ID} animation="fade">
+          <Item
+            onClick={({ props }) => {
+              const fullAppointment = appointments.find(
+                (a) => a.id === props.appointmentId
+              );
+              if (fullAppointment) {
+                handleEditAppointment(fullAppointment);
+              }
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              Edit Appointment
+            </span>
+          </Item>
+          <Item
+            onClick={({ props }) =>
+              handleDeleteAppointment(props.appointmentId)
+            }
+          >
+            <span className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-4 w-4" />
+              Delete Appointment
+            </span>
+          </Item>
+        </Menu>
 
-        <main className="flex-1 overflow-y-auto p-4">
-          <div className="container mx-auto">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Appointment Schedule
-                </h1>
-                <p className="text-muted-foreground">
-                  View and manage the dental practice schedule
-                </p>
+        {/* Main Content - Split into Schedule and Calendar */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left side - Schedule Grid */}
+          <div className="w-full lg:w-3/4 overflow-x-auto bg-white rounded-md shadow">
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setSelectedDate(addDays(selectedDate, -1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <h2 className="text-xl font-semibold">{formattedDate}</h2>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <Button
-                onClick={() => {
-                  setEditingAppointment(undefined);
-                  setIsAddModalOpen(true);
-                }}
-                className="gap-1"
-                disabled={isLoading}
-              >
-                <Plus className="h-4 w-4" />
-                New Appointment
-              </Button>
             </div>
 
-            {/* Context Menu */}
-            <Menu id={APPOINTMENT_CONTEXT_MENU_ID} animation="fade">
-              <Item
-                onClick={({ props }) => {
-                  const fullAppointment = appointments.find(
-                    (a) => a.id === props.appointmentId
-                  );
-                  if (fullAppointment) {
-                    handleEditAppointment(fullAppointment);
-                  }
-                }}
-              >
-                <span className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  Edit Appointment
-                </span>
-              </Item>
-              <Item
-                onClick={({ props }) =>
-                  handleDeleteAppointment(props.appointmentId)
-                }
-              >
-                <span className="flex items-center gap-2 text-red-600">
-                  <Trash2 className="h-4 w-4" />
-                  Delete Appointment
-                </span>
-              </Item>
-            </Menu>
+            {/* Schedule Grid with Drag and Drop */}
+            <DndProvider backend={HTML5Backend}>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse min-w-[800px]">
+                  <thead>
+                    <tr>
+                      <th className="p-2 border bg-gray-50 w-[100px]">Time</th>
+                      {staffMembers.map((staff) => (
+                        <th
+                          key={staff.id}
+                          className={`p-2 border bg-gray-50 ${staff.role === "doctor" ? "font-bold" : ""}`}
+                        >
+                          {staff.name}
+                          <div className="text-xs text-gray-500">
+                            {staff.role}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {timeSlots.map((timeSlot) => (
+                      <tr key={timeSlot.time}>
+                        <td className="border px-2 py-1 text-xs text-gray-600 font-medium">
+                          {timeSlot.displayTime}
+                        </td>
+                        {staffMembers.map((staff) => (
+                          <DroppableTimeSlot
+                            key={`${timeSlot.time}-${staff.id}`}
+                            timeSlot={timeSlot}
+                            staffId={Number(staff.id)}
+                            appointment={getAppointmentAtSlot(
+                              timeSlot,
+                              Number(staff.id)
+                            )}
+                            staff={staff}
+                          />
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </DndProvider>
+          </div>
 
-            {/* Main Content - Split into Schedule and Calendar */}
-            <div className="flex flex-col lg:flex-row gap-6">
-              {/* Left side - Schedule Grid */}
-              <div className="w-full lg:w-3/4 overflow-x-auto bg-white rounded-md shadow">
-                <div className="p-4 border-b">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() =>
-                          setSelectedDate(addDays(selectedDate, -1))
-                        }
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <h2 className="text-xl font-semibold">{formattedDate}</h2>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() =>
-                          setSelectedDate(addDays(selectedDate, 1))
-                        }
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+          {/* Right side - Calendar and Stats */}
+          <div className="w-full lg:w-1/4 space-y-6">
+            {/* Calendar Card */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>Calendar</CardTitle>
+                <CardDescription>
+                  Select a date to view or schedule appointments
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    if (date) setSelectedDate(date);
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Statistics Card */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between">
+                  <span>Appointments</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => refetchAppointments()}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+                <CardDescription>
+                  Statistics for {formattedDate}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">
+                      Total appointments:
+                    </span>
+                    <span className="font-semibold">
+                      {selectedDateAppointments.length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">With doctors:</span>
+                    <span className="font-semibold">
+                      {
+                        processedAppointments.filter(
+                          (apt) =>
+                            staffMembers.find(
+                              (s) => Number(s.id) === apt.staffId
+                            )?.role === "doctor"
+                        ).length
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">
+                      With hygienists:
+                    </span>
+                    <span className="font-semibold">
+                      {
+                        processedAppointments.filter(
+                          (apt) =>
+                            staffMembers.find(
+                              (s) => Number(s.id) === apt.staffId
+                            )?.role === "hygienist"
+                        ).length
+                      }
+                    </span>
                   </div>
                 </div>
-
-                {/* Schedule Grid with Drag and Drop */}
-                <DndProvider backend={HTML5Backend}>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse min-w-[800px]">
-                      <thead>
-                        <tr>
-                          <th className="p-2 border bg-gray-50 w-[100px]">
-                            Time
-                          </th>
-                          {staffMembers.map((staff) => (
-                            <th
-                              key={staff.id}
-                              className={`p-2 border bg-gray-50 ${staff.role === "doctor" ? "font-bold" : ""}`}
-                            >
-                              {staff.name}
-                              <div className="text-xs text-gray-500">
-                                {staff.role}
-                              </div>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {timeSlots.map((timeSlot) => (
-                          <tr key={timeSlot.time}>
-                            <td className="border px-2 py-1 text-xs text-gray-600 font-medium">
-                              {timeSlot.displayTime}
-                            </td>
-                            {staffMembers.map((staff) => (
-                              <DroppableTimeSlot
-                                key={`${timeSlot.time}-${staff.id}`}
-                                timeSlot={timeSlot}
-                                staffId={Number(staff.id)}
-                                appointment={getAppointmentAtSlot(
-                                  timeSlot,
-                                  Number(staff.id)
-                                )}
-                                staff={staff}
-                              />
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </DndProvider>
-              </div>
-
-              {/* Right side - Calendar and Stats */}
-              <div className="w-full lg:w-1/4 space-y-6">
-                {/* Calendar Card */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle>Calendar</CardTitle>
-                    <CardDescription>
-                      Select a date to view or schedule appointments
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => {
-                        if (date) setSelectedDate(date);
-                      }}
-                    />
-                  </CardContent>
-                </Card>
-
-                {/* Statistics Card */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center justify-between">
-                      <span>Appointments</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => refetchAppointments()}
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
-                    </CardTitle>
-                    <CardDescription>
-                      Statistics for {formattedDate}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-500">
-                          Total appointments:
-                        </span>
-                        <span className="font-semibold">
-                          {selectedDateAppointments.length}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-500">
-                          With doctors:
-                        </span>
-                        <span className="font-semibold">
-                          {
-                            processedAppointments.filter(
-                              (apt) =>
-                                staffMembers.find(
-                                  (s) => Number(s.id) === apt.staffId
-                                )?.role === "doctor"
-                            ).length
-                          }
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-500">
-                          With hygienists:
-                        </span>
-                        <span className="font-semibold">
-                          {
-                            processedAppointments.filter(
-                              (apt) =>
-                                staffMembers.find(
-                                  (s) => Number(s.id) === apt.staffId
-                                )?.role === "hygienist"
-                            ).length
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
-        </main>
+        </div>
       </div>
 
       {/* Add/Edit Appointment Modal */}

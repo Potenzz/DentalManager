@@ -1,5 +1,5 @@
 import { Switch, Route } from "wouter";
-import React, { Suspense, lazy } from "react";
+import React, { lazy } from "react";
 import { Provider } from "react-redux";
 import { store } from "./redux/store";
 import { queryClient } from "./lib/queryClient";
@@ -9,7 +9,6 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import Dashboard from "./pages/dashboard";
-import LoadingScreen from "./components/ui/LoadingScreen";
 
 const AuthPage = lazy(() => import("./pages/auth-page"));
 const AppointmentsPage = lazy(() => import("./pages/appointments-page"));
@@ -24,6 +23,7 @@ const DocumentPage = lazy(() => import("./pages/documents-page"));
 const DatabaseManagementPage = lazy(
   () => import("./pages/database-management-page")
 );
+const ReportsPage = lazy(() => import("./pages/reports-page"));
 const NotFound = lazy(() => import("./pages/not-found"));
 
 function Router() {
@@ -47,6 +47,7 @@ function Router() {
         path="/database-management"
         component={() => <DatabaseManagementPage />}
       />
+      <ProtectedRoute path="/reports/" component={() => <ReportsPage />} />
       <Route path="/auth" component={() => <AuthPage />} />
       <Route component={() => <NotFound />} />
     </Switch>
@@ -60,9 +61,7 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <Toaster />
-            <Suspense fallback={<LoadingScreen />}>
-              <Router />
-            </Suspense>
+            <Router />
           </TooltipProvider>
         </AuthProvider>
       </QueryClientProvider>

@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { TopAppBar } from "@/components/layout/top-app-bar";
-import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -104,13 +102,7 @@ export default function PreAuthorizationsPage() {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar isMobileOpen={isMobileMenuOpen} setIsMobileOpen={setIsMobileMenuOpen} />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-        
-        <main className="flex-1 overflow-y-auto p-4">
+    <div>
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-2xl font-semibold text-gray-800">Pre-authorizations</h1>
@@ -342,8 +334,6 @@ export default function PreAuthorizationsPage() {
               </CardContent>
             </Card>
           </div>
-        </main>
-      </div>
     </div>
   );
 }

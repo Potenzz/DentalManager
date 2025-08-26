@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { TopAppBar } from "@/components/layout/top-app-bar";
-import { Sidebar } from "@/components/layout/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -210,125 +208,114 @@ export default function InsuranceEligibilityPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar
-        isMobileOpen={isMobileMenuOpen}
-        setIsMobileOpen={setIsMobileMenuOpen}
+    <div>
+      <SeleniumTaskBanner
+        status={status}
+        message={message}
+        show={show}
+        onClear={() => dispatch(clearTaskStatus())}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopAppBar toggleMobileMenu={toggleMobileMenu} />
+      <div className="container mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Insurance Eligibility
+            </h1>
+            <p className="text-muted-foreground">
+              Check insurance eligibility and view patient information
+            </p>
+          </div>
+        </div>
 
-        <SeleniumTaskBanner
-          status={status}
-          message={message}
-          show={show}
-          onClear={() => dispatch(clearTaskStatus())}
-        />
+        {/* Insurance Eligibility Check Form */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Check Insurance Eligibility</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-4 md:grid-cols-4 gap-4 mb-4">
+              <div className="space-y-2">
+                <Label htmlFor="memberId">Member ID</Label>
+                <Input
+                  id="memberId"
+                  placeholder="Enter member ID"
+                  value={memberId}
+                  onChange={(e) => setMemberId(e.target.value)}
+                />
+              </div>
 
-        <main className="flex-1 overflow-y-auto p-4">
-          <div className="container mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Insurance Eligibility
-                </h1>
-                <p className="text-muted-foreground">
-                  Check insurance eligibility and view patient information
-                </p>
+              <div className="space-y-2">
+                <DateInput
+                  label="Date of Birth"
+                  value={dateOfBirth}
+                  onChange={setDateOfBirth}
+                  disableFuture
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  placeholder="Enter first name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  placeholder="Enter last name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
               </div>
             </div>
 
-            {/* Insurance Eligibility Check Form */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Check Insurance Eligibility</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-4 md:grid-cols-4 gap-4 mb-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="memberId">Member ID</Label>
-                    <Input
-                      id="memberId"
-                      placeholder="Enter member ID"
-                      value={memberId}
-                      onChange={(e) => setMemberId(e.target.value)}
-                    />
-                  </div>
+            <div>
+              <Button
+                onClick={() => handleMHButton()}
+                className="w-full"
+                disabled={isCheckingEligibility}
+              >
+                {isCheckingEligibility ? (
+                  <>
+                    <LoaderCircleIcon className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    MH
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-                  <div className="space-y-2">
-                    <DateInput
-                      label="Date of Birth"
-                      value={dateOfBirth}
-                      onChange={setDateOfBirth}
-                      disableFuture
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      placeholder="Enter first name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      placeholder="Enter last name"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Button
-                    onClick={() => handleMHButton()}
-                    className="w-full"
-                    disabled={isCheckingEligibility}
-                  >
-                    {isCheckingEligibility ? (
-                      <>
-                        <LoaderCircleIcon className="h-4 w-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        MH
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Patients Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Patient Records</CardTitle>
-                <CardDescription>
-                  Select Patients and Check Their Eligibility
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PatientTable
-                  allowView={true}
-                  allowDelete={true}
-                  allowCheckbox={true}
-                  allowEdit={true}
-                  onSelectPatient={setSelectedPatient}
-                  onPageChange={setCurrentTablePage}
-                  onSearchChange={setCurrentTableSearchTerm}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+        {/* Patients Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Patient Records</CardTitle>
+            <CardDescription>
+              Select Patients and Check Their Eligibility
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PatientTable
+              allowView={true}
+              allowDelete={true}
+              allowCheckbox={true}
+              allowEdit={true}
+              onSelectPatient={setSelectedPatient}
+              onPageChange={setCurrentTablePage}
+              onSearchChange={setCurrentTableSearchTerm}
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

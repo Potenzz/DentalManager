@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { TopAppBar } from "@/components/layout/top-app-bar";
-import { Sidebar } from "@/components/layout/sidebar";
 import {
   Card,
   CardHeader,
@@ -410,57 +408,46 @@ export default function ClaimsPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar
-        isMobileOpen={isMobileMenuOpen}
-        setIsMobileOpen={setIsMobileMenuOpen}
+    <div>
+      <SeleniumTaskBanner
+        status={status}
+        message={message}
+        show={show}
+        onClear={() => dispatch(clearTaskStatus())}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-
-        <SeleniumTaskBanner
-          status={status}
-          message={message}
-          show={show}
-          onClear={() => dispatch(clearTaskStatus())}
-        />
-
-        <main className="flex-1 overflow-y-auto p-4">
-          <div className="container mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Insurance Claims
-                </h1>
-                <p className="text-muted-foreground">
-                  Manage and submit insurance claims for patients
-                </p>
-              </div>
-            </div>
+      <div className="container mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Insurance Claims
+            </h1>
+            <p className="text-muted-foreground">
+              Manage and submit insurance claims for patients
+            </p>
           </div>
-
-          {/* Recent Claims by Patients also handles new claims */}
-          <ClaimsOfPatientModal onNewClaim={handleNewClaim} />
-
-          {/* Recent Claims Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recently Submitted Claims</CardTitle>
-              <CardDescription>
-                View and manage all recent claims information
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ClaimsRecentTable
-                allowEdit={true}
-                allowView={true}
-                allowDelete={true}
-              />
-            </CardContent>
-          </Card>
-        </main>
+        </div>
       </div>
+
+      {/* Recent Claims by Patients also handles new claims */}
+      <ClaimsOfPatientModal onNewClaim={handleNewClaim} />
+
+      {/* Recent Claims Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recently Submitted Claims</CardTitle>
+          <CardDescription>
+            View and manage all recent claims information
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ClaimsRecentTable
+            allowEdit={true}
+            allowView={true}
+            allowDelete={true}
+          />
+        </CardContent>
+      </Card>
 
       {/* Claim Form Modal */}
       {isClaimFormOpen && selectedPatientId !== null && (

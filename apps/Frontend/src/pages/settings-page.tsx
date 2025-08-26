@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { TopAppBar } from "@/components/layout/top-app-bar";
-import { Sidebar } from "@/components/layout/sidebar";
 import { StaffTable } from "@/components/staffs/staff-table";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -259,14 +257,7 @@ export default function SettingsPage() {
   });
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar
-        isMobileOpen={isMobileMenuOpen}
-        setIsMobileOpen={setIsMobileMenuOpen}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-        <main className="flex-1 overflow-y-auto p-2">
+    <div>
           <Card>
             <CardContent>
               <div className="mt-8">
@@ -371,8 +362,6 @@ export default function SettingsPage() {
           <div className="mt-6">
             <CredentialTable />
           </div>
-        </main>
-      </div>
     </div>
   );
 }

@@ -13,8 +13,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Eye, Trash, Download, FolderOpen } from "lucide-react";
 import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 import { PatientTable } from "@/components/patients/patient-table";
-import { Sidebar } from "@/components/layout/sidebar";
-import { TopAppBar } from "@/components/layout/top-app-bar";
 import { Patient, PdfFile } from "@repo/db/types";
 
 export default function DocumentsPage() {
@@ -117,165 +115,152 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar
-        isMobileOpen={isMobileMenuOpen}
-        setIsMobileOpen={setIsMobileMenuOpen}
-      />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-
-        <main className="flex-1 overflow-y-auto p-4">
-          <div className="container mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
-                <p className="text-muted-foreground">
-                  View and manage recent uploaded claim PDFs
-                </p>
-              </div>
-            </div>
-
-            {selectedPatient && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    Document Groups for {selectedPatient.firstName}{" "}
-                    {selectedPatient.lastName}
-                  </CardTitle>
-                  <CardDescription>Select a group to view PDFs</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {groups.length === 0 ? (
-                    <p className="text-muted-foreground">
-                      No groups found for this patient.
-                    </p>
-                  ) : (
-                    groups.map((group: any) => (
-                      <Button
-                        key={group.id}
-                        variant={
-                          group.id === selectedGroupId ? "default" : "outline"
-                        }
-                        onClick={() =>
-                          setSelectedGroupId((prevId) =>
-                            prevId === group.id ? null : group.id
-                          )
-                        }
-                      >
-                        <FolderOpen className="w-4 h-4 mr-2" />
-                        Group - {group.title}
-                      </Button>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {selectedGroupId && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>PDFs in Group</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {groupPdfs.length === 0 ? (
-                    <p className="text-muted-foreground">
-                      No PDFs found in this group.
-                    </p>
-                  ) : (
-                    groupPdfs.map((pdf: any) => (
-                      <div
-                        key={pdf.id}
-                        className="flex justify-between items-center border p-2 rounded"
-                      >
-                        <span className="text-sm">{pdf.filename}</span>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewPdf(pdf.id)}
-                          >
-                            <Eye className="w-4 h-4 text-gray-600" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleDownloadPdf(pdf.id, pdf.filename)
-                            }
-                          >
-                            <Download className="w-4 h-4 text-blue-600" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setCurrentPdf(pdf);
-                              setIsDeletePdfOpen(true);
-                            }}
-                          >
-                            <Trash className="w-4 h-4 text-red-600" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {fileBlobUrl && (
-              <Card>
-                <CardHeader className="flex justify-between items-center">
-                  <CardTitle>Viewing PDF</CardTitle>
-                  <Button
-                    variant="outline"
-                    className="ml-auto text-red-600 border-red-500 hover:bg-red-100 hover:border-red-600"
-                    onClick={() => {
-                      setFileBlobUrl(null);
-                      setSelectedPdfId(null);
-                    }}
-                  >
-                    ✕ Close
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <iframe
-                    src={fileBlobUrl}
-                    className="w-full h-[80vh] border rounded"
-                    title="PDF Viewer"
-                  />
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Patient Records</CardTitle>
-                <CardDescription>
-                  Select a patient to view document groups
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PatientTable
-                  allowView
-                  allowDelete
-                  allowCheckbox
-                  allowEdit
-                  onSelectPatient={setSelectedPatient}
-                />
-              </CardContent>
-            </Card>
-
-            <DeleteConfirmationDialog
-              isOpen={isDeletePdfOpen}
-              onConfirm={handleConfirmDeletePdf}
-              onCancel={() => setIsDeletePdfOpen(false)}
-              entityName={`PDF #${currentPdf?.id}`}
-            />
+    <div>
+      <div className="container mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+            <p className="text-muted-foreground">
+              View and manage recent uploaded claim PDFs
+            </p>
           </div>
-        </main>
+        </div>
+
+        {selectedPatient && (
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Document Groups for {selectedPatient.firstName}{" "}
+                {selectedPatient.lastName}
+              </CardTitle>
+              <CardDescription>Select a group to view PDFs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {groups.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No groups found for this patient.
+                </p>
+              ) : (
+                groups.map((group: any) => (
+                  <Button
+                    key={group.id}
+                    variant={
+                      group.id === selectedGroupId ? "default" : "outline"
+                    }
+                    onClick={() =>
+                      setSelectedGroupId((prevId) =>
+                        prevId === group.id ? null : group.id
+                      )
+                    }
+                  >
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                    Group - {group.title}
+                  </Button>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {selectedGroupId && (
+          <Card>
+            <CardHeader>
+              <CardTitle>PDFs in Group</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {groupPdfs.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No PDFs found in this group.
+                </p>
+              ) : (
+                groupPdfs.map((pdf: any) => (
+                  <div
+                    key={pdf.id}
+                    className="flex justify-between items-center border p-2 rounded"
+                  >
+                    <span className="text-sm">{pdf.filename}</span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewPdf(pdf.id)}
+                      >
+                        <Eye className="w-4 h-4 text-gray-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadPdf(pdf.id, pdf.filename)}
+                      >
+                        <Download className="w-4 h-4 text-blue-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentPdf(pdf);
+                          setIsDeletePdfOpen(true);
+                        }}
+                      >
+                        <Trash className="w-4 h-4 text-red-600" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {fileBlobUrl && (
+          <Card>
+            <CardHeader className="flex justify-between items-center">
+              <CardTitle>Viewing PDF</CardTitle>
+              <Button
+                variant="outline"
+                className="ml-auto text-red-600 border-red-500 hover:bg-red-100 hover:border-red-600"
+                onClick={() => {
+                  setFileBlobUrl(null);
+                  setSelectedPdfId(null);
+                }}
+              >
+                ✕ Close
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <iframe
+                src={fileBlobUrl}
+                className="w-full h-[80vh] border rounded"
+                title="PDF Viewer"
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Patient Records</CardTitle>
+            <CardDescription>
+              Select a patient to view document groups
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PatientTable
+              allowView
+              allowDelete
+              allowCheckbox
+              allowEdit
+              onSelectPatient={setSelectedPatient}
+            />
+          </CardContent>
+        </Card>
+
+        <DeleteConfirmationDialog
+          isOpen={isDeletePdfOpen}
+          onConfirm={handleConfirmDeletePdf}
+          onCancel={() => setIsDeletePdfOpen(false)}
+          entityName={`PDF #${currentPdf?.id}`}
+        />
       </div>
     </div>
   );

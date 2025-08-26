@@ -1,7 +1,5 @@
 import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { TopAppBar } from "@/components/layout/top-app-bar";
-import { Sidebar } from "@/components/layout/sidebar";
 import { PatientTable } from "@/components/patients/patient-table";
 import { AddPatientModal } from "@/components/patients/add-patient-modal";
 import { FileUploadZone } from "@/components/file-upload/file-upload-zone";
@@ -137,107 +135,96 @@ export default function PatientsPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      <Sidebar
-        isMobileOpen={isMobileMenuOpen}
-        setIsMobileOpen={setIsMobileMenuOpen}
-      />
+    <div>
+      <div className="container mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
+            <p className="text-muted-foreground">
+              Manage patient records and information
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              onClick={() => {
+                setCurrentPatient(undefined);
+                setIsAddPatientOpen(true);
+              }}
+              className="gap-1"
+              disabled={isLoading}
+            >
+              <Plus className="h-4 w-4" />
+              New Patient
+            </Button>
+          </div>
+        </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopAppBar toggleMobileMenu={toggleMobileMenu} />
-
-        <main className="flex-1 overflow-y-auto p-4">
-          <div className="container mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
-                <p className="text-muted-foreground">
-                  Manage patient records and information
-                </p>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  onClick={() => {
-                    setCurrentPatient(undefined);
-                    setIsAddPatientOpen(true);
-                  }}
-                  className="gap-1"
-                  disabled={isLoading}
-                >
-                  <Plus className="h-4 w-4" />
-                  New Patient
-                </Button>
-              </div>
-            </div>
-
-            {/* File Upload Zone */}
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="md:col-span-3">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Upload Patient Document
-                    </CardTitle>
-                    <File className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <FileUploadZone
-                      onFileUpload={handleFileUpload}
-                      isUploading={isUploading}
-                      acceptedFileTypes="application/pdf"
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="md:col-span-1 flex items-end">
-                <Button
-                  className="w-full h-12 gap-2"
-                  disabled={!uploadedFile || isExtracting}
-                  onClick={handleExtract}
-                >
-                  {isExtracting ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <FilePlus className="h-4 w-4" />
-                      Extract Info And Claim
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Patients Table */}
+        {/* File Upload Zone */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="md:col-span-3">
             <Card>
-              <CardHeader>
-                <CardTitle>Patient Records</CardTitle>
-                <CardDescription>
-                  View and manage all patient information
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Upload Patient Document
+                </CardTitle>
+                <File className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <PatientTable
-                  allowDelete={true}
-                  allowEdit={true}
-                  allowView={true}
+                <FileUploadZone
+                  onFileUpload={handleFileUpload}
+                  isUploading={isUploading}
+                  acceptedFileTypes="application/pdf"
                 />
               </CardContent>
             </Card>
-
-            {/* Add/Edit Patient Modal */}
-            <AddPatientModal
-              ref={addPatientModalRef}
-              open={isAddPatientOpen}
-              onOpenChange={setIsAddPatientOpen}
-              onSubmit={handleAddPatient}
-              isLoading={isLoading}
-              patient={currentPatient}
-            />
           </div>
-        </main>
+          <div className="md:col-span-1 flex items-end">
+            <Button
+              className="w-full h-12 gap-2"
+              disabled={!uploadedFile || isExtracting}
+              onClick={handleExtract}
+            >
+              {isExtracting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <FilePlus className="h-4 w-4" />
+                  Extract Info And Claim
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Patients Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Patient Records</CardTitle>
+            <CardDescription>
+              View and manage all patient information
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PatientTable
+              allowDelete={true}
+              allowEdit={true}
+              allowView={true}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Add/Edit Patient Modal */}
+        <AddPatientModal
+          ref={addPatientModalRef}
+          open={isAddPatientOpen}
+          onOpenChange={setIsAddPatientOpen}
+          onSubmit={handleAddPatient}
+          isLoading={isLoading}
+          patient={currentPatient}
+        />
       </div>
     </div>
   );

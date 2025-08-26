@@ -9,96 +9,115 @@ import {
   CreditCard,
   FolderOpen,
   Database,
+  FileText,
 } from "lucide-react";
-
 import { cn } from "@/lib/utils";
+import { useEffect, useMemo, useState } from "react";
+import { useSidebar } from "@/components/ui/sidebar";
 
-interface SidebarProps {
-  isMobileOpen: boolean;
-  setIsMobileOpen: (open: boolean) => void;
-}
+const WIDTH_ANIM_MS = 100;
 
-export function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps) {
+export function Sidebar() {
   const [location] = useLocation();
+  const { state, openMobile, setOpenMobile } = useSidebar(); // "expanded" | "collapsed"
 
-  const navItems = [
-    {
-      name: "Dashboard",
-      path: "/",
-      icon: <LayoutDashboard className="h-5 w-5" />,
-    },
-    {
-      name: "Appointments",
-      path: "/appointments",
-      icon: <Calendar className="h-5 w-5" />,
-    },
-    {
-      name: "Patients",
-      path: "/patients",
-      icon: <Users className="h-5 w-5" />,
-    },
-    {
-      name: "Insurance Eligibility",
-      path: "/insurance-eligibility",
-      icon: <Shield className="h-5 w-5" />,
-    },
-    {
-      name: "Claims",
-      path: "/claims",
-      icon: <FileCheck className="h-5 w-5" />,
-    },
-    {
-      name: "Payments",
-      path: "/payments",
-      icon: <CreditCard className="h-5 w-5" />,
-    },
-    {
-      name: "Documents",
-      path: "/documents",
-      icon: <FolderOpen className="h-5 w-5" />,
-    },
-    {
-      name: "Backup Database",
-      path: "/database-management",
-      icon: <Database className="h-5 w-5" />,
-    },
-    {
-      name: "Settings",
-      path: "/settings",
-      icon: <Settings className="h-5 w-5" />,
-    },
-  ];
+  // Delay label visibility until the width animation completes
+  const [showLabels, setShowLabels] = useState(state !== "collapsed");
+  useEffect(() => {
+    let timer: number | undefined;
+
+    if (state === "expanded") {
+      timer = window.setTimeout(() => setShowLabels(true), WIDTH_ANIM_MS);
+    } else {
+      setShowLabels(false);
+    }
+
+    return () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [state]);
+
+  const navItems = useMemo(
+    () => [
+      {
+        name: "Dashboard",
+        path: "/",
+        icon: <LayoutDashboard className="h-5 w-5" />,
+      },
+      {
+        name: "Appointments",
+        path: "/appointments",
+        icon: <Calendar className="h-5 w-5" />,
+      },
+      {
+        name: "Patients",
+        path: "/patients",
+        icon: <Users className="h-5 w-5" />,
+      },
+      {
+        name: "Insurance Eligibility",
+        path: "/insurance-eligibility",
+        icon: <Shield className="h-5 w-5" />,
+      },
+      {
+        name: "Claims",
+        path: "/claims",
+        icon: <FileCheck className="h-5 w-5" />,
+      },
+      {
+        name: "Payments",
+        path: "/payments",
+        icon: <CreditCard className="h-5 w-5" />,
+      },
+      {
+        name: "Documents",
+        path: "/documents",
+        icon: <FolderOpen className="h-5 w-5" />,
+      },
+      {
+        name: "Reports",
+        path: "/reports",
+        icon: <FileText className="h-5 w-5" />,
+      },
+      {
+        name: "Backup Database",
+        path: "/database-management",
+        icon: <Database className="h-5 w-5" />,
+      },
+      {
+        name: "Settings",
+        path: "/settings",
+        icon: <Settings className="h-5 w-5" />,
+      },
+    ],
+    []
+  );
 
   return (
     <div
       className={cn(
-        "bg-white w-64 border-r border-gray-200 shadow-sm z-10 fixed h-full md:static",
-        isMobileOpen ? "block" : "hidden md:block"
+        // original look
+        "bg-white border-r border-gray-200 shadow-sm z-20",
+        // clip during width animation to avoid text peeking
+        "overflow-hidden will-change-[width]",
+        // animate width only
+        "transition-[width] duration-200 ease-in-out",
+        // MOBILE: overlay below topbar (h = 100vh - 4rem)
+        openMobile
+          ? "fixed top-16 left-0 h-[calc(100vh-4rem)] w-64 block md:hidden"
+          : "hidden md:block",
+        // DESKTOP: participates in row layout
+        "md:static md:top-auto md:h-auto md:flex-shrink-0",
+        state === "collapsed" ? "md:w-16" : "md:w-64"
       )}
     >
-      <div className="p-4 border-b border-gray-200 flex items-center space-x-2">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-5 w-5 text-primary"
-        >
-          <path d="M12 14c-1.65 0-3-1.35-3-3V5c0-1.65 1.35-3 3-3s3 1.35 3 3v6c0 1.65-1.35 3-3 3Z" />
-          <path d="M19 14v-4a7 7 0 0 0-14 0v4" />
-          <path d="M12 19c-5 0-8-2-9-5.5m18 0c-1 3.5-4 5.5-9 5.5Z" />
-        </svg>
-        <h1 className="text-lg font-medium text-primary">DentalConnect</h1>
-      </div>
-
       <div className="p-2">
-        <nav>
+        <nav role="navigation" aria-label="Main">
           {navItems.map((item) => (
             <div key={item.path}>
-              <Link to={item.path} onClick={() => setIsMobileOpen(false)}>
+              <Link to={item.path} onClick={() => setOpenMobile(false)}>
                 <div
                   className={cn(
                     "flex items-center space-x-3 p-2 rounded-md pl-3 mb-1 transition-colors cursor-pointer",
@@ -108,7 +127,12 @@ export function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps) {
                   )}
                 >
                   {item.icon}
-                  <span>{item.name}</span>
+                  {/* show label only after expand animation completes */}
+                  {showLabels && (
+                    <span className="whitespace-nowrap select-none">
+                      {item.name}
+                    </span>
+                  )}
                 </div>
               </Link>
             </div>
