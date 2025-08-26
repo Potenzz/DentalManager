@@ -250,6 +250,7 @@ enum PaymentStatus {
   PAID
   OVERPAID
   DENIED
+  VOID
 }
 
 enum PaymentMethod {

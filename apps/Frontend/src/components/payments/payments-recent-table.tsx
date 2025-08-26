@@ -19,6 +19,7 @@ import {
   TrendingUp,
   ThumbsDown,
   DollarSign,
+  Ban,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +36,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DeleteConfirmationDialog } from "../ui/deleteDialog";
 import LoadingScreen from "../ui/LoadingScreen";
 import {
-  ClaimStatus,
   NewTransactionPayload,
   PaymentStatus,
   PaymentWithExtras,
@@ -321,6 +321,36 @@ export default function PaymentsRecentTable({
     }
   };
 
+  //VOID and UNVOID Feature
+  const handleVoid = (paymentId: number) => {
+    updatePaymentStatusMutation.mutate({ paymentId, status: "VOID" });
+  };
+
+  const handleUnvoid = (paymentId: number) => {
+    updatePaymentStatusMutation.mutate({ paymentId, status: "PENDING" });
+  };
+
+  const [isVoidOpen, setIsVoidOpen] = useState(false);
+  const [voidPaymentId, setVoidPaymentId] = useState<number | null>(null);
+
+  const [isUnvoidOpen, setIsUnvoidOpen] = useState(false);
+  const [unvoidPaymentId, setUnvoidPaymentId] = useState<number | null>(null);
+
+  const handleConfirmVoid = () => {
+    if (!voidPaymentId) return;
+    handleVoid(voidPaymentId);
+    setVoidPaymentId(null);
+    setIsVoidOpen(false);
+  };
+
+  const handleConfirmUnvoid = () => {
+    if (!unvoidPaymentId) return;
+    handleUnvoid(unvoidPaymentId);
+    setUnvoidPaymentId(null);
+    setIsUnvoidOpen(false);
+  };
+
+  // Pagination
   useEffect(() => {
     if (onPageChange) onPageChange(currentPage);
   }, [currentPage, onPageChange]);
@@ -401,6 +431,13 @@ export default function PaymentsRecentTable({
           color: "bg-red-100 text-red-800",
           icon: <ThumbsDown className="h-3 w-3 mr-1" />,
         };
+      case "VOID":
+        return {
+          label: "Void",
+          color: "bg-gray-100 text-gray-800",
+          icon: <Ban className="h-3 w-3 mr-1" />,
+        };
+
       default:
         return {
           label: status
@@ -598,17 +635,36 @@ export default function PaymentsRecentTable({
                             <Edit className="h-4 w-4" />
                           </Button>
                         )}
-                        {/* Pay Full Due */}
-                        {payment.status !== "PAID" && (
-                          <Button
-                            variant="warning"
-                            size="sm"
-                            onClick={() => handlePayAbsoluteFullDue(payment.id)}
-                          >
-                            Pay Full Due
-                          </Button>
-                        )}
-                        {/* Revert Full Due */}
+
+                        {/* When NOT PAID and NOT VOID → Pay in Full + Void */}
+                        {payment.status !== "PAID" &&
+                          payment.status !== "VOID" && (
+                            <>
+                              <Button
+                                variant="warning"
+                                size="sm"
+                                onClick={() =>
+                                  handlePayAbsoluteFullDue(payment.id)
+                                }
+                              >
+                                Pay in Full
+                              </Button>
+
+                              {/* NEW: Void */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setVoidPaymentId(payment.id);
+                                  setIsVoidOpen(true);
+                                }}
+                              >
+                                Void
+                              </Button>
+                            </>
+                          )}
+
+                        {/* When PAID → Revert */}
                         {payment.status === "PAID" && (
                           <Button
                             variant="outline"
@@ -619,6 +675,20 @@ export default function PaymentsRecentTable({
                             }}
                           >
                             Revert Full Due
+                          </Button>
+                        )}
+
+                        {/* When VOID → Unvoid */}
+                        {payment.status === "VOID" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setUnvoidPaymentId(payment.id);
+                              setIsUnvoidOpen(true);
+                            }}
+                          >
+                            Unvoid
                           </Button>
                         )}
                       </div>
@@ -640,6 +710,28 @@ export default function PaymentsRecentTable({
         confirmColor="bg-yellow-600 hover:bg-yellow-700"
         onConfirm={handleRevert}
         onCancel={() => setIsRevertOpen(false)}
+      />
+
+      {/* NEW: Void Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={isVoidOpen}
+        title="Confirm Void"
+        message={`Mark this payment as VOID? It will be excluded from balances and Calculations.`}
+        confirmLabel="Void"
+        confirmColor="bg-gray-700 hover:bg-gray-800"
+        onConfirm={handleConfirmVoid}
+        onCancel={() => setIsVoidOpen(false)}
+      />
+
+      {/* NEW: Unvoid Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={isUnvoidOpen}
+        title="Confirm Unvoid"
+        message={`Restore this payment to a normal state (PENDING)?`}
+        confirmLabel="Unvoid"
+        confirmColor="bg-blue-600 hover:bg-blue-700"
+        onConfirm={handleConfirmUnvoid}
+        onCancel={() => setIsUnvoidOpen(false)}
       />
 
       <DeleteConfirmationDialog
