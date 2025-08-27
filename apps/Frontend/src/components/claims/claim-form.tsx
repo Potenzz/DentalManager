@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { X, Calendar as CalendarIcon, HelpCircle } from "lucide-react";
+import { X, Calendar as CalendarIcon, HelpCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -27,7 +27,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import procedureCodes from "../../assets/data/procedureCodes.json";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import {
   Claim,
@@ -39,6 +38,12 @@ import {
   UpdatePatient,
 } from "@repo/db/types";
 import { Decimal } from "decimal.js";
+import {
+  COMBO_BUTTONS,
+  mapPricesForForm,
+  applyComboToForm,
+  getDescriptionForCode,
+} from "@/utils/procedureCombosMapping";
 
 interface ClaimFormData {
   patientId: number;
@@ -252,25 +257,13 @@ export function ClaimForm({
   };
 
   // Map Price function
-  const mapPrices = () => {
-    const updatedLines = form.serviceLines.map((line) => {
-      if (line.procedureCode && line.procedureCode.trim() !== "") {
-        const normalizedCode = line.procedureCode.toUpperCase().trim();
-        const procedureInfo = procedureCodes.find(
-          (p) => p["Procedure Code"].toUpperCase().trim() === normalizedCode
-        );
-
-        if (procedureInfo && procedureInfo.Price) {
-          return {
-            ...line,
-            totalBilled: new Decimal(parseFloat(procedureInfo.Price)),
-          };
-        }
-      }
-      return line;
-    });
-
-    setForm({ ...form, serviceLines: updatedLines });
+  const onMapPrice = () => {
+    setForm((prev) =>
+      mapPricesForForm({
+        form: prev,
+        patientDOB: patient?.dateOfBirth ?? "",
+      })
+    );
   };
 
   // FILE UPLOAD ZONE
@@ -554,9 +547,13 @@ export function ClaimForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-4 mb-2 font-medium text-sm text-gray-700">
-                <span>Procedure Code</span>
-                <span>Abbreviation</span>
+              {/* Header */}
+              <div className="grid grid-cols-[1.5fr,0.5fr,1fr,1fr,1fr,1fr,1fr] gap-1 mb-2 font-medium text-sm text-gray-700 items-center">
+                <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                  <span />
+                  <span className="pl-8">Procedure Code</span>
+                </div>
+                <span className="justify-self-center">Info</span>
                 <span>Procedure Date</span>
                 <span>Oral Cavity Area</span>
                 <span>Tooth Number</span>
@@ -565,116 +562,128 @@ export function ClaimForm({
               </div>
 
               {/* Dynamic Rows */}
-              {form.serviceLines.map((line, i) => (
-                <div key={i} className="grid grid-cols-7 gap-1 mb-2">
-                  <Input
-                    placeholder="eg. D0120"
-                    value={line.procedureCode}
-                    onChange={(e) =>
-                      updateServiceLine(
-                        i,
-                        "procedureCode",
-                        e.target.value.toUpperCase()
-                      )
-                    }
-                  />
+              {form.serviceLines.map((line, i) => {
+                const raw = line.procedureCode || "";
+                const code = raw.trim();
+                const desc = code
+                  ? getDescriptionForCode(code) || "No description available"
+                  : "Enter a procedure code";
 
-                  <div className="flex items-center justify-center">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="text-sm">
-                          {line.procedureCode &&
-                          line.procedureCode.trim() !== ""
-                            ? (() => {
-                                const normalizedCode = line.procedureCode
-                                  .toUpperCase()
-                                  .trim();
-                                const procedureInfo = procedureCodes.find(
-                                  (p) =>
-                                    p["Procedure Code"].toUpperCase().trim() ===
-                                    normalizedCode
-                                );
-                                return procedureInfo
-                                  ? procedureInfo.Description ||
-                                      "No description available"
-                                  : "Enter a valid procedure code";
-                              })()
-                            : "Enter a procedure code"}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-
-                  {/* Date Picker */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full text-left font-normal"
+                return (
+                  <div
+                    key={i}
+                    className="grid grid-cols-[1.5fr,0.5fr,1fr,1fr,1fr,1fr,1fr] gap-1 mb-2 items-center"
+                  >
+                    <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) => {
+                            const next = {
+                              ...prev,
+                              serviceLines: [...prev.serviceLines],
+                            };
+                            next.serviceLines.splice(i, 1);
+                            return next;
+                          })
+                        }
+                        className="p-1 rounded hover:bg-red-50"
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {line.procedureDate || "Pick Date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={new Date(line.procedureDate)}
-                        onSelect={(date) => updateProcedureDate(i, date)}
+                        <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                      </button>
+                      <Input
+                        placeholder="eg. D0120"
+                        value={line.procedureCode}
+                        onChange={(e) =>
+                          updateServiceLine(
+                            i,
+                            "procedureCode",
+                            e.target.value.toUpperCase()
+                          )
+                        }
                       />
-                    </PopoverContent>
-                  </Popover>
+                    </div>
 
-                  <Input
-                    placeholder="Oral Cavity Area"
-                    value={line.oralCavityArea}
-                    onChange={(e) =>
-                      updateServiceLine(i, "oralCavityArea", e.target.value)
-                    }
-                  />
-                  <Input
-                    placeholder="eg. 14"
-                    value={line.toothNumber}
-                    onChange={(e) =>
-                      updateServiceLine(i, "toothNumber", e.target.value)
-                    }
-                  />
-                  <Input
-                    placeholder="eg. 'B', 'D', 'F', 'I', 'L', 'M', 'O'"
-                    value={line.toothSurface}
-                    onChange={(e) =>
-                      updateServiceLine(i, "toothSurface", e.target.value)
-                    }
-                  />
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="$0.00"
-                    value={
-                      line.totalBilled?.toNumber() === 0
-                        ? ""
-                        : line.totalBilled?.toNumber()
-                    }
-                    onChange={(e) => {
-                      updateServiceLine(i, "totalBilled", e.target.value);
-                    }}
-                    onBlur={(e) => {
-                      const val = parseFloat(e.target.value);
-                      const rounded = Math.round(val * 100) / 100;
-                      updateServiceLine(
-                        i,
-                        "totalBilled",
-                        isNaN(rounded) ? 0 : rounded
-                      );
-                    }}
-                  />
-                </div>
-              ))}
+                    <div className="flex justify-center">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-sm">{desc}</div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    {/* Date Picker */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full text-left font-normal"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {line.procedureDate || "Pick Date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={new Date(line.procedureDate)}
+                          onSelect={(date) => updateProcedureDate(i, date)}
+                        />
+                      </PopoverContent>
+                    </Popover>
+
+                    <Input
+                      placeholder="Oral Cavity Area"
+                      value={line.oralCavityArea}
+                      onChange={(e) =>
+                        updateServiceLine(i, "oralCavityArea", e.target.value)
+                      }
+                    />
+                    <Input
+                      placeholder="eg. 14"
+                      value={line.toothNumber}
+                      onChange={(e) =>
+                        updateServiceLine(i, "toothNumber", e.target.value)
+                      }
+                    />
+                    <Input
+                      placeholder="eg. 'B', 'D', 'F', 'I', 'L', 'M', 'O'"
+                      value={line.toothSurface}
+                      onChange={(e) =>
+                        updateServiceLine(i, "toothSurface", e.target.value)
+                      }
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="$0.00"
+                      value={
+                        line.totalBilled?.toNumber() === 0
+                          ? ""
+                          : line.totalBilled?.toNumber()
+                      }
+                      onChange={(e) => {
+                        updateServiceLine(i, "totalBilled", e.target.value);
+                      }}
+                      onBlur={(e) => {
+                        const val = parseFloat(e.target.value);
+                        const rounded = Math.round(val * 100) / 100;
+                        updateServiceLine(
+                          i,
+                          "totalBilled",
+                          isNaN(rounded) ? 0 : rounded
+                        );
+                      }}
+                    />
+                  </div>
+                );
+              })}
 
               <Button
+                className="mt-2"
                 variant="outline"
                 onClick={() =>
                   setForm((prev) => ({
@@ -699,10 +708,28 @@ export function ClaimForm({
               </Button>
 
               <div className="flex gap-2 mt-10 mb-10">
-                <Button variant="outline">Child Prophy Codes</Button>
-                <Button variant="outline">Adult Prophy Codes</Button>
-                <Button variant="outline">Customized Group Codes</Button>
-                <Button variant="success" onClick={mapPrices}>
+                {COMBO_BUTTONS.map((b) => (
+                  <Button
+                    key={b.id}
+                    variant="secondary"
+                    onClick={() =>
+                      setForm((prev) =>
+                        applyComboToForm(
+                          prev,
+                          b.id as any,
+                          patient?.dateOfBirth ?? "",
+                          {
+                            replaceAll: true,
+                            lineDate: prev.serviceDate,
+                          }
+                        )
+                      )
+                    }
+                  >
+                    {b.label}
+                  </Button>
+                ))}
+                <Button variant="success" onClick={onMapPrice}>
                   Map Price
                 </Button>
               </div>
