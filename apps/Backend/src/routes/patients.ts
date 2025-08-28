@@ -1,62 +1,10 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { storage } from "../storage";
-import {
-  AppointmentUncheckedCreateInputObjectSchema,
-  PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
 import { z } from "zod";
-import { extractDobParts } from "../utils/DobParts";
+import { insertPatientSchema, updatePatientSchema } from "@repo/db/types";
 
 const router = Router();
-
-//creating types out of schema auto generated.
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
-
-const insertAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-
-const updateAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .partial();
-type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
-
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
 
 // Patient Routes
 // Get all patients for the logged-in user
@@ -100,9 +48,7 @@ router.get("/search", async (req: Request, res: Response): Promise<any> => {
       offset = "0",
     } = req.query as Record<string, string>;
 
-    const filters: any = {
-      userId: req.user!.id,
-    };
+    const filters: any = {};
 
     if (term) {
       filters.OR = [
@@ -159,28 +105,30 @@ router.get("/search", async (req: Request, res: Response): Promise<any> => {
   }
 });
 
-
 // get patient by insurance id
-router.get("/by-insurance-id", async (req: Request, res: Response): Promise<any> => {
-  const insuranceId = req.query.insuranceId?.toString();
+router.get(
+  "/by-insurance-id",
+  async (req: Request, res: Response): Promise<any> => {
+    const insuranceId = req.query.insuranceId?.toString();
 
-  if (!insuranceId) {
-    return res.status(400).json({ error: "Missing insuranceId" });
-  }
-
-  try {
-    const patient = await storage.getPatientByInsuranceId(insuranceId);
-
-    if (patient) {
-      return res.status(200).json(patient);
-    } else {
-      return res.status(200).json(null);
+    if (!insuranceId) {
+      return res.status(400).json({ error: "Missing insuranceId" });
     }
-  } catch (err) {
-    console.error("Failed to lookup patient:", err);
-    return res.status(500).json({ error: "Internal server error" });
+
+    try {
+      const patient = await storage.getPatientByInsuranceId(insuranceId);
+
+      if (patient) {
+        return res.status(200).json(patient);
+      } else {
+        return res.status(200).json(null);
+      }
+    } catch (err) {
+      console.error("Failed to lookup patient:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
-});
+);
 
 // Get a single patient by ID
 router.get(
@@ -334,12 +282,12 @@ router.delete(
       }
 
       if (existingPatient.userId !== req.user!.id) {
-        console.warn(
-          `User ${req.user!.id} tried to delete patient ${patientId} owned by ${existingPatient.userId}`
-        );
         return res
           .status(403)
-          .json({ message: "Forbidden: Patient belongs to a different user" });
+          .json({
+            message:
+              "Forbidden: Patient belongs to a different user, you can't delete this.",
+          });
       }
 
       // Delete patient
@@ -351,18 +299,6 @@ router.delete(
     }
   }
 );
-
-// Appointment Routes
-// Get all appointments for the logged-in user
-router.get("/appointments", async (req, res) => {
-  try {
-    const appointments = await storage.getAppointmentsByUserId(req.user!.id);
-    res.json(appointments);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to retrieve appointments" });
-  }
-});
-
 // Get appointments for a specific patient
 router.get(
   "/:patientId/appointments",

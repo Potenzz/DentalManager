@@ -1,61 +1,13 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { storage } from "../storage";
-import {
-  AppointmentUncheckedCreateInputObjectSchema,
-  PatientUncheckedCreateInputObjectSchema,
-} from "@repo/db/usedSchemas";
 import { z } from "zod";
+import {
+  insertAppointmentSchema,
+  updateAppointmentSchema,
+} from "@repo/db/types";
 
 const router = Router();
-
-//creating types out of schema auto generated.
-type Appointment = z.infer<typeof AppointmentUncheckedCreateInputObjectSchema>;
-
-const insertAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-
-const updateAppointmentSchema = (
-  AppointmentUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .partial();
-type UpdateAppointment = z.infer<typeof updateAppointmentSchema>;
-
-const PatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  appointments: true,
-});
-type Patient = z.infer<typeof PatientSchema>;
-
-const insertPatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-).omit({
-  id: true,
-  createdAt: true,
-});
-type InsertPatient = z.infer<typeof insertPatientSchema>;
-
-const updatePatientSchema = (
-  PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
-)
-  .omit({
-    id: true,
-    createdAt: true,
-    userId: true,
-  })
-  .partial();
-
-type UpdatePatient = z.infer<typeof updatePatientSchema>;
 
 // Get all appointments
 router.get("/all", async (req: Request, res: Response): Promise<any> => {
@@ -162,9 +114,7 @@ router.get("/appointments/recent", async (req: Request, res: Response) => {
     const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
     const all = await storage.getRecentAppointments(limit, offset);
-    const filtered = all.filter((a) => a.userId === req.user!.id);
-
-    res.json({ data: filtered, limit, offset });
+    res.json({ data: all, limit, offset });
   } catch (err) {
     res.status(500).json({ message: "Failed to get recent appointments" });
   }

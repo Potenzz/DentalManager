@@ -25,6 +25,7 @@ model User {
   password             String
   patients             Patient[]
   appointments         Appointment[]
+  staff                Staff[]
   claims               Claim[]
   insuranceCredentials InsuranceCredential[]
   updatedPayments      Payment[]             @relation("PaymentUpdatedBy")
@@ -87,11 +88,13 @@ model Appointment {
 
 model Staff {
   id           Int           @id @default(autoincrement())
+  userId       Int?
   name         String
   email        String?
   role         String // e.g., "Dentist", "Hygienist", "Assistant"
   phone        String?
   createdAt    DateTime      @default(now())
+  user         User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   appointments Appointment[]
   claims       Claim[]       @relation("ClaimStaff")
 }

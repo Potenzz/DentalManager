@@ -46,15 +46,12 @@ const router = Router();
 // GET /api/payments/recent
 router.get("/recent", async (req: Request, res: Response): Promise<any> => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = parseInt(req.query.offset as string) || 0;
 
     const [payments, totalCount] = await Promise.all([
-      storage.getRecentPaymentsByUser(userId, limit, offset),
-      storage.getTotalPaymentCountByUser(userId),
+      storage.getRecentPayments(limit, offset),
+      storage.getTotalPaymentCount(),
     ]);
 
     res.status(200).json({ payments, totalCount });
@@ -69,9 +66,6 @@ router.get(
   "/claim/:claimId",
   async (req: Request, res: Response): Promise<any> => {
     try {
-      const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
       const parsedClaimId = parseIntOrError(req.params.claimId, "Claim ID");
 
       const payments = await storage.getPaymentsByClaimId(parsedClaimId);
@@ -122,9 +116,6 @@ router.get(
 // GET /api/payments/filter
 router.get("/filter", async (req: Request, res: Response): Promise<any> => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
     const validated = paymentFilterSchema.safeParse(req.query);
     if (!validated.success) {
       return res.status(400).json({
@@ -148,9 +139,6 @@ router.get("/filter", async (req: Request, res: Response): Promise<any> => {
 // GET /api/payments/:id
 router.get("/:id", async (req: Request, res: Response): Promise<any> => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
     const id = parseIntOrError(req.params.id, "Payment ID");
 
     const payment = await storage.getPaymentById(id);
@@ -351,6 +339,19 @@ router.delete("/:id", async (req: Request, res: Response): Promise<any> => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const id = parseIntOrError(req.params.id, "Payment ID");
+
+    // Check if payment exists and belongs to this user
+    const existingPayment = await storage.getPayment(id);
+    if (!existingPayment) {
+      return res.status(404).json({ message: "Payment not found" });
+    }
+
+    if (existingPayment.userId !== req.user!.id) {
+      return res.status(403).json({
+        message:
+          "Forbidden: Payment belongs to a different user, you can't delete this.",
+      });
+    }
     await storage.deletePayment(id, userId);
 
     res.status(200).json({ message: "Payment deleted successfully" });

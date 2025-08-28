@@ -57,11 +57,41 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
   }
 });
 
+const parseIdOr400 = (raw: any, label: string) => {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) throw new Error(`${label} is invalid`);
+  return n;
+};
+
 router.delete("/:id", async (req: Request, res: Response): Promise<any> => {
   try {
+    const userId = req.user!.id;
+    const id = parseIdOr400(req.params.id, "Staff ID");
     const parsedStaffId = Number(req.params.id);
     if (isNaN(parsedStaffId)) {
       return res.status(400).send("Invalid staff ID");
+    }
+
+    const existing = await storage.getStaff(id); // must include createdById
+    if (!existing) return res.status(404).json({ message: "Staff not found" });
+
+    if (existing.userId !== userId) {
+      return res.status(403).json({
+        message:
+          "Forbidden: Staff was created by a different user; you cannot delete it.",
+      });
+    }
+
+    const [apptCount, claimCount] = await Promise.all([
+      storage.countAppointmentsByStaffId(id),
+      storage.countClaimsByStaffId(id),
+    ]);
+
+    if (apptCount || claimCount) {
+      return res.status(409).json({
+        message: `Cannot delete staff with linked records. Appointment of this staff : ${apptCount} and Claims ${claimCount}`,
+        hint: "Archive this staff, or reassign linked records, then delete.",
+      });
     }
 
     const deleted = await storage.deleteStaff(parsedStaffId);

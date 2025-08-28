@@ -166,8 +166,8 @@ router.get("/recent", async (req: Request, res: Response) => {
     const offset = parseInt(req.query.offset as string) || 0;
 
     const [claims, totalCount] = await Promise.all([
-      storage.getRecentClaimsByUser(req.user!.id, limit, offset),
-      storage.getTotalClaimCountByUser(req.user!.id),
+      storage.getRecentClaims(limit, offset),
+      storage.getTotalClaimCount(),
     ]);
 
     res.json({ claims, totalCount });
@@ -210,13 +210,13 @@ router.get(
   }
 );
 
-// Get all claims for the logged-in user
+// Get all claims count.
 router.get("/all", async (req: Request, res: Response) => {
   try {
-    const claims = await storage.getTotalClaimCountByUser(req.user!.id);
+    const claims = await storage.getTotalClaimCount();
     res.json(claims);
   } catch (error) {
-    res.status(500).json({ message: "Failed to retrieve claims" });
+    res.status(500).json({ message: "Failed to retrieve claims count" });
   }
 });
 

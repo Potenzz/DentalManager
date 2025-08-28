@@ -44,6 +44,7 @@ import {
   applyComboToForm,
   getDescriptionForCode,
 } from "@/utils/procedureCombosMapping";
+import { COMBO_CATEGORIES, PROCEDURE_COMBOS } from "@/utils/procedureCombos";
 
 interface ClaimFormData {
   patientId: number;
@@ -707,32 +708,49 @@ export function ClaimForm({
                 + Add Service Line
               </Button>
 
-              <div className="flex gap-2 mt-10 mb-10">
-                {COMBO_BUTTONS.map((b) => (
-                  <Button
-                    key={b.id}
-                    variant="secondary"
-                    onClick={() =>
-                      setForm((prev) =>
-                        applyComboToForm(
-                          prev,
-                          b.id as any,
-                          patient?.dateOfBirth ?? "",
-                          {
-                            replaceAll: true,
-                            lineDate: prev.serviceDate,
-                          }
-                        )
-                      )
-                    }
-                  >
-                    {b.label}
-                  </Button>
+              <div className="space-y-8 mt-10 mb-10">
+                {Object.entries(COMBO_CATEGORIES).map(([section, ids]) => (
+                  <div key={section}>
+                    <div className="mb-3 text-sm font-semibold opacity-70">
+                      {section}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {ids.map((id) => {
+                        const b = PROCEDURE_COMBOS[id];
+                        if(!b){return}
+                        return (
+                          <Button
+                            key={b.id}
+                            variant="secondary"
+                            onClick={() =>
+                              setForm((prev) =>
+                                applyComboToForm(
+                                  prev,
+                                  b.id as any,
+                                  patient?.dateOfBirth ?? "",
+                                  {
+                                    replaceAll: true,
+                                    lineDate: prev.serviceDate,
+                                  }
+                                )
+                              )
+                            }
+                          >
+                            {b.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))}
-                <Button variant="success" onClick={onMapPrice}>
-                  Map Price
-                </Button>
+
+                <div className="pt-4">
+                  <Button variant="success" onClick={onMapPrice}>
+                    Map Price
+                  </Button>
+                </div>
               </div>
+
             </div>
 
             {/* File Upload Section */}
