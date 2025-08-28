@@ -1,6 +1,6 @@
 export const PROCEDURE_COMBOS: Record<
   string,
-  { id: string; label: string; codes: string[] }
+  { id: string; label: string; codes: string[]; toothNumbers?: (string | null)[] }
 > = {
   childRecall: {
     id: "childRecall",
@@ -16,6 +16,7 @@ export const PROCEDURE_COMBOS: Record<
     id: "adultRecall",
     label: "Adult Recall",
     codes: ["D0120", "D0220", "D0230", "D0274", "D1110"],
+    toothNumbers: [null, "9", "24", null, null], // only these two need values
   },
   newChildPatient: {
     id: "newChildPatient",

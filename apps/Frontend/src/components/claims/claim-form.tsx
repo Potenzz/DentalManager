@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,7 +39,6 @@ import {
 } from "@repo/db/types";
 import { Decimal } from "decimal.js";
 import {
-  COMBO_BUTTONS,
   mapPricesForForm,
   applyComboToForm,
   getDescriptionForCode,
@@ -255,6 +254,16 @@ export function ClaimForm({
     }
 
     setForm({ ...form, serviceLines: updatedLines });
+  };
+
+  // for serviceLine rows, to auto scroll when it got updated by combo buttons and all.
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const scrollToLine = (index: number) => {
+    const el = rowRefs.current[index];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   // Map Price function
@@ -573,7 +582,11 @@ export function ClaimForm({
                 return (
                   <div
                     key={i}
-                    className="grid grid-cols-[1.5fr,0.5fr,1fr,1fr,1fr,1fr,1fr] gap-1 mb-2 items-center"
+                    ref={(el) => {
+                      rowRefs.current[i] = el;
+                      if (!el) rowRefs.current.splice(i, 1);
+                    }}
+                    className="scroll-mt-28 grid grid-cols-[1.5fr,0.5fr,1fr,1fr,1fr,1fr,1fr] gap-1 mb-2 items-center"
                   >
                     <div className="grid grid-cols-[auto,1fr] items-center gap-2">
                       <button
@@ -708,23 +721,25 @@ export function ClaimForm({
                 + Add Service Line
               </Button>
 
-              <div className="space-y-8 mt-10 mb-10">
+              <div className="space-y-4 mt-8">
                 {Object.entries(COMBO_CATEGORIES).map(([section, ids]) => (
                   <div key={section}>
                     <div className="mb-3 text-sm font-semibold opacity-70">
                       {section}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1">
                       {ids.map((id) => {
                         const b = PROCEDURE_COMBOS[id];
-                        if(!b){return}
+                        if (!b) {
+                          return;
+                        }
                         return (
                           <Button
                             key={b.id}
                             variant="secondary"
                             onClick={() =>
-                              setForm((prev) =>
-                                applyComboToForm(
+                              setForm((prev) => {
+                                const next = applyComboToForm(
                                   prev,
                                   b.id as any,
                                   patient?.dateOfBirth ?? "",
@@ -732,8 +747,12 @@ export function ClaimForm({
                                     replaceAll: true,
                                     lineDate: prev.serviceDate,
                                   }
-                                )
-                              )
+                                );
+
+                                setTimeout(() => scrollToLine(0), 0);
+
+                                return next;
+                              })
                             }
                           >
                             {b.label}
@@ -744,13 +763,12 @@ export function ClaimForm({
                   </div>
                 ))}
 
-                <div className="pt-4">
+                <div className="pt-2">
                   <Button variant="success" onClick={onMapPrice}>
                     Map Price
                   </Button>
                 </div>
               </div>
-
             </div>
 
             {/* File Upload Section */}

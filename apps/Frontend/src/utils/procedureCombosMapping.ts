@@ -251,7 +251,10 @@ export function applyComboToForm<T extends ClaimFormLike>(
       procedureCode: code,
       procedureDate: lineDate,
       oralCavityArea: original?.oralCavityArea ?? "",
-      toothNumber: original?.toothNumber ?? "",
+      toothNumber:
+      preset.toothNumbers?.[j] ??
+      original?.toothNumber ??
+      "", 
       toothSurface: original?.toothSurface ?? "",
       totalBilled: price,
       totalAdjusted: new Decimal(0),
