@@ -237,10 +237,6 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
       return res.status(404).json({ message: "Claim not found" });
     }
 
-    if (claim.userId !== req.user!.id) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
     res.json(claim);
   } catch (error) {
     res.status(500).json({ message: "Failed to retrieve claim" });
@@ -332,10 +328,6 @@ router.put("/:id", async (req: Request, res: Response): Promise<any> => {
     const existingClaim = await storage.getClaim(claimId);
     if (!existingClaim) {
       return res.status(404).json({ message: "Claim not found" });
-    }
-
-    if (existingClaim.userId !== req.user!.id) {
-      return res.status(403).json({ message: "Forbidden" });
     }
 
     const claimData = updateClaimSchema.parse(req.body);

@@ -150,12 +150,6 @@ router.get(
       if (!patient) {
         return res.status(404).json({ message: "Patient not found" });
       }
-
-      // Ensure the patient belongs to the logged-in user
-      if (patient.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
       res.json(patient);
     } catch (error) {
       res.status(500).json({ message: "Failed to retrieve patient" });
@@ -220,10 +214,6 @@ router.put(
         return res.status(404).json({ message: "Patient not found" });
       }
 
-      if (existingPatient.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
       // Validate request body
       const patientData = updatePatientSchema.parse(req.body);
 
@@ -282,12 +272,10 @@ router.delete(
       }
 
       if (existingPatient.userId !== req.user!.id) {
-        return res
-          .status(403)
-          .json({
-            message:
-              "Forbidden: Patient belongs to a different user, you can't delete this.",
-          });
+        return res.status(403).json({
+          message:
+            "Forbidden: Patient belongs to a different user, you can't delete this.",
+        });
       }
 
       // Delete patient
@@ -318,10 +306,6 @@ router.get(
       const patient = await storage.getPatient(patientId);
       if (!patient) {
         return res.status(404).json({ message: "Patient not found" });
-      }
-
-      if (patient.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
       }
 
       const appointments = await storage.getAppointmentsByPatientId(patientId);

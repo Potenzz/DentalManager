@@ -41,11 +41,6 @@ router.get(
         return res.status(404).json({ message: "Appointment not found" });
       }
 
-      // Ensure the appointment belongs to the logged-in user
-      if (appointment.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
       res.json(appointment);
     } catch (error) {
       res.status(500).json({ message: "Failed to retrieve appointment" });
@@ -71,8 +66,6 @@ router.get(
       const patient = await storage.getPatient(patientId);
       if (!patient)
         return res.status(404).json({ message: "Patient not found" });
-      if (patient.userId !== req.user!.id)
-        return res.status(403).json({ message: "Forbidden" });
 
       const appointments = await storage.getAppointmentsByPatientId(patientId);
       res.json(appointments);
@@ -132,7 +125,6 @@ router.post(
         userId: req.user!.id,
       });
 
-      const userId = req.user!.id;
       const originalStartTime = appointmentData.startTime;
       const MAX_END_TIME = "18:30";
 
@@ -140,12 +132,6 @@ router.post(
       const patient = await storage.getPatient(appointmentData.patientId);
       if (!patient) {
         return res.status(404).json({ message: "Patient not found" });
-      }
-
-      if (patient.userId !== userId) {
-        return res.status(403).json({
-          message: "Forbidden, You are not the user who created this patient.",
-        });
       }
 
       // 2. Attempt to find the next available slot
@@ -262,8 +248,6 @@ router.put(
         userId: req.user!.id,
       });
 
-      const userId = req.user!.id;
-
       const appointmentIdParam = req.params.id;
       if (!appointmentIdParam) {
         return res.status(400).json({ message: "Appointment ID is required" });
@@ -276,23 +260,11 @@ router.put(
         return res.status(404).json({ message: "Patient not found" });
       }
 
-      if (patient.userId !== userId) {
-        return res.status(403).json({
-          message: "Forbidden, You are not the user who created this patient.",
-        });
-      }
-
       // 2. Check if appointment exists and belongs to user
       const existingAppointment = await storage.getAppointment(appointmentId);
       if (!existingAppointment) {
         console.log("Appointment not found:", appointmentId);
         return res.status(404).json({ message: "Appointment not found" });
-      }
-      if (existingAppointment.userId !== req.user!.id) {
-        return res.status(403).json({
-          message:
-            "Forbidden, You are not the user who created this appointment.",
-        });
       }
 
       // 4. Reject patientId change (not allowed)
