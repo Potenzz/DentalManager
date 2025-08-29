@@ -36,7 +36,9 @@ interface AddPatientModalProps {
 // Define the ref type
 export type AddPatientModalRef = {
   shouldSchedule: boolean;
+  shouldClaim: boolean;
   navigateToSchedule: (patientId: number) => void;
+  navigateToClaim: (patientId: number) => void;
 };
 
 export const AddPatientModal = forwardRef<
@@ -51,6 +53,7 @@ export const AddPatientModal = forwardRef<
   const isEditing = !!patient;
   const [, navigate] = useLocation();
   const [saveAndSchedule, setSaveAndSchedule] = useState(false);
+  const [saveAndClaim, setSaveAndClaim] = useState(false);
   const patientFormRef = useRef<PatientFormRef>(null); // Ref for PatientForm
 
   // Set up the imperativeHandle to expose functionality to the parent component
@@ -65,8 +68,13 @@ export const AddPatientModal = forwardRef<
 
   useImperativeHandle(ref, () => ({
     shouldSchedule: saveAndSchedule,
+    shouldClaim: saveAndClaim, // ✅ NEW
     navigateToSchedule: (patientId: number) => {
       navigate(`/appointments?newPatient=${patientId}`);
+    },
+    navigateToClaim: (patientId: number) => {
+      // ✅ NEW
+      navigate(`/claims?newPatient=${patientId}`);
     },
   }));
 
@@ -79,10 +87,15 @@ export const AddPatientModal = forwardRef<
   };
 
   const handleSaveAndSchedule = () => {
+    setSaveAndClaim(false); // ensure only one flag at a time
     setSaveAndSchedule(true);
-    if (patientFormRef.current) {
-      patientFormRef.current.submit();
-    }
+    patientFormRef.current?.submit();
+  };
+
+  const handleSaveAndClaim = () => {
+    setSaveAndSchedule(false); // ensure only one flag at a time
+    setSaveAndClaim(true);
+    patientFormRef.current?.submit();
   };
 
   return (
@@ -119,6 +132,18 @@ export const AddPatientModal = forwardRef<
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
+
+          {!isEditing && (
+            <Button
+              variant="outline"
+              className="gap-1"
+              onClick={handleSaveAndClaim}
+              disabled={isLoading}
+            >
+              <Calendar className="h-4 w-4" />
+              Save & Claim
+            </Button>
+          )}
 
           {!isEditing && (
             <Button

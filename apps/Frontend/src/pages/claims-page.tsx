@@ -165,10 +165,11 @@ export default function ClaimsPage() {
 
   // workflow starts from there - this params are set by pdf extraction/patient page. then used in claim page here.
   const [location] = useLocation();
-  const { name, memberId, dob } = useMemo(() => {
+  const { name, memberId, dob, newPatient } = useMemo(() => {
     const search = window.location.search;
     const params = new URLSearchParams(search);
     return {
+      newPatient: params.get("newPatient"),
       name: params.get("name") || "",
       memberId: params.get("memberId") || "",
       dob: params.get("dob") || "",
@@ -179,7 +180,17 @@ export default function ClaimsPage() {
     setSelectedPatientId(patientId);
     setIsClaimFormOpen(true);
   };
+  // ✅ FIRST: if ?newPatient=<id> is present, open claim form directly
+  useEffect(() => {
+    if (newPatient) {
+      const id = Number(newPatient);
+      if (Number.isFinite(id) && id > 0) {
+        handleNewClaim(id);
+      }
+    }
+  }, [newPatient]);
 
+  // existing flow: only runs when there is no ?newPatient and we have memberId+dob
   useEffect(() => {
     if (memberId && dob) {
       // if matching patient found then simply send its id to claim form,

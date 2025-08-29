@@ -22,7 +22,9 @@ import { InsertPatient, Patient } from "@repo/db/types";
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
   shouldSchedule: boolean;
+  shouldClaim: boolean;
   navigateToSchedule: (patientId: number) => void;
+  navigateToClaim: (patientId: number) => void;
 };
 
 export default function PatientsPage() {
@@ -57,9 +59,14 @@ export default function PatientsPage() {
         variant: "default",
       });
 
-      // If the add patient modal wants to proceed to scheduling, redirect to appointments page
+      // ✅ Check claim first, then schedule
+      if (addPatientModalRef.current?.shouldClaim) {
+        addPatientModalRef.current.navigateToClaim(newPatient.id);
+        return;
+      }
       if (addPatientModalRef.current?.shouldSchedule) {
         addPatientModalRef.current.navigateToSchedule(newPatient.id);
+        return;
       }
     },
     onError: (error) => {
