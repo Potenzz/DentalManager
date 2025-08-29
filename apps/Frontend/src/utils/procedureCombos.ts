@@ -165,9 +165,9 @@ export const COMBO_CATEGORIES: Record<string, (keyof typeof PROCEDURE_COMBOS)[]>
   "Recalls & New Patients": [
     "childRecall",
     "adultRecall",
+    "newChildPatient",
     "newAdultPatientPano",
     "newAdultPatientFMX",
-    "newChildPatient",
   ],
   "Composite Fillings (Front)": [
     "oneSurfCompFront",
