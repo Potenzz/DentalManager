@@ -16,7 +16,7 @@ export default function useExtractPdfData() {
       const formData = new FormData();
       formData.append("pdf", pdfFile);
 
-      const res = await apiRequest("POST", "/api/pdfExtraction/extract", formData);
+      const res = await apiRequest("POST", "/api/patientDataExtraction/patientdataextract", formData);
       if (!res.ok) throw new Error("Failed to extract PDF");
       return res.json();
     },

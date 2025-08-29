@@ -9,7 +9,7 @@ export interface ExtractedData {
   [key: string]: any; 
 }
 
-export default async function forwardToPdfService(
+export default async function forwardToPatientDataExtractorService(
   file: Express.Multer.File
 ): Promise<ExtractedData> {
   const form = new FormData();

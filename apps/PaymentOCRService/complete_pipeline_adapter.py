@@ -4,10 +4,7 @@ from typing import List, Dict
 import pandas as pd
 
 # Import your existing functions directly from complete_pipeline.py
-from complete_pipeline import (
-    smart_deskew_with_lines,
-    extract_all_clients_from_lines,
-)
+from complete_pipeline import smart_deskew_with_lines, extract_all_clients_from_lines
 
 def _process_single_image_bytes(blob: bytes, display_name: str) -> List[Dict]:
     """
