@@ -1,0 +1,1026 @@
+[
+  {
+    "Procedure Code": "D0120",
+    "Description": "perio exam",
+    "Price": "105"
+  },
+  {
+    "Procedure Code": "D0140",
+    "Description": "limited exam",
+    "Price": "90"
+  },
+  {
+    "Procedure Code": "D0150",
+    "Description": "comprehensive exam",
+    "Price": "120"
+  },
+  {
+    "Procedure Code": "D0210",
+    "Description": "Fmx.",
+    "Price": "120"
+  },
+  {
+    "Procedure Code": "D0220",
+    "Description": "first PA.",
+    "Price": "60"
+  },
+  {
+    "Procedure Code": "D0230",
+    "Description": "2nd PA.",
+    "Price": "50"
+  },
+  {
+    "Procedure Code": "D0272",
+    "Description": "2 BW",
+    "Price": "80"
+  },
+  {
+    "Procedure Code": "D0274",
+    "Description": "4BW",
+    "Price": "160"
+  },
+  {
+    "Procedure Code": "D0330",
+    "Description": "pano",
+    "Price": "150"
+  },
+  {
+    "Procedure Code": "D0364",
+    "Description": "Less than one jaw",
+    "Price": "350"
+  },
+  {
+    "Procedure Code": "D0365",
+    "Description": "Mand",
+    "Price": "350"
+  },
+  {
+    "Procedure Code": "D0366",
+    "Description": "Max",
+    "Price": "350"
+  },
+  {
+    "Procedure Code": "D0367",
+    "Description": "",
+    "Price": "400"
+  },
+  {
+    "Procedure Code": "D0368",
+    "Description": "include TMJ",
+    "Price": "375"
+  },
+  {
+    "Procedure Code": "D0380",
+    "Description": "Less than one jaw",
+    "Price": "300"
+  },
+  {
+    "Procedure Code": "D0381",
+    "Description": "Mand",
+    "Price": "300"
+  },
+  {
+    "Procedure Code": "D0382",
+    "Description": "Max",
+    "Price": "300"
+  },
+  {
+    "Procedure Code": "D0383",
+    "Description": "",
+    "Price": "350"
+  },
+  {
+    "Procedure Code": "D1110",
+    "Description": "adult prophy",
+    "Price": "150"
+  },
+  {
+    "Procedure Code": "D1120",
+    "Description": "child prophy",
+    "Price": "120"
+  },
+  {
+    "Procedure Code": "D1208",
+    "Description": "FL",
+    "Price": "90"
+  },
+  {
+    "Procedure Code": "D1351",
+    "Description": "sealant",
+    "Price": "80"
+  },
+  {
+    "Procedure Code": "D1999",
+    "Description": "",
+    "Price": "50"
+  },
+  {
+    "Procedure Code": "D2140",
+    "Description": "amalgam, one surface",
+    "Price": "150"
+  },
+  {
+    "Procedure Code": "D2150",
+    "Description": "amalgam, two surface",
+    "Price": "200"
+  },
+  {
+    "Procedure Code": "D2955",
+    "Description": "post renoval",
+    "Price": "350"
+  },
+  {
+    "Procedure Code": "D4910",
+    "Description": "perio maintains",
+    "Price": "250"
+  },
+  {
+    "Procedure Code": "D5510",
+    "Description": "Repair broken complete denture base (QUAD)",
+    "Price": "400"
+  },
+  {
+    "Procedure Code": "D6056",
+    "Description": "pre fab abut",
+    "Price": "750"
+  },
+  {
+    "Procedure Code": "D6057",
+    "Description": "custom abut",
+    "Price": "800"
+  },
+  {
+    "Procedure Code": "D6058",
+    "Description": "porcelain, implant crown, ceramic crown",
+    "Price": "1400"
+  },
+  {
+    "Procedure Code": "D6059",
+    "Description": "",
+    "Price": "1400"
+  },
+  {
+    "Procedure Code": "D6100",
+    "Description": "",
+    "Price": "320"
+  },
+  {
+    "Procedure Code": "D6110",
+    "Description": "implant",
+    "Price": "1600"
+  },
+  {
+    "Procedure Code": "D6242",
+    "Description": "noble metal. For united",
+    "Price": "1400"
+  },
+  {
+    "Procedure Code": "D6245",
+    "Description": "porcelain, not for united",
+    "Price": "1400"
+  },
+  {
+    "Procedure Code": "D7910",
+    "Description": "suture, small wound up to 5 mm",
+    "Price": "400"
+  },
+  {
+    "Procedure Code": "D7950",
+    "Description": "max",
+    "Price": "800"
+  },
+  {
+    "Procedure Code": "D2160",
+    "Description": "Amalgam-three surfaces, primary or permanent",
+    "PriceLTEQ21": "110",
+    "PriceGT21": "92"
+  },
+  {
+    "Procedure Code": "D2161",
+    "Description": "Amalgam-four or more surfaces, primary or permanent",
+    "PriceLTEQ21": "137",
+    "PriceGT21": "116"
+  },
+  {
+    "Procedure Code": "D2330",
+    "Description": "Resin-based composite – one surface, anterior",
+    "PriceLTEQ21": "98",
+    "PriceGT21": "72"
+  },
+  {
+    "Procedure Code": "D2331",
+    "Description": "Resin-based composite – two surfaces, anterior",
+    "PriceLTEQ21": "118",
+    "PriceGT21": "92"
+  },
+  {
+    "Procedure Code": "D2332",
+    "Description": "Resin-based composite – three surfaces, anterior",
+    "PriceLTEQ21": "147",
+    "PriceGT21": "116"
+  },
+  {
+    "Procedure Code": "D2335",
+    "Description": "Resin-based composite – four or more surfaces or involving incisal angle (anterior)",
+    "PriceLTEQ21": "188",
+    "PriceGT21": "146"
+  },
+  {
+    "Procedure Code": "D2390",
+    "Description": "Resin-based composite crown, anterior",
+    "PriceLTEQ21": "133",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2391",
+    "Description": "Resin-based composite – one surface, posterior",
+    "PriceLTEQ21": "99",
+    "PriceGT21": "62"
+  },
+  {
+    "Procedure Code": "D2392",
+    "Description": "Resin-based composite – two surfaces, posterior",
+    "PriceLTEQ21": "123",
+    "PriceGT21": "77"
+  },
+  {
+    "Procedure Code": "D2393",
+    "Description": "Resin-based composite – three surfaces, posterior",
+    "PriceLTEQ21": "133",
+    "PriceGT21": "92"
+  },
+  {
+    "Procedure Code": "D2394",
+    "Description": "Resin-based composite – four or more surfaces, posterior",
+    "PriceLTEQ21": "182",
+    "PriceGT21": "116"
+  },
+  {
+    "Procedure Code": "D2710",
+    "Description": "Crown – resin-based composite (indirect)",
+    "PriceLTEQ21": "244",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2740",
+    "Description": "Crown – porcelain/ceramic",
+    "PriceLTEQ21": "853",
+    "PriceGT21": "729"
+  },
+  {
+    "Procedure Code": "D2750",
+    "Description": "Crown – porcelain fused to high noble metal",
+    "PriceLTEQ21": "800",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2751",
+    "Description": "Crown – porcelain fused to predominantly base metal",
+    "PriceLTEQ21": "727",
+    "PriceGT21": "613"
+  },
+  {
+    "Procedure Code": "D2752",
+    "Description": "Crown – porcelain fused to noble metal",
+    "PriceLTEQ21": "735",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2790",
+    "Description": "Crown – full cast high noble metal",
+    "PriceLTEQ21": "808",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2910",
+    "Description": "Re-cement or re-bond inlay, onlay or partial coverage restoration",
+    "PriceLTEQ21": "69",
+    "PriceGT21": "57"
+  },
+  {
+    "Procedure Code": "D2920",
+    "Description": "Re-cement or re-bond crown",
+    "PriceLTEQ21": "68",
+    "PriceGT21": "57"
+  },
+  {
+    "Procedure Code": "D2929",
+    "Description": "Prefabricated porcelain/ceramic crown – primary tooth",
+    "PriceLTEQ21": "224",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2930",
+    "Description": "Prefabricated stainless steel crown – primary tooth",
+    "PriceLTEQ21": "205",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2931",
+    "Description": "Prefabricated stainless steel crown – permanent tooth",
+    "PriceLTEQ21": "199",
+    "PriceGT21": "171"
+  },
+  {
+    "Procedure Code": "D2932",
+    "Description": "Prefabricated resin crown",
+    "PriceLTEQ21": "224",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2934",
+    "Description": "Prefabricated esthetic coated stainless steel crown – primary tooth",
+    "PriceLTEQ21": "184",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D2950",
+    "Description": "Core buildup, including any pins when required",
+    "PriceLTEQ21": "197",
+    "PriceGT21": "164"
+  },
+  {
+    "Procedure Code": "D2951",
+    "Description": "Pin retention – per tooth, in addition to restoration",
+    "PriceLTEQ21": "31",
+    "PriceGT21": "27"
+  },
+  {
+    "Procedure Code": "D2954",
+    "Description": "Prefabricated post and core in addition to crown",
+    "PriceLTEQ21": "229",
+    "PriceGT21": "191"
+  },
+  {
+    "Procedure Code": "D2980",
+    "Description": "Crown repair necessitated by restorative material failure",
+    "PriceLTEQ21": "137",
+    "PriceGT21": "115"
+  },
+  {
+    "Procedure Code": "D2999",
+    "Description": "Unspecified restorative procedure, by report",
+    "PriceLTEQ21": "IC",
+    "PriceGT21": "IC"
+  },
+  {
+    "Procedure Code": "D3120",
+    "Description": "Pulp cap – indirect (excluding final restoration)",
+    "PriceLTEQ21": "40",
+    "PriceGT21": "34"
+  },
+  {
+    "Procedure Code": "D3220",
+    "Description": "Therapeutic pulpotomy (excluding final restoration) – removal of pulp coronal to the dentinocemental junction and application of medicament",
+    "PriceLTEQ21": "106",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D3310",
+    "Description": "Endodontic therapy, anterior (excluding final restoration)",
+    "PriceLTEQ21": "544",
+    "PriceGT21": "544"
+  },
+  {
+    "Procedure Code": "D3320",
+    "Description": "Endodontic therapy, premolar tooth (excluding final restoration)",
+    "PriceLTEQ21": "639",
+    "PriceGT21": "639"
+  },
+  {
+    "Procedure Code": "D3330",
+    "Description": "Endodontic therapy, molar tooth (excluding final restoration)",
+    "PriceLTEQ21": "829",
+    "PriceGT21": "829"
+  },
+  {
+    "Procedure Code": "D3346",
+    "Description": "Retreatment of previous root canal therapy – anterior",
+    "PriceLTEQ21": "545",
+    "PriceGT21": "456"
+  },
+  {
+    "Procedure Code": "D3347",
+    "Description": "Retreatment of previous root canal therapy – premolar",
+    "PriceLTEQ21": "641",
+    "PriceGT21": "538"
+  },
+  {
+    "Procedure Code": "D3348",
+    "Description": "Retreatment of previous root canal therapy – molar",
+    "PriceLTEQ21": "789",
+    "PriceGT21": "613"
+  },
+  {
+    "Procedure Code": "D3410",
+    "Description": "Apicoectomy – anterior",
+    "PriceLTEQ21": "471",
+    "PriceGT21": "407"
+  },
+  {
+    "Procedure Code": "D3421",
+    "Description": "Apicoectomy – premolar (first root)",
+    "PriceLTEQ21": "550",
+    "PriceGT21": "460"
+  },
+  {
+    "Procedure Code": "D3425",
+    "Description": "Apicoectomy – molar (first root)",
+    "PriceLTEQ21": "639",
+    "PriceGT21": "598"
+  },
+  {
+    "Procedure Code": "D3426",
+    "Description": "Apicoectomy (each additional root)",
+    "PriceLTEQ21": "264",
+    "PriceGT21": "230"
+  },
+  {
+    "Procedure Code": "D4210",
+    "Description": "Gingivectomy or gingivoplasty - Four or more contiguous teeth or bounded teeth spaces per quadrant",
+    "PriceLTEQ21": "343",
+    "PriceGT21": "307"
+  },
+  {
+    "Procedure Code": "D4211",
+    "Description": "Gingivectomy or gingivoplasty - one to three contiguous teeth or bounded teeth spaces per quadrant",
+    "PriceLTEQ21": "133",
+    "PriceGT21": "111"
+  },
+  {
+    "Procedure Code": "D4341",
+    "Description": "Periodontal scaling and root planing - four or more teeth per quadrant",
+    "PriceLTEQ21": "160",
+    "PriceGT21": "134"
+  },
+  {
+    "Procedure Code": "D4342",
+    "Description": "Periodontal scaling and root planing - one to three teeth, per quadrant",
+    "PriceLTEQ21": "107",
+    "PriceGT21": "90"
+  },
+  {
+    "Procedure Code": "D4346",
+    "Description": "Scaling in presence of generalized moderate or severe gingival inflammation – full mouth, after oral evaluation",
+    "PriceLTEQ21": "75",
+    "PriceGT21": "60"
+  },
+  {
+    "Procedure Code": "D5110",
+    "Description": "Complete denture – maxillary",
+    "PriceLTEQ21": "858",
+    "PriceGT21": "730"
+  },
+  {
+    "Procedure Code": "D5120",
+    "Description": "Complete denture – mandibular",
+    "PriceLTEQ21": "852",
+    "PriceGT21": "730"
+  },
+  {
+    "Procedure Code": "D5130",
+    "Description": "Immediate denture – maxillary",
+    "PriceLTEQ21": "935",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5140",
+    "Description": "Immediate denture - mandibular",
+    "PriceLTEQ21": "934",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5211",
+    "Description": "Maxillary partial denture - resin base (including retentive/clasping materials, rests and teeth)",
+    "PriceLTEQ21": "650",
+    "PriceGT21": "556"
+  },
+  {
+    "Procedure Code": "D5212",
+    "Description": "Mandibular partial denture - resin base (including retentive/clasping materials, rests and teeth)",
+    "PriceLTEQ21": "691",
+    "PriceGT21": "595"
+  },
+  {
+    "Procedure Code": "D5213",
+    "Description": "Maxillary partial denture- cast metal framework with resin denture bases (including retentive/clasping materials, rests and teeth)",
+    "PriceLTEQ21": "974",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5214",
+    "Description": "Mandibular partial denture - cast metal framework with resin denture bases (including retentive/clasping materials, rests and teeth)",
+    "PriceLTEQ21": "986",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5225",
+    "Description": "Maxillary partial denture- flexible base",
+    "PriceLTEQ21": "974",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5226",
+    "Description": "Mandibular partial denture- flexible base",
+    "PriceLTEQ21": "986",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5511",
+    "Description": "Repair broken complete denture base, mandibular",
+    "PriceLTEQ21": "109",
+    "PriceGT21": "85"
+  },
+  {
+    "Procedure Code": "D5512",
+    "Description": "Repair broken complete denture base, maxillary",
+    "PriceLTEQ21": "109",
+    "PriceGT21": "85"
+  },
+  {
+    "Procedure Code": "D5520",
+    "Description": "Replace missing or broken teeth - complete denture (each tooth)",
+    "PriceLTEQ21": "89",
+    "PriceGT21": "77"
+  },
+  {
+    "Procedure Code": "D5611",
+    "Description": "Repair broken resin partial denture base, mandibular",
+    "PriceLTEQ21": "93",
+    "PriceGT21": "77"
+  },
+  {
+    "Procedure Code": "D5612",
+    "Description": "Repair broken resin partial denture base, maxillary",
+    "PriceLTEQ21": "93",
+    "PriceGT21": "77"
+  },
+  {
+    "Procedure Code": "D5621",
+    "Description": "Repair broken cast partial denture base, mandibular",
+    "PriceLTEQ21": "121",
+    "PriceGT21": "104"
+  },
+  {
+    "Procedure Code": "D5622",
+    "Description": "Repair broken cast partial denture base, maxillary",
+    "PriceLTEQ21": "121",
+    "PriceGT21": "104"
+  },
+  {
+    "Procedure Code": "D5630",
+    "Description": "Repair or replace broken retentive/clasping materials – per tooth",
+    "PriceLTEQ21": "107",
+    "PriceGT21": "99"
+  },
+  {
+    "Procedure Code": "D5640",
+    "Description": "Replace broken teeth - per tooth",
+    "PriceLTEQ21": "91",
+    "PriceGT21": "77"
+  },
+  {
+    "Procedure Code": "D5650",
+    "Description": "Add tooth to existing partial denture",
+    "PriceLTEQ21": "110",
+    "PriceGT21": "92"
+  },
+  {
+    "Procedure Code": "D5660",
+    "Description": "Add clasp to existing partial denture per tooth",
+    "PriceLTEQ21": "125",
+    "PriceGT21": "98"
+  },
+  {
+    "Procedure Code": "D5730",
+    "Description": "Reline complete maxillary denture (direct)",
+    "PriceLTEQ21": "188",
+    "PriceGT21": "158"
+  },
+  {
+    "Procedure Code": "D5731",
+    "Description": "Reline lower complete mandibular denture (direct)",
+    "PriceLTEQ21": "184",
+    "PriceGT21": "173"
+  },
+  {
+    "Procedure Code": "D5740",
+    "Description": "Reline maxillary partial denture(chairside)",
+    "PriceLTEQ21": "169",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5741",
+    "Description": "Reline mandibular partial denture(chairside)",
+    "PriceLTEQ21": "160",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5750",
+    "Description": "Reline complete maxillary denture (indirect)",
+    "PriceLTEQ21": "255",
+    "PriceGT21": "214"
+  },
+  {
+    "Procedure Code": "D5751",
+    "Description": "Reline complete mandibular denture (indirect)",
+    "PriceLTEQ21": "256",
+    "PriceGT21": "215"
+  },
+  {
+    "Procedure Code": "D5760",
+    "Description": "Reline maxillary partial denture (laboratory)",
+    "PriceLTEQ21": "252",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D5761",
+    "Description": "Reline mandibular partial denture (laboratory)",
+    "PriceLTEQ21": "252",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D6241",
+    "Description": "Pontic-porcelain fused metal",
+    "PriceLTEQ21": "691",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D6751",
+    "Description": "Retainer crown-porcelain fused to metal",
+    "PriceLTEQ21": "691",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D6930",
+    "Description": "Re-cement or re-bond fixed partial denture",
+    "PriceLTEQ21": "87",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D6980",
+    "Description": "Fixed partial denture repair",
+    "PriceLTEQ21": "155",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D6999",
+    "Description": "Fixed prosthodontic procedure",
+    "PriceLTEQ21": "IC",
+    "PriceGT21": "IC"
+  },
+  {
+    "Procedure Code": "D7111",
+    "Description": "Extraction, coronal remnants - primary tooth",
+    "PriceLTEQ21": "80",
+    "PriceGT21": "75"
+  },
+  {
+    "Procedure Code": "D7140",
+    "Description": "Extraction, erupted tooth or exposed root (elevation and/or forceps removal)",
+    "PriceLTEQ21": "107",
+    "PriceGT21": "77"
+  },
+  {
+    "Procedure Code": "D7210",
+    "Description": "Extraction, erupted tooth requiring removal of bone and/or sectioning of tooth, and including elevation of mucoperiosteal flap if indicated",
+    "PriceLTEQ21": "179",
+    "PriceGT21": "149"
+  },
+  {
+    "Procedure Code": "D7220",
+    "Description": "Removal of impacted tooth - soft tissue",
+    "PriceLTEQ21": "223",
+    "PriceGT21": "191"
+  },
+  {
+    "Procedure Code": "D7230",
+    "Description": "Removal of impacted tooth - partially bony",
+    "PriceLTEQ21": "286",
+    "PriceGT21": "249"
+  },
+  {
+    "Procedure Code": "D7240",
+    "Description": "Removal of impacted tooth - completely bony",
+    "PriceLTEQ21": "378",
+    "PriceGT21": "295"
+  },
+  {
+    "Procedure Code": "D7250",
+    "Description": "Surgical removal of residual tooth roots (cutting procedure)",
+    "PriceLTEQ21": "173",
+    "PriceGT21": "144"
+  },
+  {
+    "Procedure Code": "D7251",
+    "Description": "Coronectomy- intentional partial tooth removal, impacted teeth only",
+    "PriceLTEQ21": "173",
+    "PriceGT21": "134"
+  },
+  {
+    "Procedure Code": "D7270",
+    "Description": "Tooth reimplantation and/or stabilization of accidentally evulsed or displaced tooth",
+    "PriceLTEQ21": "145",
+    "PriceGT21": "106"
+  },
+  {
+    "Procedure Code": "D7280",
+    "Description": "Surgical access of an unerupted tooth",
+    "PriceLTEQ21": "452",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D7283",
+    "Description": "Placement of device to facilitate eruption of impacted tooth",
+    "PriceLTEQ21": "84",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D7310",
+    "Description": "Alveoloplasty in conjunction with extractions-four or more teeth or tooth spaces, per quadrant",
+    "PriceLTEQ21": "163",
+    "PriceGT21": "142"
+  },
+  {
+    "Procedure Code": "D7311",
+    "Description": "Alveoloplasty in conjunction with extractions - one to three teeth or tooth spaces, per quadrant",
+    "PriceLTEQ21": "146",
+    "PriceGT21": "128"
+  },
+  {
+    "Procedure Code": "D7320",
+    "Description": "Alveoloplasty not in conjunction with extractions- four or more teeth or tooth spaces, per quadrant",
+    "PriceLTEQ21": "202",
+    "PriceGT21": "187"
+  },
+  {
+    "Procedure Code": "D7321",
+    "Description": "Alveoloplasty not in conjunction with extractions - one to three teeth or tooth spaces, per quadrant",
+    "PriceLTEQ21": "162",
+    "PriceGT21": "149"
+  },
+  {
+    "Procedure Code": "D7340",
+    "Description": "Vestibuloplasty - ridge extension (second epithelialization)",
+    "PriceLTEQ21": "796",
+    "PriceGT21": "747"
+  },
+  {
+    "Procedure Code": "D7350",
+    "Description": "Vestibuloplasty - ridge extension (Oral surgeon only)",
+    "PriceLTEQ21": "1236",
+    "PriceGT21": "943"
+  },
+  {
+    "Procedure Code": "D7410",
+    "Description": "Radical excision - lesion diameter up to 1.25cm",
+    "PriceLTEQ21": "124",
+    "PriceGT21": "115"
+  },
+  {
+    "Procedure Code": "D7411",
+    "Description": "Excision of benign lesion greater than 1.25 cm",
+    "PriceLTEQ21": "254",
+    "PriceGT21": "208"
+  },
+  {
+    "Procedure Code": "D7450",
+    "Description": "Removal of benign odontogenic cyst or tumor - lesion diameter up to 1.25 cm",
+    "PriceLTEQ21": "252",
+    "PriceGT21": "248"
+  },
+  {
+    "Procedure Code": "D7451",
+    "Description": "Removal of benign odontogenic cyst or tumor - lesion diameter greater than 1.25 cm",
+    "PriceLTEQ21": "343",
+    "PriceGT21": "288"
+  },
+  {
+    "Procedure Code": "D7460",
+    "Description": "Removal of benign nonodontogenic cyst or tumor - lesion diameter up to 1.25 cm",
+    "PriceLTEQ21": "142",
+    "PriceGT21": "121"
+  },
+  {
+    "Procedure Code": "D7461",
+    "Description": "Removal of benign nonodontogenic cyst or tumor - lesion diameter greater than 1.25 cm",
+    "PriceLTEQ21": "194",
+    "PriceGT21": "143"
+  },
+  {
+    "Procedure Code": "D7471",
+    "Description": "Removal of lateral exostosis (maxilla or mandible) (Oral surgeon only)",
+    "PriceLTEQ21": "194",
+    "PriceGT21": "143"
+  },
+  {
+    "Procedure Code": "D7472",
+    "Description": "Removal of torus palatinus (Oral surgeon only)",
+    "PriceLTEQ21": "194",
+    "PriceGT21": "143"
+  },
+  {
+    "Procedure Code": "D7473",
+    "Description": "Removal of torus mandibularis (Oral surgeon only)",
+    "PriceLTEQ21": "194",
+    "PriceGT21": "143"
+  },
+  {
+    "Procedure Code": "D7961",
+    "Description": "Buccal/labial frenectomy (frenulectomy)",
+    "PriceLTEQ21": "353",
+    "PriceGT21": "107"
+  },
+  {
+    "Procedure Code": "D7962",
+    "Description": "Lingual frenectomy (frenulectomy)",
+    "PriceLTEQ21": "353",
+    "PriceGT21": "107"
+  },
+  {
+    "Procedure Code": "D7963",
+    "Description": "Frenuloplasty",
+    "PriceLTEQ21": "480",
+    "PriceGT21": "416"
+  },
+  {
+    "Procedure Code": "D7970",
+    "Description": "Excision of hyperplastic tissue - per arch",
+    "PriceLTEQ21": "334",
+    "PriceGT21": "246"
+  },
+  {
+    "Procedure Code": "D7999",
+    "Description": "Unspecified oral surgery procedure, by report",
+    "PriceLTEQ21": "IC",
+    "PriceGT21": "IC"
+  },
+  {
+    "Procedure Code": "D8010",
+    "Description": "Limited orthodontic treamtnent of the primary transition (Orthodontist only)",
+    "PriceLTEQ21": "250",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8020",
+    "Description": "Limited orthodontic treatment of the transitional dentition (Orthodontist only)",
+    "PriceLTEQ21": "250",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8030",
+    "Description": "Limited orthodontic treatment of the adolescent dentition (Orthodontist only)",
+    "PriceLTEQ21": "250",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8040",
+    "Description": "Limited orthodontic treatment of the adult dentition (Orthodontist only)",
+    "PriceLTEQ21": "250",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8070",
+    "Description": "Comprehensive orthodontic treatment of the transitional dentition (Orthodontist only)",
+    "PriceLTEQ21": "1302",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8080",
+    "Description": "Comprehensive orthodontic treatment of the adolescent dentition (Orthodontist only)",
+    "PriceLTEQ21": "1302",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8090",
+    "Description": "Comprehensive orthodontic treatment of the adult dentition (Orthodontist only)",
+    "PriceLTEQ21": "1302",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8660",
+    "Description": "Pre-orthodontic treatment examination to monitor growth and development (records fee) (Orthodontist only)",
+    "PriceLTEQ21": "136",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8670",
+    "Description": "Periodic orthodontic treatment visit (Orthodontist only)",
+    "PriceLTEQ21": "288",
+    "PriceGT21": "215"
+  },
+  {
+    "Procedure Code": "D8680",
+    "Description": "Orthodontic retention (removal of appliances, construction and placement of retainer(s)) (Orthodontist only)",
+    "PriceLTEQ21": "102",
+    "PriceGT21": "85"
+  },
+  {
+    "Procedure Code": "D8703",
+    "Description": "Replacement of lost or broken retainer- maxillary (Orthodontist only)",
+    "PriceLTEQ21": "95",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8704",
+    "Description": "Replacement of lost or broken retainer- mandibular (Orthodontist only)",
+    "PriceLTEQ21": "95",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D8999",
+    "Description": "Unspecified orthodontic procedure, by report (Orthodontist only) I.C I.C** Y Y**",
+    "PriceLTEQ21": "IC",
+    "PriceGT21": "IC"
+  },
+  {
+    "Procedure Code": "D9110",
+    "Description": "Palliative treatment of dental pain – per visit",
+    "PriceLTEQ21": "75",
+    "PriceGT21": "36"
+  },
+  {
+    "Procedure Code": "D9222",
+    "Description": "Deep sedation/general anesthesia – first 15 minutes",
+    "PriceLTEQ21": "109",
+    "PriceGT21": "90"
+  },
+  {
+    "Procedure Code": "D9223",
+    "Description": "Deep sedation/general anesthesia – each additional 15- minute increment",
+    "PriceLTEQ21": "109",
+    "PriceGT21": "90"
+  },
+  {
+    "Procedure Code": "D9230",
+    "Description": "Analgesia, anxiolysis, inhalation of nitrous oxide",
+    "PriceLTEQ21": "22",
+    "PriceGT21": "15"
+  },
+  {
+    "Procedure Code": "D9248",
+    "Description": "Nonintravenous conscious sedation",
+    "PriceLTEQ21": "45",
+    "PriceGT21": "45"
+  },
+  {
+    "Procedure Code": "D9310",
+    "Description": "Consultation- Diagnostic service provided by dentist or physician other than requesting dentist or physician (Specialist only)",
+    "PriceLTEQ21": "54",
+    "PriceGT21": "63"
+  },
+  {
+    "Procedure Code": "D9410",
+    "Description": "House/extended care facility call, once per facility per day",
+    "PriceLTEQ21": "36",
+    "PriceGT21": "39"
+  },
+  {
+    "Procedure Code": "D9450",
+    "Description": "Rural add-on encounter payment",
+    "PriceLTEQ21": "31",
+    "PriceGT21": "31"
+  },
+  {
+    "Procedure Code": "D9920",
+    "Description": "Behavior management, by report",
+    "PriceLTEQ21": "86",
+    "PriceGT21": "86"
+  },
+  {
+    "Procedure Code": "D9930",
+    "Description": "Treatment of complications (postsurgical) - unusual circumstances, by report",
+    "PriceLTEQ21": "66",
+    "PriceGT21": "30"
+  },
+  {
+    "Procedure Code": "D9941",
+    "Description": "Fabrication of athletic mouthguard",
+    "PriceLTEQ21": "85",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D9944",
+    "Description": "Occlusal guard - hard appliance, full arch",
+    "PriceLTEQ21": "308",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D9945",
+    "Description": "Occlusal guard - soft appliance, full arch",
+    "PriceLTEQ21": "308",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D9946",
+    "Description": "Occlusal guard - hard appliance, partial arch",
+    "PriceLTEQ21": "308",
+    "PriceGT21": "NC"
+  },
+  {
+    "Procedure Code": "D9999",
+    "Description": "Unspecified adjunctive procedure, by report",
+    "PriceLTEQ21": "IC",
+    "PriceGT21": "IC"
+  }
+]

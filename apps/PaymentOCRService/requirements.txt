@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+google-cloud-vision
+opencv-python-headless
+pytesseract
+pillow
+pandas
+openpyxl
+numpy
+python-multipart
