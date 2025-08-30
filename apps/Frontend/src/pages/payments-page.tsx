@@ -6,9 +6,7 @@ import {
   CardContent,
   CardDescription,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { DollarSign, Upload, Image, X } from "lucide-react";
+import { DollarSign } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -18,95 +16,10 @@ import {
 } from "@/components/ui/select";
 import PaymentsRecentTable from "@/components/payments/payments-recent-table";
 import PaymentsOfPatientModal from "@/components/payments/payments-of-patient-table";
+import PaymentOCRBlock from "@/components/payments/payment-ocr-block";
 
 export default function PaymentsPage() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [paymentPeriod, setPaymentPeriod] = useState<string>("all-time");
-  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [editableData, setEditableData] = useState<any[]>([]);
-
-  const { toast } = useToast();
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  // Image upload handlers for OCR
-  const handleImageDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const files = e.dataTransfer.files;
-    if (files && files[0]) {
-      const file = files[0];
-      if (file.type.startsWith("image/")) {
-        setUploadedImage(file);
-      } else {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload an image file (JPG, PNG, etc.)",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files[0]) {
-      const file = files[0];
-      setUploadedImage(file);
-    }
-  };
-
-  const handleOCRExtraction = async (file: File) => {
-    setIsExtracting(true);
-
-    try {
-      // Create FormData for image upload
-      const formData = new FormData();
-      formData.append("image", file);
-
-      // Simulate OCR extraction process
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    } finally {
-      setIsExtracting(false);
-    }
-  };
-
-  const removeUploadedImage = () => {
-    setUploadedImage(null);
-  };
-
-  const updateEditableData = (
-    index: number,
-    field: string,
-    value: string | number
-  ) => {
-    setEditableData((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
-  };
-
-  const deleteRow = (index: number) => {
-    setEditableData((prev) => prev.filter((_, i) => i !== index));
-    toast({
-      title: "Row Deleted",
-      description: `Payment record has been removed`,
-    });
-  };
-
-  const saveRow = (index: number) => {
-    toast({
-      title: "Row Saved",
-      description: `Changes to payment record ${index + 1} have been saved`,
-    });
-  };
 
   return (
     <div>
@@ -192,118 +105,8 @@ export default function PaymentsPage() {
         </Card>
       </div>
 
-      {/* OCR Image Upload Section - not working rn*/}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-medium text-gray-800">
-            Payment Document OCR
-          </h2>
-        </div>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex gap-4">
-              <div
-                className={`flex-1 border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  isDragging
-                    ? "border-blue-400 bg-blue-50"
-                    : uploadedImage
-                      ? "border-green-400 bg-green-50"
-                      : "border-gray-300 bg-gray-50 hover:border-gray-400"
-                }`}
-                onDrop={handleImageDrop}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={() => setIsDragging(false)}
-                onClick={() =>
-                  document.getElementById("image-upload-input")?.click()
-                }
-              >
-                {uploadedImage ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center space-x-4">
-                      <Image className="h-8 w-8 text-green-500" />
-                      <div className="text-left">
-                        <p className="font-medium text-green-700">
-                          {uploadedImage.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {(uploadedImage.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeUploadedImage();
-                        }}
-                        className="ml-auto"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {isExtracting && (
-                      <div className="text-sm text-blue-600">
-                        Extracting payment information...
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <Upload className="h-12 w-12 text-gray-400 mx-auto" />
-                    <div>
-                      <p className="text-lg font-medium text-gray-700 mb-2">
-                        Upload Payment Document
-                      </p>
-                      <p className="text-sm text-gray-500 mb-4">
-                        Drag and drop an image or click to browse
-                      </p>
-                      <Button variant="outline" type="button">
-                        Choose Image
-                      </Button>
-                    </div>
-                    <p className="text-xs text-gray-400">
-                      Supported formats: JPG, PNG, GIF • Max size: 10MB
-                    </p>
-                  </div>
-                )}
-
-                <input
-                  id="image-upload-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-              </div>
-
-              <div className="flex flex-col justify-center">
-                <Button
-                  onClick={() => {
-                    if (!uploadedImage) {
-                      toast({
-                        title: "No Image Selected",
-                        description:
-                          "Please upload an image first before extracting information",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    handleOCRExtraction(uploadedImage);
-                  }}
-                  disabled={!uploadedImage || isExtracting}
-                  className="min-w-32"
-                >
-                  {isExtracting ? "Extracting..." : "Extract Info"}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* OCR Image Upload Section*/}
+      <PaymentOCRBlock />
 
       {/* Recent Payments table  */}
       <Card>

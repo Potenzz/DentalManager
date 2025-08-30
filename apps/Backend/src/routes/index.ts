@@ -4,7 +4,7 @@ import appointmentsRoutes from "./appointments";
 import usersRoutes from "./users";
 import staffsRoutes from "./staffs";
 import claimsRoutes from "./claims";
-import patientDataExtractionRoutes from "./patientdataExtraction";
+import patientDataExtractionRoutes from "./patientDataExtraction";
 import insuranceCredsRoutes from "./insuranceCreds";
 import documentsRoutes from "./documents";
 import insuranceEligibilityRoutes from "./insuranceEligibility";

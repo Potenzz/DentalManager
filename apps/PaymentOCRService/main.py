@@ -7,14 +7,10 @@ import os
 import asyncio
 
 from dotenv import load_dotenv
-load_dotenv()  # loads .env (GOOGLE_APPLICATION_CREDENTIALS, HOST, PORT, etc.)
+load_dotenv() 
 
-# Your adapter that calls the pipeline
 from complete_pipeline_adapter import process_images_to_rows,rows_to_csv_bytes
 
-# -------------------------------------------------
-# App + concurrency controls (similar to your other app)
-# -------------------------------------------------
 app = FastAPI(
     title="Payment OCR Services API",
     description="FastAPI wrapper around the OCR pipeline (Google Vision + deskew + line grouping + extraction).",
@@ -92,7 +88,7 @@ async def extract_json(files: List[UploadFile] = File(...)):
         try:
             blobs = [await f.read() for f in files]
             names = [f.filename or "upload.bin" for f in files]
-            rows = process_images_to_rows(blobs, names)  # calls your pipeline
+            rows = process_images_to_rows(blobs, names)  # calls pipeline
             return JSONResponse(content={"rows": rows})
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Processing error: {e}")
