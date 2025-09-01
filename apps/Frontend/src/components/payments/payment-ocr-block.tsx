@@ -1,24 +1,31 @@
 // PaymentOCRBlock.tsx
 import * as React from "react";
 
-// If you're using shadcn/ui and lucide-react, keep these.
-// Otherwise swap for your own components/icons.
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Image as ImageIcon, X } from "lucide-react";
+import { Upload, Image as ImageIcon, X, Plus, Minus } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 
-type Row = Record<string, string | number | boolean | null | undefined>;
+import {
+  useReactTable,
+  getCoreRowModel,
+  flexRender,
+  ColumnDef,
+} from "@tanstack/react-table";
+
+// ---------------- Types ----------------
+
+type Row = { __id: number } & Record<string, string | number | null>;
 
 export default function PaymentOCRBlock() {
   // UI state
-  const [uploadedImage, setUploadedImage] = React.useState<File | null>(null);
   const [uploadedImages, setUploadedImages] = React.useState<File[]>([]);
   const [isDragging, setIsDragging] = React.useState(false);
   const [isExtracting, setIsExtracting] = React.useState(false);
   const [rows, setRows] = React.useState<Row[]>([]);
+  const [columns, setColumns] = React.useState<ColumnDef<Row>[]>([]);
   const [error, setError] = React.useState<string | null>(null);
 
   //Mutation
@@ -37,24 +44,68 @@ export default function PaymentOCRBlock() {
       const data = (await res.json()) as { rows: Row[] } | Row[];
       return Array.isArray(data) ? data : data.rows;
     },
-    onSuccess: (rows) => {
-      setRows(rows);
+    onSuccess: (data) => {
+      const withIds: Row[] = data.map((r, i) => ({ ...r, __id: i }));
+      setRows(withIds);
+
+      const allKeys = Array.from(
+        data.reduce<Set<string>>((acc, row) => {
+          Object.keys(row).forEach((k) => acc.add(k));
+          return acc;
+        }, new Set())
+      );
+
+      setColumns(
+        allKeys.map((key) => ({
+          id: key, // ✅ unique identifier
+          header: key,
+          cell: ({ row }) => (
+            <input
+              className="w-full border rounded p-1"
+              value={(row.original[key] as string) ?? ""}
+              onChange={(e) => {
+                const newData = [...rows];
+                newData[row.index] = {
+                  ...newData[row.index],
+                  __id: newData[row.index]!.__id,
+                  [key]: e.target.value,
+                };
+                setRows(newData);
+              }}
+            />
+          ),
+        }))
+      );
+
+      setIsExtracting(false);
     },
+
     onError: (error: any) => {
       toast({
         title: "Error",
         description: `Failed to extract payment data: ${error.message}`,
         variant: "destructive",
       });
+      setIsExtracting(false);
     },
   });
 
+  // ---- Table instance ----
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
   // ---- handlers (all in this file) -----------------------------------------
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || !files.length) return;
-    const list = Array.from(files);
-    setUploadedImage(list[0] as File); // preview first
+    const list = Array.from(e.target.files || []);
+    if (!list.length) return;
+    if (list.length > 10) {
+      setError("You can only upload up to 10 images.");
+      return;
+    }
     setUploadedImages(list);
     setError(null);
   };
@@ -69,25 +120,56 @@ export default function PaymentOCRBlock() {
       setError("Please drop image files (JPG/PNG/TIFF/BMP).");
       return;
     }
-    setUploadedImage(list[0] as File);
+    if (list.length > 10) {
+      setError("You can only upload up to 10 images.");
+      return;
+    }
 
     setUploadedImages(list);
     setError(null);
   };
 
-  const removeUploadedImage = () => {
-    setUploadedImage(null);
-    setUploadedImages([]);
-    setRows([]);
-    setError(null);
+  const removeUploadedImage = (index: number) => {
+    setUploadedImages((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) {
+        setRows([]);
+        setColumns([]);
+        setError(null);
+      }
+      return next;
+    });
   };
 
   const handleExtract = () => {
     if (!uploadedImages.length) return;
+    setIsExtracting(true);
     extractPaymentOCR.mutate(uploadedImages);
   };
 
-  // ---- render ---------------------------------------------------------------
+  const handleSave = () => {
+    console.log("Saving edited rows:", rows);
+    toast({
+      title: "Saved",
+      description: "Edited OCR results are ready to be sent to the database.",
+    });
+    // Here can POST `rows` to your backend API for DB save
+  };
+
+  //rows helper
+
+  const handleAddRow = () => {
+    const newRow: Row = { __id: rows.length };
+    columns.forEach((c) => {
+      if (c.id) newRow[c.id] = "";
+    });
+    setRows((prev) => [...prev, newRow]);
+  };
+
+  const handleDeleteRow = (index: number) => {
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-4">
@@ -97,180 +179,316 @@ export default function PaymentOCRBlock() {
       </div>
 
       <Card>
-        <CardContent className="p-6">
-          <div className="flex gap-4">
-            <div
-              className={`flex-1 border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragging
-                  ? "border-blue-400 bg-blue-50"
-                  : uploadedImage
-                    ? "border-green-400 bg-green-50"
-                    : "border-gray-300 bg-gray-50 hover:border-gray-400"
-              }`}
-              onDrop={handleImageDrop}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onClick={() =>
-                document.getElementById("image-upload-input")?.click()
-              }
-            >
-              {uploadedImage ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-center space-x-4">
-                    <ImageIcon className="h-8 w-8 text-green-500" />
-                    <div className="text-left">
-                      <p className="font-medium text-green-700">
-                        {uploadedImage.name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {(uploadedImage.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
+        <CardContent className="p-6 space-y-6">
+          {/* Upload block */}
+          <div
+            className={`flex-1 border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              isDragging
+                ? "border-blue-400 bg-blue-50"
+                : uploadedImages.length
+                  ? "border-green-400 bg-green-50"
+                  : "border-gray-300 bg-gray-50 hover:border-gray-400"
+            }`}
+            onDrop={handleImageDrop}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onClick={() =>
+              document.getElementById("image-upload-input")?.click()
+            }
+          >
+            {uploadedImages.length ? (
+              <div className="space-y-4">
+                {uploadedImages.map((file, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between space-x-4 border rounded-md p-2 bg-white"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <ImageIcon className="h-6 w-6 text-green-500" />
+                      <div className="text-left">
+                        <p className="font-medium text-green-700">
+                          {file.name}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        removeUploadedImage();
+                        removeUploadedImage(idx);
                       }}
-                      className="ml-auto"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  {isExtracting && (
-                    <div className="text-sm text-blue-600">
-                      Extracting payment information...
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Upload className="h-12 w-12 text-gray-400 mx-auto" />
-                  <div>
-                    <p className="text-lg font-medium text-gray-700 mb-2">
-                      Upload Payment Document
-                    </p>
-                    <p className="text-sm text-gray-500 mb-4">
-                      Drag and drop image(s) or click to browse
-                    </p>
-                    <Button variant="outline" type="button">
-                      Choose Image
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Supported formats: JPG, PNG, TIFF, BMP • Max size: 10MB each
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Upload className="h-12 w-12 text-gray-400 mx-auto" />
+                <div>
+                  <p className="text-lg font-medium text-gray-700 mb-2">
+                    Upload Payment Documents
                   </p>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Drag and drop up to 10 images or click to browse
+                  </p>
+                  <Button variant="outline" type="button">
+                    Choose Images
+                  </Button>
                 </div>
-              )}
+                <p className="text-xs text-gray-400">
+                  Supported formats: JPG, PNG, TIFF, BMP • Max size: 10MB each
+                </p>
+              </div>
+            )}
+            <input
+              id="image-upload-input"
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+              multiple
+            />
+          </div>
 
-              <input
-                id="image-upload-input"
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-                multiple
-              />
-            </div>
+          {/* Extract */}
 
-            <div className="flex flex-col justify-center">
+          <div className="flex justify-end gap-4">
+            <Button
+              className="w-full h-12 gap-2"
+              type="button"
+              onClick={handleExtract}
+              disabled={!uploadedImages.length || isExtracting}
+            >
+              {extractPaymentOCR.isPending
+                ? "Extracting..."
+                : "Extract Payment Data"}
+            </Button>
+          </div>
+
+          {/* Results Table */}
+
+          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+          {rows.length > 0 && (
+            <div className="space-y-4">
+              {/* Row/Column control buttons */}
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" onClick={handleAddRow}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Row
+                </Button>
+              </div>
+
+              {/* Table */}
+
+              <div className="overflow-x-auto">
+                <table className="border-collapse border border-gray-300 w-full table-auto min-w-max">
+                  <thead>
+                    {table.getHeaderGroups().map((hg) => (
+                      <tr key={hg.id} className="bg-gray-100">
+                        {hg.headers.map((header) => (
+                          <th
+                            key={header.id}
+                            className="border p-2 text-left whitespace-nowrap"
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                          </th>
+                        ))}
+                        <th className="border p-2">Actions</th>
+                      </tr>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {table.getRowModel().rows.map((row, rowIndex) => (
+                      <tr key={row.id}>
+                        {row.getVisibleCells().map((cell) => {
+                          const colId = cell.column.id; // ✅ key for field
+                          return (
+                            <td
+                              key={cell.id}
+                              className="border p-2 whitespace-nowrap"
+                            >
+                              <input
+                                className="w-full border rounded p-1"
+                                value={
+                                  (rows[rowIndex]?.[colId] as string) ?? ""
+                                }
+                                onChange={(e) => {
+                                  const newData = [...rows];
+                                  newData[rowIndex] = {
+                                    ...newData[rowIndex],
+                                    __id: newData[rowIndex]!.__id, // keep id
+                                    [colId]: e.target.value,
+                                  };
+                                  setRows(newData);
+                                }}
+                              />
+                            </td>
+                          );
+                        })}
+                        <td className="border p-2">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteRow(rowIndex)}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
               <Button
+                className="w-full h-12 gap-2"
                 type="button"
-                onClick={handleExtract}
-                disabled={!uploadedImages.length || isExtracting}
+                variant="warning"
+                onClick={handleSave}
               >
-                {extractPaymentOCR.isPending
-                  ? "Extracting..."
-                  : "Extract Payment Data"}
+                Save Edited Data
               </Button>
             </div>
-
-            {/* Results */}
-            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-            <OCRTable rows={rows} />
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
 
-// --------------------- helpers (kept in same file) ----------------------------
+// --------------------- Editable OCRTable ----------------------------
 
-function OCRTable({ rows }: { rows: Row[] }) {
-  if (!rows?.length) return null;
+// function OCRTable({
+//   rows,
+//   setRows,
+// }: {
+//   rows: Row[];
+//   setRows: React.Dispatch<React.SetStateAction<Row[]>>;
+// }) {
+//   const [columns, setColumns] = React.useState<string[]>([]);
 
-  // prefer Excel-like order if present, then append any extra columns
-  const desired = [
-    "Patient Name",
-    "Patient ID",
-    "ICN",
-    "CDT Code",
-    "Tooth",
-    "Date SVC",
-    "Billed Amount",
-    "Allowed Amount",
-    "Paid Amount",
-    "Extraction Success",
-    "Source File",
-  ];
-  const dynamicCols = Array.from(
-    rows.reduce<Set<string>>((acc, r) => {
-      Object.keys(r || {}).forEach((k) => acc.add(k));
-      return acc;
-    }, new Set())
-  );
+//   // Initialize columns once when rows come in
+//   React.useEffect(() => {
+//     if (rows.length && columns.length === 0) {
+//       const dynamicCols = Array.from(
+//         rows.reduce<Set<string>>((acc, r) => {
+//           Object.keys(r || {}).forEach((k) => acc.add(k));
+//           return acc;
+//         }, new Set())
+//       );
+//       setColumns(dynamicCols);
+//     }
+//   }, [rows]);
 
-  const columns = [
-    ...desired.filter((c) => dynamicCols.includes(c)),
-    ...dynamicCols.filter((c) => !desired.includes(c)),
-  ];
+//   if (!rows?.length) return null;
 
-  return (
-    <div className="mt-6 overflow-auto border rounded-lg">
-      <table className="min-w-full text-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            {columns.map((c) => (
-              <th
-                key={c}
-                className="px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap"
-              >
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="odd:bg-white even:bg-gray-50">
-              {columns.map((c) => (
-                <td key={c} className="px-3 py-2 whitespace-nowrap">
-                  {formatCell(r[c])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+//   // ---------------- column handling ----------------
+//   const handleColumnNameChange = (colIdx: number, value: string) => {
+//     // Just update local columns state for typing responsiveness
+//     setColumns((prev) => prev.map((c, i) => (i === colIdx ? value : c)));
+//   };
 
-function formatCell(v: unknown) {
-  if (v === null || v === undefined) return "";
-  if (typeof v === "boolean") return v ? "Yes" : "No";
-  return String(v);
-}
+//   const commitColumnRename = (colIdx: number) => {
+//     const oldName = Object.keys(rows[0] ?? {})[colIdx];
+//     const newName = columns[colIdx];
+//     if (!oldName || !newName || oldName === newName) return;
 
-async function safeJson(resp: Response) {
-  try {
-    return await resp.json();
-  } catch {
-    return null;
-  }
-}
+//     const updated = rows.map((r) => {
+//       const { [oldName]: oldVal, ...rest } = r;
+//       return { ...rest, [newName]: oldVal };
+//     });
+//     setRows(updated);
+//   };
+
+//   // ---------------- row/col editing ----------------
+//   const addColumn = () => {
+//     const newColName = `New Column ${columns.length + 1}`;
+//     setColumns((prev) => [...prev, newColName]);
+//     const updated = rows.map((r) => ({ ...r, [newColName]: "" }));
+//     setRows(updated);
+//   };
+
+//   const addRow = () => {
+//     const newRow: Row = {};
+//     columns.forEach((c) => (newRow[c] = ""));
+//     setRows([...rows, newRow]);
+//   };
+
+//   const handleCellChange = (rowIdx: number, col: string, value: string) => {
+//     const updated = rows.map((r, i) =>
+//       i === rowIdx ? { ...r, [col]: value } : r
+//     );
+//     setRows(updated);
+//   };
+
+//   // ---------------- render ----------------
+//   return (
+//     <div className="mt-6 overflow-auto border rounded-lg">
+//       <table className="min-w-full text-sm">
+//         <thead className="bg-gray-50">
+//           <tr>
+//             {columns.map((c, idx) => (
+//               <th
+//                 key={idx}
+//                 className="px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap"
+//               >
+//                 <input
+//                   type="text"
+//                   className="border rounded px-2 py-1 text-sm font-semibold w-40"
+//                   value={c}
+//                   onChange={(e) => handleColumnNameChange(idx, e.target.value)}
+//                   onBlur={() => commitColumnRename(idx)}
+//                   onKeyDown={(e) => {
+//                     if (e.key === "Enter") {
+//                       e.currentTarget.blur(); // commit rename
+//                     }
+//                   }}
+//                 />
+//               </th>
+//             ))}
+//             <th className="px-3 py-2">
+//               <Button size="sm" variant="outline" onClick={addColumn}>
+//                 + Add Column
+//               </Button>
+//             </th>
+//           </tr>
+//         </thead>
+//         <tbody>
+//           {rows.map((r, i) => (
+//             <tr key={i} className="odd:bg-white even:bg-gray-50">
+//               {columns.map((c) => (
+//                 <td key={c} className="px-3 py-2 whitespace-nowrap">
+//                   <input
+//                     type="text"
+//                     className="w-full border rounded px-2 py-1 text-sm"
+//                     value={r[c] != null ? String(r[c]) : ""}
+//                     onChange={(e) => handleCellChange(i, c, e.target.value)}
+//                   />
+//                 </td>
+//               ))}
+//             </tr>
+//           ))}
+//           <tr>
+//             <td colSpan={columns.length + 1} className="px-3 py-2 text-center">
+//               <Button size="sm" variant="outline" onClick={addRow}>
+//                 + Add Row
+//               </Button>
+//             </td>
+//           </tr>
+//         </tbody>
+//       </table>
+//     </div>
+//   );
+// }
