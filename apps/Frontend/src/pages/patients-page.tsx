@@ -167,43 +167,41 @@ export default function PatientsPage() {
         </div>
 
         {/* File Upload Zone */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="md:col-span-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Upload Patient Document
-                </CardTitle>
-                <File className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <FileUploadZone
-                  onFileUpload={handleFileUpload}
-                  isUploading={isUploading}
-                  acceptedFileTypes="application/pdf"
-                />
-              </CardContent>
-            </Card>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-medium text-gray-800">
+              Upload Patient Document
+            </h2>
           </div>
-          <div className="md:col-span-1 flex items-end">
-            <Button
-              className="w-full h-12 gap-2"
-              disabled={!uploadedFile || isExtracting}
-              onClick={handleExtract}
-            >
-              {isExtracting ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <FilePlus className="h-4 w-4" />
-                  Extract Info And Claim
-                </>
-              )}
-            </Button>
-          </div>
+          <Card>
+            <CardContent className="p-6 space-y-6">
+              <FileUploadZone
+                onFileUpload={handleFileUpload}
+                isUploading={isUploading}
+                acceptedFileTypes="application/pdf"
+              />
+
+              <div className="flex justify-end gap-4">
+                <Button
+                  className="w-full h-12 gap-2"
+                  disabled={!uploadedFile || isExtracting}
+                  onClick={handleExtract}
+                >
+                  {isExtracting ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <FilePlus className="h-4 w-4" />
+                      Extract Info And Claim
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Patients Table */}
