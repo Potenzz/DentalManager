@@ -1,6 +1,5 @@
 import axios from "axios";
 import FormData from "form-data";
-import { Express } from "express";
 
 export interface ExtractedData {
   name?: string;
