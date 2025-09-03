@@ -16,10 +16,17 @@ export async function validateTransactions(
     throw new Error("Payment not found");
   }
 
+  // Choose service lines from claim if present, otherwise direct payment service lines(OCR Based datas)
+  const serviceLines = paymentRecord.claim
+    ? paymentRecord.claim.serviceLines
+    : paymentRecord.serviceLines;
+
+  if (!serviceLines || serviceLines.length === 0) {
+    throw new Error("No service lines available for this payment");
+  }
+
   for (const txn of serviceLineTransactions) {
-    const line = paymentRecord.claim.serviceLines.find(
-      (sl) => sl.id === txn.serviceLineId
-    );
+    const line = serviceLines.find((sl) => sl.id === txn.serviceLineId);
 
     if (!line) {
       throw new Error(`Invalid service line: ${txn.serviceLineId}`);

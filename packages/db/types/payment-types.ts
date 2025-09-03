@@ -67,12 +67,14 @@ export type PaymentWithExtras = Prisma.PaymentGetPayload<{
         serviceLines: true;
       };
     };
+    serviceLines: true; // ✅ OCR-only service lines directly under Payment
     serviceLineTransactions: {
       include: {
         serviceLine: true;
       };
     };
     updatedBy: true;
+    patient: true; 
   };
 }> & {
   patientName: string;

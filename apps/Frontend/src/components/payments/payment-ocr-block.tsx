@@ -14,6 +14,7 @@ import {
   flexRender,
   ColumnDef,
 } from "@tanstack/react-table";
+import { convertOCRDate } from "@/utils/dateUtils";
 
 // ---------------- Types ----------------
 
@@ -45,11 +46,17 @@ export default function PaymentOCRBlock() {
       return Array.isArray(data) ? data : data.rows;
     },
     onSuccess: (data) => {
-      const withIds: Row[] = data.map((r, i) => ({ ...r, __id: i }));
+      // Remove unwanted keys before using the data
+      const cleaned = data.map((row) => {
+        const { ["Extraction Success"]: _, ["Source File"]: __, ...rest } = row;
+        return rest;
+      });
+
+      const withIds: Row[] = cleaned.map((r, i) => ({ ...r, __id: i }));
       setRows(withIds);
 
       const allKeys = Array.from(
-        data.reduce<Set<string>>((acc, row) => {
+        cleaned.reduce<Set<string>>((acc, row) => {
           Object.keys(row).forEach((k) => acc.add(k));
           return acc;
         }, new Set())
@@ -147,17 +154,57 @@ export default function PaymentOCRBlock() {
     extractPaymentOCR.mutate(uploadedImages);
   };
 
-  const handleSave = () => {
-    console.log("Saving edited rows:", rows);
-    toast({
-      title: "Saved",
-      description: "Edited OCR results are ready to be sent to the database.",
-    });
-    // Here can POST `rows` to your backend API for DB save
+  const handleSave = async () => {
+    try {
+      const payload = rows.map((row) => {
+        const billed = Number(row["Billed Amount"] ?? 0);
+        const allowed = Number(row["Allowed Amount"] ?? 0);
+        const paid = Number(row["Paid Amount"] ?? 0);
+
+        return {
+          patientId: parseInt(row["Patient ID"] as string, 10),
+          totalBilled: billed,
+          totalPaid: paid,
+          totalAdjusted: billed - allowed, // ❗ write-off
+          totalDue: allowed - paid, // ❗ patient responsibility
+          notes: `OCR import - CDT ${row["CDT Code"]}, Tooth ${row["Tooth"]}, Date ${row["Date SVC"]}`,
+          serviceLine: {
+            procedureCode: row["CDT Code"],
+            procedureDate: convertOCRDate(row["Date SVC"]), // you’ll parse "070825" → proper Date
+            toothNumber: row["Tooth"],
+            totalBilled: billed,
+            totalPaid: paid,
+            totalAdjusted: billed - allowed,
+            totalDue: allowed - paid,
+          },
+          transaction: {
+            paidAmount: paid,
+            adjustedAmount: billed - allowed, // same as totalAdjusted
+            method: "OTHER", // fallback, since OCR doesn’t give this
+            receivedDate: new Date(),
+          },
+        };
+      });
+
+      const res = await apiRequest(
+        "POST",
+        "/api/payments/ocr",
+        JSON.stringify({ payments: payload })
+      );
+
+      if (!res.ok) throw new Error("Failed to save OCR payments");
+
+      toast({ title: "Saved", description: "OCR rows saved successfully" });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   //rows helper
-
   const handleAddRow = () => {
     const newRow: Row = { __id: rows.length };
     columns.forEach((c) => {
@@ -367,128 +414,3 @@ export default function PaymentOCRBlock() {
     </div>
   );
 }
-
-// --------------------- Editable OCRTable ----------------------------
-
-// function OCRTable({
-//   rows,
-//   setRows,
-// }: {
-//   rows: Row[];
-//   setRows: React.Dispatch<React.SetStateAction<Row[]>>;
-// }) {
-//   const [columns, setColumns] = React.useState<string[]>([]);
-
-//   // Initialize columns once when rows come in
-//   React.useEffect(() => {
-//     if (rows.length && columns.length === 0) {
-//       const dynamicCols = Array.from(
-//         rows.reduce<Set<string>>((acc, r) => {
-//           Object.keys(r || {}).forEach((k) => acc.add(k));
-//           return acc;
-//         }, new Set())
-//       );
-//       setColumns(dynamicCols);
-//     }
-//   }, [rows]);
-
-//   if (!rows?.length) return null;
-
-//   // ---------------- column handling ----------------
-//   const handleColumnNameChange = (colIdx: number, value: string) => {
-//     // Just update local columns state for typing responsiveness
-//     setColumns((prev) => prev.map((c, i) => (i === colIdx ? value : c)));
-//   };
-
-//   const commitColumnRename = (colIdx: number) => {
-//     const oldName = Object.keys(rows[0] ?? {})[colIdx];
-//     const newName = columns[colIdx];
-//     if (!oldName || !newName || oldName === newName) return;
-
-//     const updated = rows.map((r) => {
-//       const { [oldName]: oldVal, ...rest } = r;
-//       return { ...rest, [newName]: oldVal };
-//     });
-//     setRows(updated);
-//   };
-
-//   // ---------------- row/col editing ----------------
-//   const addColumn = () => {
-//     const newColName = `New Column ${columns.length + 1}`;
-//     setColumns((prev) => [...prev, newColName]);
-//     const updated = rows.map((r) => ({ ...r, [newColName]: "" }));
-//     setRows(updated);
-//   };
-
-//   const addRow = () => {
-//     const newRow: Row = {};
-//     columns.forEach((c) => (newRow[c] = ""));
-//     setRows([...rows, newRow]);
-//   };
-
-//   const handleCellChange = (rowIdx: number, col: string, value: string) => {
-//     const updated = rows.map((r, i) =>
-//       i === rowIdx ? { ...r, [col]: value } : r
-//     );
-//     setRows(updated);
-//   };
-
-//   // ---------------- render ----------------
-//   return (
-//     <div className="mt-6 overflow-auto border rounded-lg">
-//       <table className="min-w-full text-sm">
-//         <thead className="bg-gray-50">
-//           <tr>
-//             {columns.map((c, idx) => (
-//               <th
-//                 key={idx}
-//                 className="px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap"
-//               >
-//                 <input
-//                   type="text"
-//                   className="border rounded px-2 py-1 text-sm font-semibold w-40"
-//                   value={c}
-//                   onChange={(e) => handleColumnNameChange(idx, e.target.value)}
-//                   onBlur={() => commitColumnRename(idx)}
-//                   onKeyDown={(e) => {
-//                     if (e.key === "Enter") {
-//                       e.currentTarget.blur(); // commit rename
-//                     }
-//                   }}
-//                 />
-//               </th>
-//             ))}
-//             <th className="px-3 py-2">
-//               <Button size="sm" variant="outline" onClick={addColumn}>
-//                 + Add Column
-//               </Button>
-//             </th>
-//           </tr>
-//         </thead>
-//         <tbody>
-//           {rows.map((r, i) => (
-//             <tr key={i} className="odd:bg-white even:bg-gray-50">
-//               {columns.map((c) => (
-//                 <td key={c} className="px-3 py-2 whitespace-nowrap">
-//                   <input
-//                     type="text"
-//                     className="w-full border rounded px-2 py-1 text-sm"
-//                     value={r[c] != null ? String(r[c]) : ""}
-//                     onChange={(e) => handleCellChange(i, c, e.target.value)}
-//                   />
-//                 </td>
-//               ))}
-//             </tr>
-//           ))}
-//           <tr>
-//             <td colSpan={columns.length + 1} className="px-3 py-2 text-center">
-//               <Button size="sm" variant="outline" onClick={addRow}>
-//                 + Add Row
-//               </Button>
-//             </td>
-//           </tr>
-//         </tbody>
-//       </table>
-//     </div>
-//   );
-// }

@@ -230,7 +230,18 @@ router.put(
         return res.status(404).json({ message: "Payment not found" });
       }
 
-      const serviceLineTransactions = paymentRecord.claim.serviceLines
+      // Collect service lines from either claim or direct payment(OCR based data)
+      const serviceLines = paymentRecord.claim
+        ? paymentRecord.claim.serviceLines
+        : paymentRecord.serviceLines;
+
+      if (!serviceLines || serviceLines.length === 0) {
+        return res
+          .status(400)
+          .json({ message: "No service lines available for this payment" });
+      }
+
+      const serviceLineTransactions = serviceLines
         .filter((line) => line.totalDue.gt(0))
         .map((line) => ({
           serviceLineId: line.id,
@@ -273,8 +284,19 @@ router.put(
       if (!paymentRecord) {
         return res.status(404).json({ message: "Payment not found" });
       }
+
+      const serviceLines = paymentRecord.claim
+        ? paymentRecord.claim.serviceLines
+        : paymentRecord.serviceLines;
+
+      if (!serviceLines || serviceLines.length === 0) {
+        return res
+          .status(400)
+          .json({ message: "No service lines available for this payment" });
+      }
+
       // Build reversal transactions (negating what’s already paid/adjusted)
-      const serviceLineTransactions = paymentRecord.claim.serviceLines
+      const serviceLineTransactions = serviceLines
         .filter((line) => line.totalPaid.gt(0) || line.totalAdjusted.gt(0))
         .map((line) => ({
           serviceLineId: line.id,

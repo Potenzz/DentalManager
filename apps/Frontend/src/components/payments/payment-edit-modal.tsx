@@ -72,6 +72,9 @@ export default function PaymentEditModal({
     };
   });
 
+  const serviceLines =
+    payment.claim?.serviceLines ?? payment.serviceLines ?? [];
+
   const handleEditServiceLine = (lineId: number) => {
     if (expandedLineId === lineId) {
       // Closing current line
@@ -80,7 +83,7 @@ export default function PaymentEditModal({
     }
 
     // Find line data
-    const line = payment.claim.serviceLines.find((sl) => sl.id === lineId);
+    const line = serviceLines.find((sl) => sl.id === lineId);
     if (!line) return;
 
     // updating form to show its data, while expanding.
@@ -136,9 +139,7 @@ export default function PaymentEditModal({
       return;
     }
 
-    const line = payment.claim.serviceLines.find(
-      (sl) => sl.id === formState.serviceLineId
-    );
+    const line = serviceLines.find((sl) => sl.id === formState.serviceLineId);
     if (!line) {
       toast({
         title: "Error",
@@ -189,9 +190,7 @@ export default function PaymentEditModal({
     }
   };
 
-  const handlePayFullDue = async (
-    line: (typeof payment.claim.serviceLines)[0]
-  ) => {
+  const handlePayFullDue = async (line: (typeof serviceLines)[0]) => {
     if (!line || !payment) {
       toast({
         title: "Error",
@@ -268,15 +267,28 @@ export default function PaymentEditModal({
           {/* Claim + Patient Info */}
           <div className="space-y-2 border-b border-gray-200 pb-4">
             <h3 className="text-2xl font-bold text-gray-900">
-              {payment.claim.patientName}
+              {payment.claim?.patientName ??
+                (`${payment.patient?.firstName ?? ""} ${payment.patient?.lastName ?? ""}`.trim() ||
+                  "Unknown Patient")}
             </h3>
+
             <div className="flex flex-wrap items-center gap-3 text-sm">
-              <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-medium">
-                Claim #{payment.claimId.toString().padStart(4, "0")}
-              </span>
+              {payment.claimId ? (
+                <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-medium">
+                  Claim #{payment.claimId.toString().padStart(4, "0")}
+                </span>
+              ) : (
+                <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-medium">
+                  OCR Imported Payment
+                </span>
+              )}
               <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-medium">
                 Service Date:{" "}
-                {formatDateToHumanReadable(payment.claim.serviceDate)}
+                {payment.claim?.serviceDate
+                  ? formatDateToHumanReadable(payment.claim.serviceDate)
+                  : serviceLines.length > 0
+                    ? formatDateToHumanReadable(serviceLines[0]?.procedureDate)
+                    : formatDateToHumanReadable(payment.createdAt)}
               </span>
             </div>
           </div>
@@ -366,8 +378,8 @@ export default function PaymentEditModal({
           <div>
             <h4 className="font-medium text-gray-900 pt-4">Service Lines</h4>
             <div className="mt-3 space-y-4">
-              {payment.claim.serviceLines.length > 0 ? (
-                payment.claim.serviceLines.map((line) => {
+              {serviceLines.length > 0 ? (
+                serviceLines.map((line) => {
                   const isExpanded = expandedLineId === line.id;
 
                   return (
