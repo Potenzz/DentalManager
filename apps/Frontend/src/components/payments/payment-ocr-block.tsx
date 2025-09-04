@@ -22,6 +22,7 @@ type Row = { __id: number } & Record<string, string | number | null>;
 
 export default function PaymentOCRBlock() {
   // UI state
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploadedImages, setUploadedImages] = React.useState<File[]>([]);
   const [isDragging, setIsDragging] = React.useState(false);
   const [isExtracting, setIsExtracting] = React.useState(false);
@@ -257,9 +258,12 @@ export default function PaymentOCRBlock() {
               setIsDragging(true);
             }}
             onDragLeave={() => setIsDragging(false)}
-            onClick={() =>
-              document.getElementById("image-upload-input")?.click()
-            }
+            onClick={() => {
+              if (fileInputRef.current) {
+                fileInputRef.current.value = ""; // ✅ reset before opening
+                fileInputRef.current.click();
+              }
+            }}
           >
             {uploadedImages.length ? (
               <div className="space-y-4">
@@ -312,17 +316,20 @@ export default function PaymentOCRBlock() {
               </div>
             )}
             <input
+              ref={fileInputRef}
               id="image-upload-input"
               type="file"
               accept="image/*"
-              onChange={handleImageSelect}
+              onChange={(e) => {
+                handleImageSelect(e);
+                e.currentTarget.value = "";
+              }}
               className="hidden"
               multiple
             />
           </div>
 
           {/* Extract */}
-
           <div className="flex justify-end gap-4">
             <Button
               className="w-full h-12 gap-2"

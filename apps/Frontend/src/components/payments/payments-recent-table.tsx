@@ -751,7 +751,7 @@ export default function PaymentsRecentTable({
         isOpen={isDeletePaymentOpen}
         onConfirm={handleConfirmDeletePayment}
         onCancel={() => setIsDeletePaymentOpen(false)}
-        entityName={`ClaimID : ${currentPayment?.claimId}`}
+        entityName={`PaymentID : ${currentPayment?.id}`}
       />
 
       {isEditPaymentOpen && currentPayment && (

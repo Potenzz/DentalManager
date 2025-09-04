@@ -220,6 +220,7 @@ export const fullOcrPaymentService = {
                 totalDue: billed,
                 status: "PENDING", // updatePayment will fix it
                 notes: `OCR import from ${row.sourceFile ?? "Unknown file"}`,
+                icn: row.icn ?? "",
               },
             });
 

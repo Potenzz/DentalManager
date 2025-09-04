@@ -290,6 +290,12 @@ export default function PaymentEditModal({
                     ? formatDateToHumanReadable(serviceLines[0]?.procedureDate)
                     : formatDateToHumanReadable(payment.createdAt)}
               </span>
+
+              {payment.icn ? (
+                <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-medium">
+                  ICN : {payment.icn}
+                </span>
+              ) : null}
             </div>
           </div>
 
