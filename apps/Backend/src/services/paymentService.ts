@@ -180,7 +180,6 @@ export const fullOcrPaymentService = {
         const paid = new Decimal(row.totalPaid ?? 0);
 
         const adjusted = billed.minus(allowed); // write-off
-        const due = billed.minus(paid).minus(adjusted); // patient responsibility
 
         // Step 1–3 in a transaction
         const { paymentId, serviceLineId } = await prisma.$transaction(
