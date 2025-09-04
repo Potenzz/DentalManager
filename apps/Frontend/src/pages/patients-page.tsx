@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { PatientTable } from "@/components/patients/patient-table";
+import { PatientTable, qkPatients } from "@/components/patients/patient-table";
 import { AddPatientModal } from "@/components/patients/add-patient-modal";
 import { FileUploadZone } from "@/components/file-upload/file-upload-zone";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/use-auth";
 import useExtractPdfData from "@/hooks/use-extractPdfData";
 import { useLocation } from "wouter";
 import { InsertPatient, Patient } from "@repo/db/types";
+import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
@@ -52,7 +53,7 @@ export default function PatientsPage() {
     },
     onSuccess: (newPatient) => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
       toast({
         title: "Success",
         description: "Patient added successfully!",

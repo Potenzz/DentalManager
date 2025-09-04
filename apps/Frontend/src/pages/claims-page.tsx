@@ -20,7 +20,9 @@ import {
 } from "@/redux/slices/seleniumClaimSubmitTaskSlice";
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 import { formatLocalDate } from "@/utils/dateUtils";
-import ClaimsRecentTable from "@/components/claims/claims-recent-table";
+import ClaimsRecentTable, {
+  QK_CLAIMS_BASE,
+} from "@/components/claims/claims-recent-table";
 import ClaimsOfPatientModal from "@/components/claims/claims-of-patient-table";
 import {
   Claim,
@@ -128,10 +130,7 @@ export default function ClaimsPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["claims-recent"],
-        exact: false,
-      });
+      queryClient.invalidateQueries({ queryKey: QK_CLAIMS_BASE });
 
       toast({
         title: "Claim created successfully",

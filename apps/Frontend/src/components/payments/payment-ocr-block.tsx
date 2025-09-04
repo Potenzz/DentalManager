@@ -3,9 +3,9 @@ import * as React from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Image as ImageIcon, X, Plus, Minus } from "lucide-react";
+import { Upload, Image as ImageIcon, X, Plus } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 
 import {
@@ -14,7 +14,8 @@ import {
   flexRender,
   ColumnDef,
 } from "@tanstack/react-table";
-import { convertOCRDate } from "@/utils/dateUtils";
+import { QK_PAYMENTS_RECENT_BASE } from "@/components/payments/payments-recent-table";
+import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 
 // ---------------- Types ----------------
 
@@ -211,6 +212,20 @@ export default function PaymentOCRBlock() {
       if (!res.ok) throw new Error("Failed to save OCR payments");
 
       toast({ title: "Saved", description: "OCR rows saved successfully" });
+
+      // 🔄 REFRESH both tables (all pages/filters)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QK_PAYMENTS_RECENT_BASE }), // all recent payments
+        queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE }), // recent patients list
+      ]);
+
+      // ✅ CLEAR UI: remove files and table rows
+      setUploadedImages([]);
+      setRows([]);
+      setColumns([]);
+      setError(null);
+      setIsDragging(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: any) {
       toast({
         title: "Error",

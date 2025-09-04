@@ -58,6 +58,22 @@ interface PaymentsRecentTableProps {
   patientId?: number;
 }
 
+// 🔑 exported base key (so others can invalidate all pages/filters)
+export const QK_PAYMENTS_RECENT_BASE = ["payments-recent"] as const;
+// 🔑 exported helper for specific pages/scopes
+export const qkPaymentsRecent = (opts: {
+  patientId?: number | null;
+  page: number;
+}) =>
+  opts.patientId
+    ? ([
+        ...QK_PAYMENTS_RECENT_BASE,
+        "patient",
+        opts.patientId,
+        opts.page,
+      ] as const)
+    : ([...QK_PAYMENTS_RECENT_BASE, "global", opts.page] as const);
+
 export default function PaymentsRecentTable({
   allowEdit,
   allowDelete,
@@ -94,17 +110,17 @@ export default function PaymentsRecentTable({
     }
   };
 
-  const getPaymentsQueryKey = () =>
-    patientId
-      ? ["payments-recent", "patient", patientId, currentPage]
-      : ["payments-recent", "global", currentPage];
+  const queryKey = qkPaymentsRecent({
+    patientId: patientId ?? undefined,
+    page: currentPage,
+  });
 
   const {
     data: paymentsData,
     isLoading,
     isError,
   } = useQuery<PaymentApiResponse>({
-    queryKey: getPaymentsQueryKey(),
+    queryKey,
     queryFn: async () => {
       const endpoint = patientId
         ? `/api/payments/patient/${patientId}?limit=${paymentsPerPage}&offset=${offset}`
@@ -141,8 +157,9 @@ export default function PaymentsRecentTable({
         description: "Payment updated successfully!",
       });
 
-      queryClient.invalidateQueries({
-        queryKey: getPaymentsQueryKey(),
+      // 🔄 refresh this table page
+      await queryClient.invalidateQueries({
+        queryKey: QK_PAYMENTS_RECENT_BASE,
       });
 
       // Fetch updated payment and set into local state
@@ -193,8 +210,8 @@ export default function PaymentsRecentTable({
         description: "Payment Status updated successfully!",
       });
 
-      queryClient.invalidateQueries({
-        queryKey: getPaymentsQueryKey(),
+      await queryClient.invalidateQueries({
+        queryKey: QK_PAYMENTS_RECENT_BASE,
       });
 
       // Fetch updated payment and set into local state
@@ -233,12 +250,14 @@ export default function PaymentsRecentTable({
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: "Success",
         description: "Payment updated successfully!",
       });
-      queryClient.invalidateQueries({ queryKey: getPaymentsQueryKey() });
+      await queryClient.invalidateQueries({
+        queryKey: QK_PAYMENTS_RECENT_BASE,
+      });
     },
     onError: (error: any) => {
       toast({
@@ -271,10 +290,10 @@ export default function PaymentsRecentTable({
       return;
     },
 
-    onSuccess: () => {
+    onSuccess: async () => {
       setIsDeletePaymentOpen(false);
-      queryClient.invalidateQueries({
-        queryKey: getPaymentsQueryKey(),
+      await queryClient.invalidateQueries({
+        queryKey: QK_PAYMENTS_RECENT_BASE,
       });
       toast({
         title: "Deleted",

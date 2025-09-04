@@ -29,11 +29,14 @@ import {
   Patient,
   UpdateAppointment,
 } from "@repo/db/types";
+import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
   shouldSchedule: boolean;
+  shouldClaim: boolean;
   navigateToSchedule: (patientId: number) => void;
+  navigateToClaim: (patientId: number) => void;
 };
 
 export default function Dashboard() {
@@ -84,7 +87,8 @@ export default function Dashboard() {
     },
     onSuccess: (newPatient) => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+
+      queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
       toast({
         title: "Success",
         description: "Patient added successfully!",

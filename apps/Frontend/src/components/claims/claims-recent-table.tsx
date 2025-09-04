@@ -51,6 +51,17 @@ interface ClaimsRecentTableProps {
   patientId?: number;
 }
 
+// 🔑 exported base key
+export const QK_CLAIMS_BASE = ["claims-recent"] as const;
+// helper for specific pages/patient scope
+export const qkClaimsRecent = (opts: {
+  patientId?: number | null;
+  page: number;
+}) =>
+  opts.patientId
+    ? ([...QK_CLAIMS_BASE, "patient", opts.patientId, opts.page] as const)
+    : ([...QK_CLAIMS_BASE, "global", opts.page] as const);
+
 export default function ClaimsRecentTable({
   allowEdit,
   allowView,
@@ -89,17 +100,17 @@ export default function ClaimsRecentTable({
     setCurrentPage(1);
   }, [patientId]);
 
-  const getClaimsQueryKey = () =>
-    patientId
-      ? ["claims-recent", "patient", patientId, currentPage]
-      : ["claims-recent", "global", currentPage];
+  const queryKey = qkClaimsRecent({
+    patientId: patientId ?? undefined,
+    page: currentPage,
+  });
 
   const {
     data: claimsData,
     isLoading,
     isError,
   } = useQuery<ClaimApiResponse, Error>({
-    queryKey: getClaimsQueryKey(),
+    queryKey,
 
     queryFn: async () => {
       const endpoint = patientId
@@ -134,9 +145,7 @@ export default function ClaimsRecentTable({
         description: "Claim updated successfully!",
         variant: "default",
       });
-      queryClient.invalidateQueries({
-        queryKey: getClaimsQueryKey(),
-      });
+      queryClient.invalidateQueries({ queryKey: QK_CLAIMS_BASE });
     },
     onError: (error) => {
       toast({
@@ -154,9 +163,7 @@ export default function ClaimsRecentTable({
     },
     onSuccess: () => {
       setIsDeleteClaimOpen(false);
-      queryClient.invalidateQueries({
-        queryKey: getClaimsQueryKey(),
-      });
+      queryClient.invalidateQueries({ queryKey: QK_CLAIMS_BASE });
       toast({
         title: "Success",
         description: "Claim deleted successfully!",

@@ -24,6 +24,7 @@ import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import { InsertPatient, Patient } from "@repo/db/types";
 import { DateInput } from "@/components/ui/dateInput";
+import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 
 export default function InsuranceEligibilityPage() {
   const { user } = useAuth();
@@ -77,7 +78,7 @@ export default function InsuranceEligibilityPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
       toast({
         title: "Success",
         description: "Patient added successfully!",

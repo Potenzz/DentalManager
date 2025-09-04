@@ -56,6 +56,12 @@ interface PatientTableProps {
   onSearchChange?: (searchTerm: string) => void;
 }
 
+// 🔑 exported base key
+export const QK_PATIENTS_BASE = ["patients"] as const;
+// helper (optional) – mirrors your current key structure
+export const qkPatients = (page: number, search: string) =>
+  [...QK_PATIENTS_BASE, { page, search }] as const;
+
 export function PatientTable({
   allowEdit,
   allowView,
@@ -101,18 +107,14 @@ export function PatientTable({
     }
   };
 
+  const searchKeyPart = debouncedSearchCriteria?.searchTerm || "recent";
+
   const {
     data: patientsData,
     isLoading,
     isError,
   } = useQuery<PatientApiResponse, Error>({
-    queryKey: [
-      "patients",
-      {
-        page: currentPage,
-        search: debouncedSearchCriteria?.searchTerm || "recent",
-      },
-    ],
+    queryKey: qkPatients(currentPage, searchKeyPart),
     queryFn: async () => {
       const trimmedTerm = debouncedSearchCriteria?.searchTerm?.trim();
       const isSearch = trimmedTerm && trimmedTerm.length > 0;
@@ -176,17 +178,11 @@ export function PatientTable({
       const res = await apiRequest("PUT", `/api/patients/${id}`, patient);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setIsAddPatientOpen(false);
-      queryClient.invalidateQueries({
-        queryKey: [
-          "patients",
-          {
-            page: currentPage,
-            search: debouncedSearchCriteria?.searchTerm || "recent",
-          },
-        ],
-      });
+
+      // this query every page,
+      await queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
       toast({
         title: "Success",
         description: "Patient updated successfully!",
@@ -207,17 +203,10 @@ export function PatientTable({
       const res = await apiRequest("DELETE", `/api/patients/${id}`);
       return;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setIsDeletePatientOpen(false);
-      queryClient.invalidateQueries({
-        queryKey: [
-          "patients",
-          {
-            page: currentPage,
-            search: debouncedSearchCriteria?.searchTerm || "recent",
-          },
-        ],
-      });
+      await queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
+
       toast({
         title: "Success",
         description: "Patient deleted successfully!",
