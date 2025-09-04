@@ -52,7 +52,7 @@ export interface InputServiceLine {
 export type ClaimWithServiceLines = Claim & {
   serviceLines: {
     id: number;
-    claimId: number;
+    claimId: number | null;
     procedureCode: string;
     procedureDate: Date;
     oralCavityArea: string | null;

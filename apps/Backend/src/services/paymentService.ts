@@ -1,7 +1,15 @@
 import Decimal from "decimal.js";
-import { NewTransactionPayload, Payment, PaymentStatus } from "@repo/db/types";
+import {
+  NewTransactionPayload,
+  OcrRow,
+  Payment,
+  PaymentMethod,
+  paymentMethodOptions,
+  PaymentStatus,
+} from "@repo/db/types";
 import { storage } from "../storage";
 import { prisma } from "@repo/db/client";
+import { convertOCRDate } from "../utils/dateUtils";
 
 /**
  * Validate transactions against a payment record
@@ -149,3 +157,112 @@ export async function updatePayment(
   await validateTransactions(paymentId, serviceLineTransactions, options);
   return applyTransactions(paymentId, serviceLineTransactions, userId);
 }
+
+// handling full-ocr-payments-import
+
+export const fullOcrPaymentService = {
+  async importRows(rows: OcrRow[], userId: number) {
+    const results: number[] = [];
+
+    for (const [index, row] of rows.entries()) {
+      try {
+        if (!row.patientName || !row.insuranceId) {
+          throw new Error(
+            `Row ${index + 1}: missing patientName or insuranceId`
+          );
+        }
+        if (!row.procedureCode) {
+          throw new Error(`Row ${index + 1}: missing procedureCode`);
+        }
+
+        const billed = new Decimal(row.totalBilled ?? 0);
+        const allowed = new Decimal(row.totalAllowed ?? row.totalBilled ?? 0);
+        const paid = new Decimal(row.totalPaid ?? 0);
+
+        const adjusted = billed.minus(allowed); // write-off
+        const due = billed.minus(paid).minus(adjusted); // patient responsibility
+
+        // Step 1–3 in a transaction
+        const { paymentId, serviceLineId } = await prisma.$transaction(
+          async (tx) => {
+            // 1. Find or create patient
+            let patient = await tx.patient.findFirst({
+              where: { insuranceId: row.insuranceId.toString() },
+            });
+
+            if (!patient) {
+              const [firstNameRaw, ...rest] = (row.patientName ?? "")
+                .trim()
+                .split(" ");
+              const firstName = firstNameRaw || "Unknown";
+              const lastName = rest.length > 0 ? rest.join(" ") : "Unknown";
+
+              patient = await tx.patient.create({
+                data: {
+                  firstName,
+                  lastName,
+                  insuranceId: row.insuranceId.toString(),
+                  dateOfBirth: new Date(Date.UTC(1900, 0, 1)), // fallback (1900, jan, 1)
+                  gender: "",
+                  phone: "",
+                  userId,
+                },
+              });
+            }
+
+            // 2. Create payment (claimId null) — IMPORTANT: start with zeros, due = billed
+            const payment = await tx.payment.create({
+              data: {
+                patientId: patient.id,
+                userId,
+                totalBilled: billed,
+                totalPaid: new Decimal(0),
+                totalAdjusted: new Decimal(0),
+                totalDue: billed,
+                status: "PENDING", // updatePayment will fix it
+                notes: `OCR import from ${row.sourceFile ?? "Unknown file"}`,
+              },
+            });
+
+            // 3. Create service line — IMPORTANT: start with zeros, due = billed
+            const serviceLine = await tx.serviceLine.create({
+              data: {
+                paymentId: payment.id,
+                procedureCode: row.procedureCode,
+                toothNumber: row.toothNumber ?? null,
+                toothSurface: row.toothSurface ?? null,
+                procedureDate: convertOCRDate(row.procedureDate),
+                totalBilled: billed,
+                totalPaid: new Decimal(0),
+                totalAdjusted: new Decimal(0),
+                totalDue: billed,
+              },
+            });
+
+            return { paymentId: payment.id, serviceLineId: serviceLine.id };
+          }
+        );
+
+        // Step 4: AFTER commit, recalc using updatePayment (global prisma can see it now)
+        // Build transaction & let updatePayment handle recalculation
+        const txn = {
+          serviceLineId,
+          paidAmount: paid.toNumber(),
+          adjustedAmount: adjusted.toNumber(),
+          method: "OTHER" as PaymentMethod,
+          receivedDate: new Date(),
+          notes: "OCR import",
+        };
+
+        await updatePayment(paymentId, [txn], userId);
+
+        results.push(paymentId);
+      } catch (err) {
+        console.error(`❌ Failed to import OCR row ${index + 1}:`, err);
+        throw err;
+      }
+    }
+
+    return results;
+  },
+};

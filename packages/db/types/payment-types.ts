@@ -74,7 +74,7 @@ export type PaymentWithExtras = Prisma.PaymentGetPayload<{
       };
     };
     updatedBy: true;
-    patient: true; 
+    patient: true;
   };
 }> & {
   patientName: string;
@@ -99,3 +99,18 @@ export const newTransactionPayloadSchema = z.object({
 });
 
 export type NewTransactionPayload = z.infer<typeof newTransactionPayloadSchema>;
+
+// OCR Payment - row
+export interface OcrRow {
+  patientName: string;
+  insuranceId: string | number;
+  icn?: string | null;
+  procedureCode: string;
+  toothNumber?: string | null;
+  toothSurface?: string | null;
+  procedureDate: string | null;
+  totalBilled: number;
+  totalAllowed?: number;
+  totalPaid: number;
+  sourceFile?: string | null;
+}

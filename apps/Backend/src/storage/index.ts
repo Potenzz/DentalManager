@@ -820,12 +820,14 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
+        serviceLines: true,
         serviceLineTransactions: {
           include: {
             serviceLine: true,
           },
         },
         updatedBy: true,
+        patient: true,
       },
     });
 
@@ -852,12 +854,14 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
+        serviceLines: true,
         serviceLineTransactions: {
           include: {
             serviceLine: true,
           },
         },
         updatedBy: true,
+        patient: true,
       },
     });
 
@@ -882,12 +886,14 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
+        serviceLines: true,
         serviceLineTransactions: {
           include: {
             serviceLine: true,
           },
         },
         updatedBy: true,
+        patient: true,
       },
     });
 
@@ -915,12 +921,14 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
+        serviceLines: true,
         serviceLineTransactions: {
           include: {
             serviceLine: true,
           },
         },
         updatedBy: true,
+        patient: true,
       },
     });
 
@@ -950,12 +958,14 @@ export const storage: IStorage = {
             serviceLines: true,
           },
         },
+        serviceLines: true,
         serviceLineTransactions: {
           include: {
             serviceLine: true,
           },
         },
         updatedBy: true,
+        patient: true,
       },
     });
 

@@ -156,41 +156,56 @@ export default function PaymentOCRBlock() {
 
   const handleSave = async () => {
     try {
-      const payload = rows.map((row) => {
-        const billed = Number(row["Billed Amount"] ?? 0);
-        const allowed = Number(row["Allowed Amount"] ?? 0);
-        const paid = Number(row["Paid Amount"] ?? 0);
+      const skipped: string[] = [];
 
-        return {
-          patientId: parseInt(row["Patient ID"] as string, 10),
-          totalBilled: billed,
-          totalPaid: paid,
-          totalAdjusted: billed - allowed, // ❗ write-off
-          totalDue: allowed - paid, // ❗ patient responsibility
-          notes: `OCR import - CDT ${row["CDT Code"]}, Tooth ${row["Tooth"]}, Date ${row["Date SVC"]}`,
-          serviceLine: {
+      const payload = rows
+        .map((row, idx) => {
+          const patientName = row["Patient Name"];
+          const patientId = row["Patient ID"];
+          const procedureCode = row["CDT Code"];
+
+          if (!patientName || !patientId || !procedureCode) {
+            skipped.push(`Row ${idx + 1} (missing name/id/procedureCode)`);
+            return null;
+          }
+
+          return {
+            patientName,
+            insuranceId: patientId,
+            icn: row["ICN"] ?? null,
             procedureCode: row["CDT Code"],
-            procedureDate: convertOCRDate(row["Date SVC"]), // you’ll parse "070825" → proper Date
-            toothNumber: row["Tooth"],
-            totalBilled: billed,
-            totalPaid: paid,
-            totalAdjusted: billed - allowed,
-            totalDue: allowed - paid,
-          },
-          transaction: {
-            paidAmount: paid,
-            adjustedAmount: billed - allowed, // same as totalAdjusted
-            method: "OTHER", // fallback, since OCR doesn’t give this
-            receivedDate: new Date(),
-          },
-        };
-      });
+            toothNumber: row["Tooth"] ?? null,
+            toothSurface: row["Surface"] ?? null,
+            procedureDate: row["Date SVC"] ?? null,
+            totalBilled: Number(row["Billed Amount"] ?? 0),
+            totalAllowed: Number(row["Allowed Amount"] ?? 0),
+            totalPaid: Number(row["Paid Amount"] ?? 0),
+            sourceFile: row["Source File"] ?? null,
+          };
+        })
+        .filter((r) => r !== null);
 
-      const res = await apiRequest(
-        "POST",
-        "/api/payments/ocr",
-        JSON.stringify({ payments: payload })
-      );
+      if (skipped.length > 0) {
+        toast({
+          title:
+            "Some rows skipped, because of either no patient Name or MemberId given.",
+          description: skipped.join(", "),
+          variant: "destructive",
+        });
+      }
+
+      if (payload.length === 0) {
+        toast({
+          title: "Error",
+          description: "No valid rows to save",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const res = await apiRequest("POST", "/api/payments/full-ocr-import", {
+        rows: payload,
+      });
 
       if (!res.ok) throw new Error("Failed to save OCR payments");
 

@@ -370,6 +370,11 @@ export default function PaymentsRecentTable({
     paymentsData?.totalCount || 0
   );
 
+  const getName = (p: PaymentWithExtras) =>
+    p.patient
+      ? `${p.patient.firstName} ${p.patient.lastName}`.trim()
+      : (p.patientName ?? "Unknown");
+
   const getInitials = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
     const filteredParts = parts.filter((part) => part.length > 0);
@@ -480,7 +485,7 @@ export default function PaymentsRecentTable({
               <TableHead>Claim ID</TableHead>
               <TableHead>Patient Name</TableHead>
               <TableHead>Amount</TableHead>
-              <TableHead>Claim Submitted on</TableHead>
+              <TableHead>Service Date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -519,6 +524,14 @@ export default function PaymentsRecentTable({
                 const totalPaid = Number(payment.totalPaid || 0);
                 const totalDue = Number(payment.totalDue || 0);
 
+                const displayName = getName(payment);
+                const submittedOn =
+                  payment.serviceLines?.[0]?.procedureDate ??
+                  payment.claim?.createdAt ??
+                  payment.createdAt ??
+                  payment.serviceLineTransactions?.[0]?.receivedDate ??
+                  null;
+
                 return (
                   <TableRow key={payment.id}>
                     {allowCheckbox && (
@@ -547,13 +560,13 @@ export default function PaymentsRecentTable({
                           className={`h-10 w-10 ${getAvatarColor(Number(payment.id))}`}
                         >
                           <AvatarFallback className="text-white">
-                            {getInitials(payment.patientName)}
+                            {getInitials(displayName)}
                           </AvatarFallback>
                         </Avatar>
 
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {payment.patientName}
+                            {displayName}
                           </div>
                           <div className="text-sm text-gray-500">
                             PID-{payment.patientId?.toString().padStart(4, "0")}
@@ -585,7 +598,7 @@ export default function PaymentsRecentTable({
                       </div>
                     </TableCell>
                     <TableCell>
-                      {formatDateToHumanReadable(payment.paymentDate)}
+                      {formatDateToHumanReadable(submittedOn)}
                     </TableCell>
 
                     <TableCell>

@@ -152,6 +152,42 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
   }
 });
 
+// POST /api/payments/full-ocr-import
+router.post(
+  "/full-ocr-import",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const { rows } = req.body;
+      if (!rows || !Array.isArray(rows)) {
+        return res.status(400).json({ message: "Invalid OCR payload" });
+      }
+
+      const paymentIds = await paymentService.fullOcrPaymentService.importRows(
+        rows,
+        userId
+      );
+
+      res.status(200).json({
+        message: "OCR rows imported successfully",
+        paymentIds,
+      });
+    } catch (err) {
+      console.error(err);
+
+      if (err instanceof Error) {
+        return res.status(500).json({ message: err.message });
+      }
+
+      return res
+        .status(500)
+        .json({ message: "Unknown error importing OCR payments" });
+    }
+  }
+);
+
 // POST /api/payments/:claimId
 router.post("/:claimId", async (req: Request, res: Response): Promise<any> => {
   try {
