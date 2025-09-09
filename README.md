@@ -45,6 +45,9 @@ cd apps/SeleniumService
 python3 agent.py
 ```
 
+## 📖 Developer Documentation
+
+- [Development Hosts & Ports](docs/ports.md) — which app runs on which host/port
 
 
 ## This in a Turborepo. What's inside?

@@ -4,7 +4,10 @@ import uvicorn
 import asyncio
 from selenium_claimSubmitWorker import AutomationMassHealth
 from selenium_eligibilityCheckWorker import AutomationMassHealthEligibilityCheck
+import os
 
+from dotenv import load_dotenv
+load_dotenv() 
 
 app = FastAPI()
 # Allow 1 selenium session at a time
@@ -89,4 +92,6 @@ async def get_status():
         }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5002)
+    host = os.getenv("HOST")
+    port = int(os.getenv("PORT"))
+    uvicorn.run(app, host=host, port=port)

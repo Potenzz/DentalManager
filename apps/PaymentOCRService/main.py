@@ -5,7 +5,7 @@ from typing import List, Optional
 import io
 import os
 import asyncio
-
+import uvicorn
 from dotenv import load_dotenv
 load_dotenv() 
 
@@ -157,8 +157,6 @@ async def extract_csv(files: List[UploadFile] = File(...), filename: Optional[st
 # Entrypoint (same pattern as your selenium app)
 # -------------------------------------------------
 if __name__ == "__main__":
-    import uvicorn
     host = os.getenv("HOST")
     port = int(os.getenv("PORT"))
-    reload_flag = os.getenv("RELOAD", "false").lower() == "true"
-    uvicorn.run(app, host=host, port=port, reload=reload_flag)
+    uvicorn.run(app, host=host, port=port)

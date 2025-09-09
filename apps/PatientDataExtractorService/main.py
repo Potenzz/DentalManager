@@ -1,8 +1,22 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 import fitz  # PyMuPDF
 import re
+import os
 
-app = Flask(__name__)
+from dotenv import load_dotenv
+load_dotenv() 
+
+app = FastAPI()
+
+# Optional: allow CORS for development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # change in production
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 DOB_RE = re.compile(r'(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4})(?!\d)')
 ID_RE  = re.compile(r'^\d{8,14}$')  # 8–14 digits, whole line
@@ -14,10 +28,18 @@ STOP_WORDS = {
     'provider', 'printed on', 'member id', 'name', 'date of birth'
 }
 
-@app.route("/extract", methods=["POST"])
-def extract():
-    file = request.files['pdf']
-    doc = fitz.open(stream=file.read(), filetype="pdf")
+@app.post("/extract")
+async def extract(pdf: UploadFile = File(...)):
+    if not pdf:
+        raise HTTPException(status_code=400, detail="Missing 'pdf' file")
+
+    content = await pdf.read()
+    try:
+        doc = fitz.open(stream=content, filetype="pdf")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Unable to open PDF: {e}")
+    
+    # Extract text from all pages
     text = "\n".join(page.get_text("text") for page in doc)
     lines = [line.strip() for line in text.splitlines() if line.strip()]
 
@@ -34,7 +56,7 @@ def extract():
             break
 
     if id_idx == -1:
-        return jsonify({"memberId": "", "name": "", "dob": ""})
+        return {"memberId": "", "name": "", "dob": ""}
 
     # 2) Scan forward to collect name + DOB; handle both same-line and next-line cases
     collected = []
@@ -61,11 +83,13 @@ def extract():
         # fallback: if we didn't find a date, assume first collected line(s) are name
         name = blob
 
-    return jsonify({
+    return {
         "memberId": member_id,
         "name": name,
         "dob": dob
-    })
+    }
 
 if __name__ == "__main__":
-    app.run(port=5001)
+    host = os.getenv("HOST")
+    port = int(os.getenv("PORT"))
+    uvicorn.run(app, host=host, port=port)
