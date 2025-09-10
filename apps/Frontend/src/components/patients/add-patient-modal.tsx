@@ -141,7 +141,7 @@ export const AddPatientModal = forwardRef<
               disabled={isLoading}
             >
               <Calendar className="h-4 w-4" />
-              Save & Claim
+              Save & Claim/PreAuth
             </Button>
           )}
 

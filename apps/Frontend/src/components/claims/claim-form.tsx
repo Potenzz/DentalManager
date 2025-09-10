@@ -805,7 +805,7 @@ export function ClaimForm({
                   variant="warning"
                   onClick={handleMHSubmit}
                 >
-                  MH
+                  MH PreAuth
                 </Button>
                 <Button className="w-32" variant="outline">
                   Delta MA

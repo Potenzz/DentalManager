@@ -62,7 +62,7 @@ export function Sidebar() {
         icon: <Shield className="h-5 w-5" />,
       },
       {
-        name: "Claims",
+        name: "Claims/PreAuth",
         path: "/claims",
         icon: <FileCheck className="h-5 w-5" />,
       },

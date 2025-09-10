@@ -196,7 +196,7 @@ export default function PatientsPage() {
                   ) : (
                     <>
                       <FilePlus className="h-4 w-4" />
-                      Extract Info And Claim
+                      Extract Info & Claim/PreAuth
                     </>
                   )}
                 </Button>
