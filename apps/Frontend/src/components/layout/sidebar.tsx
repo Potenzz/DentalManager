@@ -12,32 +12,12 @@ import {
   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useSidebar } from "@/components/ui/sidebar";
-
-const WIDTH_ANIM_MS = 100;
 
 export function Sidebar() {
   const [location] = useLocation();
   const { state, openMobile, setOpenMobile } = useSidebar(); // "expanded" | "collapsed"
-
-  // Delay label visibility until the width animation completes
-  const [showLabels, setShowLabels] = useState(state !== "collapsed");
-  useEffect(() => {
-    let timer: number | undefined;
-
-    if (state === "expanded") {
-      timer = window.setTimeout(() => setShowLabels(true), WIDTH_ANIM_MS);
-    } else {
-      setShowLabels(false);
-    }
-
-    return () => {
-      if (timer !== undefined) {
-        window.clearTimeout(timer);
-      }
-    };
-  }, [state]);
 
   const navItems = useMemo(
     () => [
@@ -110,7 +90,7 @@ export function Sidebar() {
           : "hidden md:block",
         // DESKTOP: participates in row layout
         "md:static md:top-auto md:h-auto md:flex-shrink-0",
-        state === "collapsed" ? "md:w-16" : "md:w-64"
+        state === "collapsed" ? "md:w-0 overflow-hidden" : "md:w-64"
       )}
     >
       <div className="p-2">
@@ -128,11 +108,9 @@ export function Sidebar() {
                 >
                   {item.icon}
                   {/* show label only after expand animation completes */}
-                  {showLabels && (
-                    <span className="whitespace-nowrap select-none">
-                      {item.name}
-                    </span>
-                  )}
+                  <span className="whitespace-nowrap select-none">
+                    {item.name}
+                  </span>
                 </div>
               </Link>
             </div>
