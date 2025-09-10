@@ -43,7 +43,9 @@ export function TopAppBar() {
               <path d="M12 19c-5 0-8-2-9-5.5m18 0c-1 3.5-4 5.5-9 5.5Z" />
             </svg>
 
-            <h1 className="text-lg font-medium text-primary">DentalConnect</h1>
+            <h1 className="text-lg font-medium text-primary">
+              My Dental Office Management
+            </h1>
           </div>
         </div>
 

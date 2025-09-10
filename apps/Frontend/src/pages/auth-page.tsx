@@ -78,9 +78,12 @@ export default function AuthPage() {
         <Card className="p-6 bg-white">
           <div className="mb-10 text-center">
             <h1 className="text-3xl font-medium text-primary mb-2">
-              DentalConnect
+              My Dental Office Management
             </h1>
-            <p className="text-gray-600">Patient Management System</p>
+            <p className="text-gray-600">
+              {" "}
+              Comprehensive Practice Management System
+            </p>
           </div>
 
           <Tabs
@@ -279,9 +282,6 @@ export default function AuthPage() {
               <Torus className="h-8 w-8" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold mb-4 text-center">
-            Welcome to DentalConnect
-          </h2>
           <p className="mb-6 text-center text-white text-opacity-80">
             The complete solution for dental practice management. Streamline
             your patient records, appointments, and more.
