@@ -399,6 +399,68 @@ export function ClaimForm({
     onClose();
   };
 
+  // 2nd Button workflow - Only Creates Data, patient, appointmetn, claim, payment, not actually submits claim to MH site.
+  const handleAddService = async () => {
+    // 0. Validate required fields
+    const missingFields: string[] = [];
+
+    if (!form.memberId?.trim()) missingFields.push("Member ID");
+    if (!form.dateOfBirth?.trim()) missingFields.push("Date of Birth");
+    if (!patient?.firstName?.trim()) missingFields.push("First Name");
+
+    if (missingFields.length > 0) {
+      toast({
+        title: "Missing Required Fields",
+        description: `Please fill out the following field(s): ${missingFields.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 1. Create or update appointment
+    const appointmentData = {
+      patientId: patientId,
+      date: serviceDate,
+      staffId: staff?.id,
+    };
+    const appointmentId = await onHandleAppointmentSubmit(appointmentData);
+
+    // 2. Update patient
+    if (patient && typeof patient.id === "number") {
+      const { id, createdAt, userId, ...sanitizedFields } = patient;
+      const updatedPatientFields = {
+        id,
+        ...sanitizedFields,
+        insuranceProvider: "MassHealth",
+      };
+      onHandleUpdatePatient(updatedPatientFields);
+    } else {
+      toast({
+        title: "Error",
+        description: "Cannot update patient: Missing or invalid patient data",
+        variant: "destructive",
+      });
+    }
+
+    // 3. Create Claim(if not)
+    // Filter out empty service lines (empty procedureCode)
+    const filteredServiceLines = form.serviceLines.filter(
+      (line) => line.procedureCode.trim() !== ""
+    );
+    const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
+    const createdClaim = await onSubmit({
+      ...formToCreateClaim,
+      serviceLines: filteredServiceLines,
+      staffId: Number(staff?.id),
+      patientId: patientId,
+      insuranceProvider: "MassHealth",
+      appointmentId: appointmentId!,
+    });
+
+    // 4. Close form
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <Card className="w-full max-w-5xl max-h-[90vh] overflow-y-auto bg-white">
@@ -810,6 +872,13 @@ export function ClaimForm({
                   onClick={handleMHSubmit}
                 >
                   MH PreAuth
+                </Button>
+                <Button
+                  className="w-32"
+                  variant="warning"
+                  onClick={handleAddService}
+                >
+                  Add Service
                 </Button>
                 <Button className="w-32" variant="outline">
                   Delta MA
