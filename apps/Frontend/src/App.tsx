@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import React, { lazy, Suspense } from "react";
 import { Provider } from "react-redux";
 import { store } from "./redux/store";
@@ -30,7 +30,9 @@ const NotFound = lazy(() => import("./pages/not-found"));
 function Router() {
   return (
     <Switch>
-      <ProtectedRoute path="/" component={() => <Dashboard />} />
+      <ProtectedRoute path="/" component={() => <Redirect to="/patients" />} />
+
+      <ProtectedRoute path="/dashboard" component={() => <Dashboard />} />
       <ProtectedRoute
         path="/appointments"
         component={() => <AppointmentsPage />}

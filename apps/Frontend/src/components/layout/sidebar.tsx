@@ -43,7 +43,7 @@ export function Sidebar() {
     () => [
       {
         name: "Dashboard",
-        path: "/",
+        path: "/dashboard",
         icon: <LayoutDashboard className="h-5 w-5" />,
       },
       {
