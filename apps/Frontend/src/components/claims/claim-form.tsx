@@ -492,6 +492,7 @@ export function ClaimForm({
               <h3 className="text-xl font-semibold mb-2 text-center">
                 Service Lines
               </h3>
+
               <div className="flex justify-end items-center mb-2">
                 {/* Service Date */}
                 <div className="flex gap-2">
@@ -554,11 +555,20 @@ export function ClaimForm({
                       })}
                     </SelectContent>
                   </Select>
+
+                  {/* Map Price Button */}
+                  <Button
+                    className="ml-4"
+                    variant="success"
+                    onClick={onMapPrice}
+                  >
+                    Map Price
+                  </Button>
                 </div>
               </div>
 
               {/* Header */}
-              <div className="grid grid-cols-[1.5fr,0.5fr,1fr,1fr,1fr,1fr,1fr] gap-1 mb-2 font-medium text-sm text-gray-700 items-center">
+              <div className="grid grid-cols-[1.5fr,0.5fr,1fr,1fr,1fr,1fr,1fr] gap-1 mb-2 mt-10 font-medium text-sm text-gray-700 items-center">
                 <div className="grid grid-cols-[auto,1fr] items-center gap-2">
                   <span />
                   <span className="pl-8">Procedure Code</span>
@@ -762,12 +772,6 @@ export function ClaimForm({
                     </div>
                   </div>
                 ))}
-
-                <div className="pt-2">
-                  <Button variant="success" onClick={onMapPrice}>
-                    Map Price
-                  </Button>
-                </div>
               </div>
             </div>
 
