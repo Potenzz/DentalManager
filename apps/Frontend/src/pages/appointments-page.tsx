@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { format, addDays, startOfToday, addMinutes } from "date-fns";
 import { parseLocalDate, formatLocalDate } from "@/utils/dateUtils";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
@@ -69,16 +69,10 @@ export default function AppointmentsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
-  const [claimAppointmentId, setClaimAppointmentId] = useState<number | null>(
-    null
-  );
-  const [claimPatientId, setClaimPatientId] = useState<number | null>(null);
   const [editingAppointment, setEditingAppointment] = useState<
     Appointment | undefined
   >(undefined);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [location] = useLocation();
   const [confirmDeleteState, setConfirmDeleteState] = useState<{
     open: boolean;
@@ -91,16 +85,15 @@ export default function AppointmentsPage() {
     id: APPOINTMENT_CONTEXT_MENU_ID,
   });
 
-  //Fetching staff memebers
-  const { data: staffMembersRaw = [] as Staff[], isLoading: isLoadingStaff } =
-    useQuery<Staff[]>({
-      queryKey: ["/api/staffs/"],
-      queryFn: async () => {
-        const res = await apiRequest("GET", "/api/staffs/");
-        return res.json();
-      },
-      enabled: !!user,
-    });
+  // Staff memebers
+  const { data: staffMembersRaw = [] as Staff[] } = useQuery<Staff[]>({
+    queryKey: ["/api/staffs/"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/staffs/");
+      return res.json();
+    },
+    enabled: !!user,
+  });
 
   const colors = [
     "bg-blue-600",
@@ -130,19 +123,43 @@ export default function AppointmentsPage() {
     }
   }
 
-  // Fetch appointments
+  // ----------------------
+  // Day-level fetch: appointments + patients for selectedDate (lightweight)
+  // ----------------------
+  const formattedSelectedDate = formatLocalDate(selectedDate);
+  type DayPayload = { appointments: Appointment[]; patients: Patient[] };
+  const queryKey = ["appointments", "day", formattedSelectedDate] as const;
+
   const {
-    data: appointments = [] as Appointment[],
+    data: dayPayload = {
+      appointments: [] as Appointment[],
+      patients: [] as Patient[],
+    },
     isLoading: isLoadingAppointments,
     refetch: refetchAppointments,
-  } = useQuery<Appointment[]>({
-    queryKey: ["/api/appointments/all"],
+  } = useQuery<
+    DayPayload,
+    Error,
+    DayPayload,
+    readonly [string, string, string]
+  >({
+    queryKey,
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/appointments/all");
+      const res = await apiRequest(
+        "GET",
+        `/api/appointments/day?date=${formattedSelectedDate}`
+      );
+      if (!res.ok) {
+        throw new Error("Failed to load appointments for date");
+      }
       return res.json();
     },
-    enabled: !!user,
+    enabled: !!user && !!formattedSelectedDate,
+    placeholderData: keepPreviousData,
   });
+
+  const appointments = dayPayload.appointments ?? [];
+  const patientsFromDay = dayPayload.patients ?? [];
 
   // Fetch patients (needed for the dropdowns)
   const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
@@ -344,7 +361,6 @@ export default function AppointmentsPage() {
     appointmentData: InsertAppointment | UpdateAppointment
   ) => {
     // Converts local date to exact UTC date with no offset issues
-
     const rawDate = parseLocalDate(appointmentData.date);
 
     const updatedData = {
@@ -399,12 +415,7 @@ export default function AppointmentsPage() {
     });
   };
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
   // Get formatted date string for display
-  const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
   const selectedDateAppointments = appointments.filter((appointment) => {
     const dateObj = parseLocalDate(appointment.date);
@@ -690,7 +701,9 @@ export default function AppointmentsPage() {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <h2 className="text-xl font-semibold">{formattedDate}</h2>
+                  <h2 className="text-xl font-semibold">
+                    {formattedSelectedDate}
+                  </h2>
                   <Button
                     variant="outline"
                     size="icon"
@@ -783,7 +796,7 @@ export default function AppointmentsPage() {
                   </Button>
                 </CardTitle>
                 <CardDescription>
-                  Statistics for {formattedDate}
+                  Statistics for {formattedSelectedDate}
                 </CardDescription>
               </CardHeader>
               <CardContent>
