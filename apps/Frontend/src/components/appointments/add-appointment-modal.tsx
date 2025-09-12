@@ -8,7 +8,6 @@ import { AppointmentForm } from "./appointment-form";
 import {
   Appointment,
   InsertAppointment,
-  Patient,
   UpdateAppointment,
 } from "@repo/db/types";
 
@@ -19,7 +18,6 @@ interface AddAppointmentModalProps {
   onDelete?: (id: number) => void;
   isLoading: boolean;
   appointment?: Appointment;
-  patients: Patient[];
 }
 
 export function AddAppointmentModal({
@@ -29,7 +27,6 @@ export function AddAppointmentModal({
   onDelete,
   isLoading,
   appointment,
-  patients,
 }: AddAppointmentModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -42,7 +39,6 @@ export function AddAppointmentModal({
         <div className="p-1">
           <AppointmentForm
             appointment={appointment}
-            patients={patients}
             onSubmit={(data) => {
               onSubmit(data);
               onOpenChange(false);
