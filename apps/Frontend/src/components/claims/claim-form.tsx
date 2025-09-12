@@ -871,6 +871,12 @@ export function ClaimForm({
                   variant="warning"
                   onClick={handleMHSubmit}
                 >
+                  MH
+                </Button>
+                <Button
+                  className="w-32"
+                  variant="warning"
+                >
                   MH PreAuth
                 </Button>
                 <Button
