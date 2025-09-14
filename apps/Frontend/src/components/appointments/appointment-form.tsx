@@ -314,6 +314,48 @@ export function AppointmentForm({
     }
   }, [form]);
 
+  // When editing an appointment, ensure we prefill the patient so SelectValue can render
+  useEffect(() => {
+    if (!appointment?.patientId) return;
+
+    const pid = Number(appointment.patientId);
+    if (Number.isNaN(pid)) return;
+
+    // set form value immediately so the select has a value
+    form.setValue("patientId", pid);
+
+    // fetch the single patient record and set prefill
+    (async () => {
+      try {
+        const res = await apiRequest("GET", `/api/patients/${pid}`);
+        if (res.ok) {
+          const patientRecord = await res.json();
+          setPrefillPatient(patientRecord);
+        } else {
+          let msg = `Failed to load patient (status ${res.status})`;
+          try {
+            const body = await res.json().catch(() => null);
+            if (body && body.message) msg = body.message;
+          } catch {}
+          toast({
+            title: "Could not load patient",
+            description: msg,
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        toast({
+          title: "Error fetching patient",
+          description:
+            (err as Error)?.message ||
+            "An unknown error occurred while fetching patient details.",
+          variant: "destructive",
+        });
+      }
+    })();
+    // note: we intentionally do NOT remove prefillPatientd here; it will be cleared when dropdown opens and main list contains the patient
+  }, [appointment?.patientId]);
+
   const handleSubmit = (data: InsertAppointment) => {
     // Make sure patientId is a number
     const patientId =
