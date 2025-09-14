@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { addDays, startOfToday, addMinutes } from "date-fns";
 import {
   parseLocalDate,
@@ -20,13 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "@/components/ui/calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Menu, Item, useContextMenu } from "react-contexify";
@@ -39,6 +32,12 @@ import {
   Patient,
   UpdateAppointment,
 } from "@repo/db/types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 
 // Define types for scheduling
 interface TimeSlot {
@@ -78,6 +77,7 @@ export default function AppointmentsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<
     Appointment | undefined
   >(undefined);
@@ -233,10 +233,10 @@ export default function AppointmentsPage() {
       );
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (appointment) => {
       toast({
-        title: "Success",
-        description: "Appointment created successfully.",
+        title: "Appointment Scheduled",
+        description: appointment.message || "Appointment created successfully.",
       });
       // Invalidate both appointments and patients queries
       queryClient.invalidateQueries({
@@ -269,10 +269,10 @@ export default function AppointmentsPage() {
       );
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (appointment) => {
       toast({
-        title: "Success",
-        description: "Appointment updated successfully.",
+        title: "Appointment Scheduled",
+        description: appointment.message || "Appointment created successfully.",
       });
       queryClient.invalidateQueries({
         queryKey: qkAppointmentsDay(formattedSelectedDate),
@@ -697,10 +697,10 @@ export default function AppointmentsPage() {
           </Item>
         </Menu>
 
-        {/* Main Content - Split into Schedule and Calendar */}
+        {/* Main Content  */}
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left side - Schedule Grid */}
-          <div className="w-full lg:w-3/4 overflow-x-auto bg-white rounded-md shadow">
+          {/* Schedule Grid */}
+          <div className="w-full overflow-x-auto bg-white rounded-md shadow">
             <div className="p-4 border-b">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -721,6 +721,35 @@ export default function AppointmentsPage() {
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
+                </div>
+
+                {/* Top button with popover calendar */}
+                <div className="flex items-center gap-2">
+                  <Label className="hidden sm:flex">Selected</Label>
+                  <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-[160px] justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate
+                          ? selectedDate.toLocaleDateString()
+                          : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+
+                    <PopoverContent className="w-auto">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                          if (date) setSelectedDate(date);
+                        }}
+                        onClose={() => setCalendarOpen(false)}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </div>
@@ -769,28 +798,6 @@ export default function AppointmentsPage() {
                 </table>
               </div>
             </DndProvider>
-          </div>
-
-          {/* Right side - Calendar and Stats */}
-          <div className="w-full lg:w-1/4 space-y-6">
-            {/* Calendar Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle>Calendar</CardTitle>
-                <CardDescription>
-                  Select a date to view or schedule appointments
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    if (date) setSelectedDate(date);
-                  }}
-                />
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>

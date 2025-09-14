@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Clock } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useDebounce } from "use-debounce";
 import {
@@ -39,7 +39,6 @@ import {
   PatientSearch,
   SearchCriteria,
 } from "@/components/patients/patient-search";
-import { QK_PATIENTS_BASE } from "../patients/patient-table";
 import { toast } from "@/hooks/use-toast";
 
 interface AppointmentFormProps {
@@ -59,7 +58,6 @@ export function AppointmentForm({
 }: AppointmentFormProps) {
   const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
-  const queryClient = useQueryClient();
   const [prefillPatient, setPrefillPatient] = useState<Patient | null>(null);
 
   useEffect(() => {
@@ -70,15 +68,14 @@ export function AppointmentForm({
     return () => clearTimeout(timeout);
   }, []);
 
-  const { data: staffMembersRaw = [] as Staff[], isLoading: isLoadingStaff } =
-    useQuery<Staff[]>({
-      queryKey: ["/api/staffs/"],
-      queryFn: async () => {
-        const res = await apiRequest("GET", "/api/staffs/");
-        return res.json();
-      },
-      enabled: !!user,
-    });
+  const { data: staffMembersRaw = [] as Staff[] } = useQuery<Staff[]>({
+    queryKey: ["/api/staffs/"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/staffs/");
+      return res.json();
+    },
+    enabled: !!user,
+  });
 
   const colorMap: Record<string, string> = {
     "Dr. Kai Gao": "bg-blue-600",

@@ -43,6 +43,8 @@ export function PatientSearch({
   onClearSearch,
   isSearchActive,
 }: PatientSearchProps) {
+  const [dobOpen, setDobOpen] = useState(false);
+  const [advanceDobOpen, setAdvanceDobOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchBy, setSearchBy] = useState<SearchCriteria["searchBy"]>("name");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -84,7 +86,7 @@ export function PatientSearch({
       <div className="flex gap-2 mb-4">
         <div className="relative flex-1">
           {searchBy === "dob" ? (
-            <Popover>
+            <Popover open={dobOpen} onOpenChange={setDobOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -112,6 +114,7 @@ export function PatientSearch({
                     if (date) {
                       const formattedDate = format(date, "yyyy-MM-dd");
                       setSearchTerm(String(formattedDate));
+                      setDobOpen(false);
                     }
                   }}
                   disabled={(date) => date > new Date()}
@@ -153,9 +156,10 @@ export function PatientSearch({
 
         <Select
           value={searchBy}
-          onValueChange={(value) =>
-            setSearchBy(value as SearchCriteria["searchBy"])
-          }
+          onValueChange={(value) => {
+            setSearchBy(value as SearchCriteria["searchBy"]);
+            setSearchTerm("");
+          }}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Search by..." />
@@ -189,12 +193,13 @@ export function PatientSearch({
                 </label>
                 <Select
                   value={advancedCriteria.searchBy}
-                  onValueChange={(value) =>
-                    updateAdvancedCriteria(
-                      "searchBy",
-                      value as SearchCriteria["searchBy"]
-                    )
-                  }
+                  onValueChange={(value) => {
+                    setAdvancedCriteria((prev) => ({
+                      ...prev,
+                      searchBy: value as SearchCriteria["searchBy"],
+                      searchTerm: "",
+                    }));
+                  }}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Name" />
@@ -215,9 +220,13 @@ export function PatientSearch({
                   Search term
                 </label>
                 {advancedCriteria.searchBy === "dob" ? (
-                  <Popover>
+                  <Popover
+                    open={advanceDobOpen}
+                    onOpenChange={setAdvanceDobOpen}
+                  >
                     <PopoverTrigger asChild>
                       <Button
+                        type="button"
                         variant="outline"
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleSearch();
@@ -251,6 +260,7 @@ export function PatientSearch({
                               "searchTerm",
                               String(formattedDate)
                             );
+                            setAdvanceDobOpen(false);
                           }
                         }}
                         disabled={(date) => date > new Date()}

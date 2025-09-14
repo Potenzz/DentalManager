@@ -133,6 +133,10 @@ export function ClaimForm({
   const [serviceDate, setServiceDate] = useState<string>(
     formatLocalDate(new Date())
   );
+  const [serviceDateOpen, setServiceDateOpen] = useState(false);
+  const [openProcedureDateIndex, setOpenProcedureDateIndex] = useState<
+    number | null
+  >(null);
 
   // Update service date when calendar date changes
   const onServiceDateChange = (date: Date | undefined) => {
@@ -559,7 +563,10 @@ export function ClaimForm({
                 {/* Service Date */}
                 <div className="flex gap-2">
                   <Label className="flex items-center">Service Date</Label>
-                  <Popover>
+                  <Popover
+                    open={serviceDateOpen}
+                    onOpenChange={setServiceDateOpen}
+                  >
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
@@ -569,11 +576,14 @@ export function ClaimForm({
                         {form.serviceDate}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto">
                       <Calendar
                         mode="single"
                         selected={serviceDateValue}
-                        onSelect={onServiceDateChange}
+                        onSelect={(date) => {
+                          onServiceDateChange(date);
+                        }}
+                        onClose={() => setServiceDateOpen(false)}
                       />
                     </PopoverContent>
                   </Popover>
@@ -702,7 +712,12 @@ export function ClaimForm({
                     </div>
 
                     {/* Date Picker */}
-                    <Popover>
+                    <Popover
+                      open={openProcedureDateIndex === i}
+                      onOpenChange={(open) =>
+                        setOpenProcedureDateIndex(open ? i : null)
+                      }
+                    >
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -712,11 +727,16 @@ export function ClaimForm({
                           {line.procedureDate || "Pick Date"}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
+                      <PopoverContent className="w-auto">
                         <Calendar
                           mode="single"
-                          selected={new Date(line.procedureDate)}
+                          selected={
+                            line.procedureDate
+                              ? new Date(line.procedureDate)
+                              : undefined
+                          }
                           onSelect={(date) => updateProcedureDate(i, date)}
+                          onClose={() => setOpenProcedureDateIndex(null)}
                         />
                       </PopoverContent>
                     </Popover>
