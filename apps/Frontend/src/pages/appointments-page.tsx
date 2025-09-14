@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, addDays, startOfToday, addMinutes } from "date-fns";
-import { parseLocalDate, formatLocalDate } from "@/utils/dateUtils";
+import { addDays, startOfToday, addMinutes } from "date-fns";
+import {
+  parseLocalDate,
+  formatLocalDate,
+  formatLocalTime,
+} from "@/utils/dateUtils";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +13,6 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
   Move,
   Trash2,
 } from "lucide-react";
@@ -17,13 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "@/components/ui/calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Menu, Item, useContextMenu } from "react-contexify";
@@ -36,6 +32,12 @@ import {
   Patient,
   UpdateAppointment,
 } from "@repo/db/types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 
 // Define types for scheduling
 interface TimeSlot {
@@ -65,25 +67,25 @@ interface ScheduledAppointment {
 // Define a unique ID for the appointment context menu
 const APPOINTMENT_CONTEXT_MENU_ID = "appointment-context-menu";
 
+// 🔑 exported base key
+export const QK_APPOINTMENTS_BASE = ["appointments", "day"] as const;
+// helper (optional) – mirrors the query key structure
+export const qkAppointmentsDay = (date: string) =>
+  [...QK_APPOINTMENTS_BASE, date] as const;
+
 export default function AppointmentsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
-  const [claimAppointmentId, setClaimAppointmentId] = useState<number | null>(
-    null
-  );
-  const [claimPatientId, setClaimPatientId] = useState<number | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<
     Appointment | undefined
   >(undefined);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [location] = useLocation();
   const [confirmDeleteState, setConfirmDeleteState] = useState<{
     open: boolean;
     appointmentId?: number;
-    appointmentTitle?: string;
   }>({ open: false });
 
   // Create context menu hook
@@ -91,16 +93,51 @@ export default function AppointmentsPage() {
     id: APPOINTMENT_CONTEXT_MENU_ID,
   });
 
-  //Fetching staff memebers
-  const { data: staffMembersRaw = [] as Staff[], isLoading: isLoadingStaff } =
-    useQuery<Staff[]>({
-      queryKey: ["/api/staffs/"],
-      queryFn: async () => {
-        const res = await apiRequest("GET", "/api/staffs/");
-        return res.json();
-      },
-      enabled: !!user,
-    });
+  // ----------------------
+  // Day-level fetch: appointments + patients for selectedDate (lightweight)
+  // ----------------------
+  const formattedSelectedDate = formatLocalDate(selectedDate);
+  type DayPayload = { appointments: Appointment[]; patients: Patient[] };
+  const {
+    data: dayPayload = {
+      appointments: [] as Appointment[],
+      patients: [] as Patient[],
+    },
+    isLoading: isLoadingAppointments,
+    refetch: refetchAppointments,
+  } = useQuery<
+    DayPayload,
+    Error,
+    DayPayload,
+    readonly [string, string, string]
+  >({
+    queryKey: qkAppointmentsDay(formattedSelectedDate),
+    queryFn: async () => {
+      const res = await apiRequest(
+        "GET",
+        `/api/appointments/day?date=${formattedSelectedDate}`
+      );
+      if (!res.ok) {
+        throw new Error("Failed to load appointments for date");
+      }
+      return res.json();
+    },
+    enabled: !!user && !!formattedSelectedDate,
+    // placeholderData: keepPreviousData,
+  });
+
+  const appointments = dayPayload.appointments ?? [];
+  const patientsFromDay = dayPayload.patients ?? [];
+
+  // Staff memebers
+  const { data: staffMembersRaw = [] as Staff[] } = useQuery<Staff[]>({
+    queryKey: ["/api/staffs/"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/staffs/");
+      return res.json();
+    },
+    enabled: !!user,
+  });
 
   const colors = [
     "bg-blue-600",
@@ -130,126 +167,61 @@ export default function AppointmentsPage() {
     }
   }
 
-  // Fetch appointments
-  const {
-    data: appointments = [] as Appointment[],
-    isLoading: isLoadingAppointments,
-    refetch: refetchAppointments,
-  } = useQuery<Appointment[]>({
-    queryKey: ["/api/appointments/all"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/appointments/all");
-      return res.json();
-    },
-    enabled: !!user,
-  });
-
-  // Fetch patients (needed for the dropdowns)
-  const { data: patients = [], isLoading: isLoadingPatients } = useQuery<
-    Patient[]
-  >({
-    queryKey: ["/api/patients/"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/patients/");
-      return res.json();
-    },
-    enabled: !!user,
-  });
-
-  // Handle creating a new appointment at a specific time slot and for a specific staff member
-  const handleCreateAppointmentAtSlot = (
-    timeSlot: TimeSlot,
-    staffId: number
-  ) => {
-    // Calculate end time (30 minutes after start time)
-    const startHour = parseInt(timeSlot.time.split(":")[0] as string);
-    const startMinute = parseInt(timeSlot.time.split(":")[1] as string);
-    const startDate = parseLocalDate(selectedDate);
-    startDate.setHours(startHour, startMinute, 0);
-
-    const endDate = addMinutes(startDate, 30);
-    const endTime = `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
-
-    // Find staff member
-    const staff = staffMembers.find((s) => Number(s.id) === Number(staffId));
-
-    // Pre-fill appointment form with default values
-    const newAppointment = {
-      date: format(selectedDate, "yyyy-MM-dd"),
-      startTime: timeSlot.time, // This is in "HH:MM" format
-      endTime: endTime,
-      type: staff?.role === "doctor" ? "checkup" : "cleaning",
-      status: "scheduled",
-      title: `Appointment with ${staff?.name}`, // Add staff name in title for easier display
-      notes: `Appointment with ${staff?.name}`, // Store staff info in notes for processing
-      staff: staffId, // This matches the 'staff' field in the appointment form schema
-    };
-
-    // For new appointments, set editingAppointment to undefined
-    // This will ensure we go to the "create" branch in handleAppointmentSubmit
-    setEditingAppointment(undefined);
-
-    // But still pass the pre-filled data to the modal
-    setIsAddModalOpen(true);
-
-    // Store the prefilled values in state or sessionStorage to access in the modal
-    // Clear any existing data first to ensure we're not using old data
-    sessionStorage.removeItem("newAppointmentData");
-    sessionStorage.setItem(
-      "newAppointmentData",
-      JSON.stringify(newAppointment)
-    );
-  };
-
   // Check for newPatient parameter in URL
   useEffect(() => {
-    if (patients.length === 0 || !user) return;
-
     // Parse URL search params to check for newPatient
     const params = new URLSearchParams(window.location.search);
     const newPatientId = params.get("newPatient");
 
     if (newPatientId) {
       const patientId = parseInt(newPatientId);
-      // Find the patient in our list
-      const patient = (patients as Patient[]).find((p) => p.id === patientId);
-
-      if (patient) {
+      // Choose first available staff safely (fallback to 1 if none)
+      const firstStaff =
+        staffMembers && staffMembers.length > 0 ? staffMembers[0] : undefined;
+      const staffId = firstStaff ? Number(firstStaff.id) : 1;
+      // Find first time slot today (9:00 AM is a common starting time)
+      const defaultTimeSlot =
+        timeSlots.find((slot) => slot.time === "09:00") || timeSlots[0];
+      if (!defaultTimeSlot) {
         toast({
-          title: "Patient Added",
-          description: `${patient.firstName} ${patient.lastName} was added successfully. You can now schedule an appointment.`,
+          title: "Unable to schedule",
+          description:
+            "No available time slots to schedule the new patient right now.",
+          variant: "destructive",
         });
-
-        // Select first available staff member
-        const staffId = staffMembers[0]!.id;
-
-        // Find first time slot today (9:00 AM is a common starting time)
-        const defaultTimeSlot =
-          timeSlots.find((slot) => slot.time === "09:00") || timeSlots[0];
-
-        // Open appointment modal with prefilled patient
-        handleCreateAppointmentAtSlot(defaultTimeSlot!, Number(staffId));
-
-        // Pre-select the patient in the appointment form
-        const patientData = {
-          patientId: patient.id,
-        };
-
-        // Store info in session storage for the modal to pick up
-        const existingData = sessionStorage.getItem("newAppointmentData");
-        if (existingData) {
-          const parsedData = JSON.parse(existingData);
-          sessionStorage.setItem(
-            "newAppointmentData",
-            JSON.stringify({
-              ...parsedData,
-              ...patientData,
-            })
-          );
-        }
+        return;
       }
+
+      // Merge any existing "newAppointmentData" with the patient info BEFORE opening modal
+      try {
+        const existingRaw = sessionStorage.getItem("newAppointmentData");
+        const existing = existingRaw ? JSON.parse(existingRaw) : {};
+        const newAppointmentData = {
+          ...existing,
+          patientId: patientId,
+        };
+        sessionStorage.setItem(
+          "newAppointmentData",
+          JSON.stringify(newAppointmentData)
+        );
+      } catch (err) {
+        // If sessionStorage parsing fails, overwrite with a fresh object
+        sessionStorage.setItem(
+          "newAppointmentData",
+          JSON.stringify({ patientId: patientId })
+        );
+      }
+
+      // Open/create the appointment modal (will read sessionStorage in the modal)
+      handleCreateAppointmentAtSlot(defaultTimeSlot, Number(staffId));
+
+      // Remove the query param from the URL so this doesn't re-run on navigation/refresh
+      params.delete("newPatient");
+      const newSearch = params.toString();
+      const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${window.location.hash || ""}`;
+      window.history.replaceState({}, "", newUrl);
     }
-  }, [patients, user, location]);
+  }, [location]);
 
   // Create/upsert appointment mutation
   const createAppointmentMutation = useMutation({
@@ -261,14 +233,15 @@ export default function AppointmentsPage() {
       );
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (appointment) => {
       toast({
-        title: "Success",
-        description: "Appointment created successfully.",
+        title: "Appointment Scheduled",
+        description: appointment.message || "Appointment created successfully.",
       });
       // Invalidate both appointments and patients queries
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+      queryClient.invalidateQueries({
+        queryKey: qkAppointmentsDay(formattedSelectedDate),
+      });
       setIsAddModalOpen(false);
     },
     onError: (error: Error) => {
@@ -296,13 +269,14 @@ export default function AppointmentsPage() {
       );
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (appointment) => {
       toast({
-        title: "Success",
-        description: "Appointment updated successfully.",
+        title: "Appointment Scheduled",
+        description: appointment.message || "Appointment created successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+      queryClient.invalidateQueries({
+        queryKey: qkAppointmentsDay(formattedSelectedDate),
+      });
       setEditingAppointment(undefined);
       setIsAddModalOpen(false);
     },
@@ -326,8 +300,9 @@ export default function AppointmentsPage() {
         description: "Appointment deleted successfully.",
       });
       // Invalidate both appointments and patients queries
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patients/"] });
+      queryClient.invalidateQueries({
+        queryKey: qkAppointmentsDay(formattedSelectedDate),
+      });
       setConfirmDeleteState({ open: false });
     },
     onError: (error: Error) => {
@@ -344,7 +319,6 @@ export default function AppointmentsPage() {
     appointmentData: InsertAppointment | UpdateAppointment
   ) => {
     // Converts local date to exact UTC date with no offset issues
-
     const rawDate = parseLocalDate(appointmentData.date);
 
     const updatedData = {
@@ -386,80 +360,58 @@ export default function AppointmentsPage() {
   };
 
   const handleDeleteAppointment = (id: number) => {
-    const appointment = appointments.find((a) => a.id === id);
-    if (!appointment) return;
-
-    // Find patient by patientId
-    const patient = patients.find((p) => p.id === appointment.patientId);
-
     setConfirmDeleteState({
       open: true,
       appointmentId: id,
-      appointmentTitle: `${patient?.firstName ?? "Appointment"}`,
     });
   };
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  // Get formatted date string for display
-  const formattedDate = format(selectedDate, "yyyy-MM-dd");
-
-  const selectedDateAppointments = appointments.filter((appointment) => {
-    const dateObj = parseLocalDate(appointment.date);
-    return formatLocalDate(dateObj) === formatLocalDate(selectedDate);
-  });
 
   // Process appointments for the scheduler view
-  const processedAppointments: ScheduledAppointment[] =
-    selectedDateAppointments.map((apt) => {
-      // Find patient name
-      const patient = patients.find((p) => p.id === apt.patientId);
-      const patientName = patient
-        ? `${patient.firstName} ${patient.lastName}`
-        : "Unknown Patient";
+  const processedAppointments: ScheduledAppointment[] = (
+    appointments ?? []
+  ).map((apt) => {
+    // Find patient name
+    const patient = patientsFromDay.find((p) => p.id === apt.patientId);
+    const patientName = patient
+      ? `${patient.firstName} ${patient.lastName}`
+      : "Unknown Patient";
 
-      let staffId: number;
+    const staffId = Number(apt.staffId ?? 1);
 
-      if (
-        staffMembers &&
-        staffMembers.length > 0 &&
-        staffMembers[0] !== undefined &&
-        staffMembers[0].id !== undefined
-      ) {
-        staffId = Number(apt.staffId);
-      } else {
-        staffId = 1;
-      }
+    const normalizedStart =
+      typeof apt.startTime === "string"
+        ? apt.startTime.substring(0, 5)
+        : formatLocalTime(apt.startTime);
+    const normalizedEnd =
+      typeof apt.endTime === "string"
+        ? apt.endTime.substring(0, 5)
+        : formatLocalTime(apt.endTime);
 
-      const processed = {
-        ...apt,
-        patientName,
-        staffId,
-        status: apt.status ?? null,
-        date: formatLocalDate(parseLocalDate(apt.date)),
-      };
+    const processed = {
+      ...apt,
+      patientName,
+      staffId,
+      status: apt.status ?? null,
+      date: formatLocalDate(parseLocalDate(apt.date)),
+      startTime: normalizedStart,
+      endTime: normalizedEnd,
+    } as ScheduledAppointment;
 
-      return processed;
-    });
+    return processed;
+  });
 
   // Check if appointment exists at a specific time slot and staff
   const getAppointmentAtSlot = (timeSlot: TimeSlot, staffId: number) => {
-    if (processedAppointments.length === 0) {
+    if (!processedAppointments || processedAppointments.length === 0)
       return undefined;
-    }
 
     // In appointments for a given time slot, we'll just display the first one
     // In a real application, you might want to show multiple or stack them
     const appointmentsAtSlot = processedAppointments.filter((apt) => {
-      // Fix time format comparison - the database adds ":00" seconds to the time
       const dbTime =
         typeof apt.startTime === "string" ? apt.startTime.substring(0, 5) : "";
-
       const timeMatches = dbTime === timeSlot.time;
       const staffMatches = apt.staffId === staffId;
-
       return timeMatches && staffMatches;
     });
 
@@ -468,7 +420,6 @@ export default function AppointmentsPage() {
 
   const isLoading =
     isLoadingAppointments ||
-    isLoadingPatients ||
     createAppointmentMutation.isPending ||
     updateAppointmentMutation.isPending ||
     deleteAppointmentMutation.isPending;
@@ -476,6 +427,76 @@ export default function AppointmentsPage() {
   // Define drag item types
   const ItemTypes = {
     APPOINTMENT: "appointment",
+  };
+
+  // Handle creating a new appointment at a specific time slot and for a specific staff member
+  const handleCreateAppointmentAtSlot = (
+    timeSlot: TimeSlot,
+    staffId: number
+  ) => {
+    // Calculate end time (30 minutes after start time)
+    const startHour = parseInt(timeSlot.time.split(":")[0] as string);
+    const startMinute = parseInt(timeSlot.time.split(":")[1] as string);
+    const startDate = parseLocalDate(selectedDate);
+    startDate.setHours(startHour, startMinute, 0);
+
+    const endDate = addMinutes(startDate, 30);
+    const endTime = `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
+
+    // Find staff member
+    const staff = staffMembers.find((s) => Number(s.id) === Number(staffId));
+
+    // Try to read any existing prefill data (may include patientId from the URL handler)
+    let existingStored: any = null;
+    try {
+      const raw = sessionStorage.getItem("newAppointmentData");
+      existingStored = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      // ignore parse errors and treat as no existing stored data
+      existingStored = null;
+    }
+
+    // Build the prefill appointment object and merge existing stored data
+    const newAppointment = {
+      // base defaults
+      date: formatLocalDate(selectedDate),
+      startTime: timeSlot.time, // This is in "HH:MM" format
+      endTime: endTime,
+      type: staff?.role === "doctor" ? "checkup" : "cleaning",
+      status: "scheduled",
+      title: `Appointment with ${staff?.name}`,
+      notes: `Appointment with ${staff?.name}`,
+      staff: Number(staffId), // consistent field name that matches update mutation
+      // if existingStored has patientId (or other fields) merge them below
+      ...(existingStored || {}),
+    };
+
+    // Ensure explicit values from this function override stale values from storage
+    // (for example, prefer current slot and staff)
+    const mergedAppointment = {
+      ...newAppointment,
+      date: newAppointment.date,
+      startTime: newAppointment.startTime,
+      endTime: newAppointment.endTime,
+      staff: Number(staffId),
+    };
+
+    // Persist merged prefill so the modal/form can read it
+    try {
+      sessionStorage.setItem(
+        "newAppointmentData",
+        JSON.stringify(mergedAppointment)
+      );
+    } catch (e) {
+      // ignore sessionStorage write failures
+      console.error("Failed to write newAppointmentData to sessionStorage", e);
+    }
+
+    // For new appointments, set editingAppointment to undefined
+    setEditingAppointment(undefined);
+
+    // Open modal
+    setIsAddModalOpen(true);
   };
 
   // Handle moving an appointment to a new time slot and staff
@@ -676,10 +697,10 @@ export default function AppointmentsPage() {
           </Item>
         </Menu>
 
-        {/* Main Content - Split into Schedule and Calendar */}
+        {/* Main Content  */}
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left side - Schedule Grid */}
-          <div className="w-full lg:w-3/4 overflow-x-auto bg-white rounded-md shadow">
+          {/* Schedule Grid */}
+          <div className="w-full overflow-x-auto bg-white rounded-md shadow">
             <div className="p-4 border-b">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -690,7 +711,9 @@ export default function AppointmentsPage() {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <h2 className="text-xl font-semibold">{formattedDate}</h2>
+                  <h2 className="text-xl font-semibold">
+                    {formattedSelectedDate}
+                  </h2>
                   <Button
                     variant="outline"
                     size="icon"
@@ -698,6 +721,35 @@ export default function AppointmentsPage() {
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
+                </div>
+
+                {/* Top button with popover calendar */}
+                <div className="flex items-center gap-2">
+                  <Label className="hidden sm:flex">Selected</Label>
+                  <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-[160px] justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate
+                          ? selectedDate.toLocaleDateString()
+                          : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+
+                    <PopoverContent className="w-auto">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                          if (date) setSelectedDate(date);
+                        }}
+                        onClose={() => setCalendarOpen(false)}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </div>
@@ -747,87 +799,6 @@ export default function AppointmentsPage() {
               </div>
             </DndProvider>
           </div>
-
-          {/* Right side - Calendar and Stats */}
-          <div className="w-full lg:w-1/4 space-y-6">
-            {/* Calendar Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle>Calendar</CardTitle>
-                <CardDescription>
-                  Select a date to view or schedule appointments
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    if (date) setSelectedDate(date);
-                  }}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Statistics Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center justify-between">
-                  <span>Appointments</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => refetchAppointments()}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </CardTitle>
-                <CardDescription>
-                  Statistics for {formattedDate}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">
-                      Total appointments:
-                    </span>
-                    <span className="font-semibold">
-                      {selectedDateAppointments.length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">With doctors:</span>
-                    <span className="font-semibold">
-                      {
-                        processedAppointments.filter(
-                          (apt) =>
-                            staffMembers.find(
-                              (s) => Number(s.id) === apt.staffId
-                            )?.role === "doctor"
-                        ).length
-                      }
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">
-                      With hygienists:
-                    </span>
-                    <span className="font-semibold">
-                      {
-                        processedAppointments.filter(
-                          (apt) =>
-                            staffMembers.find(
-                              (s) => Number(s.id) === apt.staffId
-                            )?.role === "hygienist"
-                        ).length
-                      }
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
 
@@ -841,7 +812,6 @@ export default function AppointmentsPage() {
           updateAppointmentMutation.isPending
         }
         appointment={editingAppointment}
-        patients={patients}
         onDelete={handleDeleteAppointment}
       />
 
@@ -849,7 +819,7 @@ export default function AppointmentsPage() {
         isOpen={confirmDeleteState.open}
         onConfirm={handleConfirmDelete}
         onCancel={() => setConfirmDeleteState({ open: false })}
-        entityName={confirmDeleteState.appointmentTitle}
+        entityName={String(confirmDeleteState.appointmentId)}
       />
     </div>
   );

@@ -20,6 +20,62 @@ router.get("/all", async (req: Request, res: Response): Promise<any> => {
   }
 });
 
+/**
+ * GET /api/appointments/day?date=YYYY-MM-DD
+ * Response: { appointments: Appointment[], patients: Patient[] }
+ */
+router.get("/day", async (req: Request, res: Response): Promise<any> => {
+  function isValidYMD(s: string) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(s);
+  }
+
+  try {
+    const rawDate = req.query.date as string | undefined;
+    if (!rawDate || !isValidYMD(rawDate)) {
+      return res.status(400).json({ message: "Date query param is required." });
+    }
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    // Build literal UTC day bounds from the YYYY-MM-DD query string
+    const start = new Date(`${rawDate}T00:00:00.000Z`);
+    const end = new Date(`${rawDate}T23:59:59.999Z`);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ message: "Invalid date format" });
+    }
+
+    // Call the storage method that takes a start/end range (no change to storage needed)
+    const appointments = await storage.getAppointmentsOnRange(start, end);
+
+    // dedupe patient ids referenced by those appointments
+    const patientIds = Array.from(
+      new Set(appointments.map((a) => a.patientId).filter(Boolean))
+    );
+
+    const patients = patientIds.length
+      ? await storage.getPatientsByIds(patientIds)
+      : [];
+
+    return res.json({ appointments, patients });
+  } catch (err) {
+    console.error("Error in /api/appointments/day:", err);
+    res.status(500).json({ message: "Failed to load appointments for date" });
+  }
+});
+
+// Get recent appointments (paginated)
+router.get("/recent", async (req: Request, res: Response) => {
+  try {
+    const limit = Math.max(1, parseInt(req.query.limit as string) || 10);
+    const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+
+    const all = await storage.getRecentAppointments(limit, offset);
+    res.json({ data: all, limit, offset });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to get recent appointments" });
+  }
+});
+
 // Get a single appointment by ID
 router.get(
   "/:id",
@@ -74,44 +130,6 @@ router.get(
     }
   }
 );
-
-// Get appointments on a specific date
-router.get(
-  "/appointments/on/:date",
-  async (req: Request, res: Response): Promise<any> => {
-    try {
-      const rawDate = req.params.date;
-      if (!rawDate) {
-        return res.status(400).json({ message: "Date parameter is required" });
-      }
-
-      const date = new Date(rawDate);
-      if (isNaN(date.getTime())) {
-        return res.status(400).json({ message: "Invalid date format" });
-      }
-
-      const all = await storage.getAppointmentsOn(date);
-      const appointments = all.filter((a) => a.userId === req.user!.id);
-
-      res.json(appointments);
-    } catch (err) {
-      res.status(500).json({ message: "Failed to get appointments on date" });
-    }
-  }
-);
-
-// Get recent appointments (paginated)
-router.get("/appointments/recent", async (req: Request, res: Response) => {
-  try {
-    const limit = Math.max(1, parseInt(req.query.limit as string) || 10);
-    const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
-
-    const all = await storage.getRecentAppointments(limit, offset);
-    res.json({ data: all, limit, offset });
-  } catch (err) {
-    res.status(500).json({ message: "Failed to get recent appointments" });
-  }
-});
 
 // Create a new appointment
 router.post(

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -34,10 +34,15 @@ import {
   UpdateAppointment,
 } from "@repo/db/types";
 import { DateInputField } from "@/components/ui/dateInputField";
+import { parseLocalDate } from "@/utils/dateUtils";
+import {
+  PatientSearch,
+  SearchCriteria,
+} from "@/components/patients/patient-search";
+import { toast } from "@/hooks/use-toast";
 
 interface AppointmentFormProps {
   appointment?: Appointment;
-  patients: Patient[];
   onSubmit: (data: InsertAppointment | UpdateAppointment) => void;
   onDelete?: (id: number) => void;
   onOpenChange?: (open: boolean) => void;
@@ -46,7 +51,6 @@ interface AppointmentFormProps {
 
 export function AppointmentForm({
   appointment,
-  patients,
   onSubmit,
   onDelete,
   onOpenChange,
@@ -54,6 +58,8 @@ export function AppointmentForm({
 }: AppointmentFormProps) {
   const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [prefillPatient, setPrefillPatient] = useState<Patient | null>(null);
+
   useEffect(() => {
     const timeout = setTimeout(() => {
       inputRef.current?.focus();
@@ -62,15 +68,14 @@ export function AppointmentForm({
     return () => clearTimeout(timeout);
   }, []);
 
-  const { data: staffMembersRaw = [] as Staff[], isLoading: isLoadingStaff } =
-    useQuery<Staff[]>({
-      queryKey: ["/api/staffs/"],
-      queryFn: async () => {
-        const res = await apiRequest("GET", "/api/staffs/");
-        return res.json();
-      },
-      enabled: !!user,
-    });
+  const { data: staffMembersRaw = [] as Staff[] } = useQuery<Staff[]>({
+    queryKey: ["/api/staffs/"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/staffs/");
+      return res.json();
+    },
+    enabled: !!user,
+  });
 
   const colorMap: Record<string, string> = {
     "Dr. Kai Gao": "bg-blue-600",
@@ -81,23 +86,6 @@ export function AppointmentForm({
     ...staff,
     color: colorMap[staff.name] || "bg-gray-400",
   }));
-
-  function parseLocalDate(dateString: string): Date {
-    const parts = dateString.split("-");
-    if (parts.length !== 3) {
-      return new Date();
-    }
-    const year = parseInt(parts[0] ?? "", 10);
-    const month = parseInt(parts[1] ?? "", 10);
-    const day = parseInt(parts[2] ?? "", 10);
-
-    if (isNaN(year) || isNaN(month) || isNaN(day)) {
-      return new Date();
-    }
-
-    // Create date at UTC midnight instead of local midnight
-    return new Date(year, month - 1, day);
-  }
 
   // Get the stored data from session storage
   const storedDataString = sessionStorage.getItem("newAppointmentData");
@@ -169,50 +157,159 @@ export function AppointmentForm({
     defaultValues,
   });
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 200); // 1 seconds
-  const [filteredPatients, setFilteredPatients] = useState(patients);
+  // -----------------------------
+  // PATIENT SEARCH (reuse PatientSearch)
+  // -----------------------------
+  const [selectOpen, setSelectOpen] = useState(false);
 
-  useEffect(() => {
-    if (!debouncedSearchTerm.trim()) {
-      setFilteredPatients(patients);
+  // search criteria state (reused from patient page)
+  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(
+    null
+  );
+  const [isSearchActive, setIsSearchActive] = useState(false);
+
+  // debounce search criteria so we don't hammer the backend
+  const [debouncedSearchCriteria] = useDebounce(searchCriteria, 300);
+
+  const limit = 50; // dropdown size
+  const offset = 0; // always first page for dropdown
+
+  // compute key used in patient page: recent or trimmed term
+  const searchKeyPart = useMemo(
+    () => debouncedSearchCriteria?.searchTerm?.trim() || "recent",
+    [debouncedSearchCriteria]
+  );
+
+  // Query function mirrors PatientTable logic (so backend contract is identical)
+  const queryFn = async (): Promise<Patient[]> => {
+    const trimmedTerm = debouncedSearchCriteria?.searchTerm?.trim();
+    const isSearch = !!trimmedTerm && trimmedTerm.length > 0;
+    const rawSearchBy = debouncedSearchCriteria?.searchBy || "name";
+    const validSearchKeys = [
+      "name",
+      "phone",
+      "insuranceId",
+      "gender",
+      "dob",
+      "all",
+    ];
+    const searchKey = validSearchKeys.includes(rawSearchBy)
+      ? rawSearchBy
+      : "name";
+
+    let url: string;
+    if (isSearch) {
+      const searchParams = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+      });
+
+      if (searchKey === "all") {
+        searchParams.set("term", trimmedTerm!);
+      } else {
+        searchParams.set(searchKey, trimmedTerm!);
+      }
+
+      url = `/api/patients/search?${searchParams.toString()}`;
     } else {
-      const term = debouncedSearchTerm.toLowerCase();
-      setFilteredPatients(
-        patients.filter((p) =>
-          `${p.firstName} ${p.lastName} ${p.phone} ${p.dateOfBirth}`
-            .toLowerCase()
-            .includes(term)
-        )
-      );
+      url = `/api/patients/recent?limit=${limit}&offset=${offset}`;
     }
-  }, [debouncedSearchTerm, patients]);
+
+    const res = await apiRequest("GET", url);
+
+    if (!res.ok) {
+      const err = await res
+        .json()
+        .catch(() => ({ message: "Failed to fetch patients" }));
+      throw new Error(err.message || "Failed to fetch patients");
+    }
+
+    const payload = await res.json();
+    // Expect payload to be { patients: Patient[], totalCount: number } or just an array.
+    // Normalize: if payload.patients exists, return it; otherwise assume array of patients.
+    return Array.isArray(payload) ? payload : (payload.patients ?? []);
+  };
+
+  const {
+    data: patients = [],
+    isFetching: isFetchingPatients,
+    refetch: refetchPatients,
+  } = useQuery<Patient[], Error>({
+    queryKey: ["patients-dropdown", searchKeyPart],
+    queryFn,
+    enabled: selectOpen || !!debouncedSearchCriteria?.searchTerm,
+  });
+
+  // If select opened and no patients loaded, fetch
+  useEffect(() => {
+    if (selectOpen && (!patients || patients.length === 0)) {
+      refetchPatients();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectOpen]);
 
   // Force form field values to update and clean up storage
   useEffect(() => {
-    if (parsedStoredData) {
-      // Update form field values directly
-      if (parsedStoredData.startTime) {
-        form.setValue("startTime", parsedStoredData.startTime);
-      }
+    if (!parsedStoredData) return;
 
-      if (parsedStoredData.endTime) {
-        form.setValue("endTime", parsedStoredData.endTime);
-      }
+    // set times/staff/date as before
+    if (parsedStoredData.startTime)
+      form.setValue("startTime", parsedStoredData.startTime);
+    if (parsedStoredData.endTime)
+      form.setValue("endTime", parsedStoredData.endTime);
+    if (parsedStoredData.staff)
+      form.setValue("staffId", parsedStoredData.staff);
+    if (parsedStoredData.date) {
+      const parsedDate =
+        typeof parsedStoredData.date === "string"
+          ? parseLocalDate(parsedStoredData.date)
+          : new Date(parsedStoredData.date);
+      form.setValue("date", parsedDate);
+    }
 
-      if (parsedStoredData.staff) {
-        form.setValue("staffId", parsedStoredData.staff);
-      }
+    // ---- patient prefill: check main cache, else fetch once ----
+    if (parsedStoredData.patientId) {
+      const pid = Number(parsedStoredData.patientId);
+      if (!Number.isNaN(pid)) {
+        // ensure the form value is set
+        form.setValue("patientId", pid);
 
-      if (parsedStoredData.date) {
-        const parsedDate =
-          typeof parsedStoredData.date === "string"
-            ? parseLocalDate(parsedStoredData.date)
-            : new Date(parsedStoredData.date);
-        form.setValue("date", parsedDate);
+        // fetch single patient record (preferred)
+        (async () => {
+          try {
+            const res = await apiRequest("GET", `/api/patients/${pid}`);
+            if (res.ok) {
+              const patientRecord = await res.json();
+              setPrefillPatient(patientRecord);
+            } else {
+              // non-OK response: show toast with status / message
+              let msg = `Failed to load patient (status ${res.status})`;
+              try {
+                const body = await res.json().catch(() => null);
+                if (body && body.message) msg = body.message;
+              } catch {}
+              toast({
+                title: "Could not load patient",
+                description: msg,
+                variant: "destructive",
+              });
+            }
+          } catch (err) {
+            toast({
+              title: "Error fetching patient",
+              description:
+                (err as Error)?.message ||
+                "An unknown error occurred while fetching patient details.",
+              variant: "destructive",
+            });
+          } finally {
+            // remove the one-time transport
+            sessionStorage.removeItem("newAppointmentData");
+          }
+        })();
       }
-
-      // Clean up session storage
+    } else {
+      // no patientId in storage — still remove to avoid stale state
       sessionStorage.removeItem("newAppointmentData");
     }
   }, [form]);
@@ -223,12 +320,6 @@ export function AppointmentForm({
       typeof data.patientId === "string"
         ? parseInt(data.patientId, 10)
         : data.patientId;
-
-    // Get patient name for the title
-    const patient = patients.find((p) => p.id === patientId);
-    const patientName = patient
-      ? `${patient.firstName} ${patient.lastName}`
-      : "Patient";
 
     // Auto-create title if it's empty
     let title = data.title;
@@ -289,41 +380,109 @@ export function AppointmentForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Patient</FormLabel>
+
                 <Select
                   disabled={isLoading}
-                  onValueChange={(val) => field.onChange(Number(val))}
-                  value={field.value?.toString()}
-                  defaultValue={field.value?.toString()}
+                  onOpenChange={(open: boolean) => {
+                    setSelectOpen(open);
+                    if (!open) {
+                      // reset transient search state when the dropdown closes
+                      setSearchCriteria(null);
+                      setIsSearchActive(false);
+
+                      // Remove transient prefill if the main cached list contains it now
+                      if (
+                        prefillPatient &&
+                        patients &&
+                        patients.some(
+                          (p) => Number(p.id) === Number(prefillPatient.id)
+                        )
+                      ) {
+                        setPrefillPatient(null);
+                      }
+                    } else {
+                      // when opened, ensure initial results
+                      if (!patients || patients.length === 0) refetchPatients();
+                    }
+                  }}
+                  value={
+                    field.value == null || // null or undefined
+                    (typeof field.value === "number" &&
+                      !Number.isFinite(field.value)) || // NaN/Infinity
+                    (typeof field.value === "string" &&
+                      field.value.trim() === "") || // empty string
+                    field.value === "NaN" // defensive check
+                      ? ""
+                      : String(field.value)
+                  }
+                  onValueChange={(val) =>
+                    field.onChange(val === "" ? undefined : Number(val))
+                  }
                 >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a patient" />
                     </SelectTrigger>
                   </FormControl>
+
                   <SelectContent>
+                    {/* Reuse full PatientSearch UI inside dropdown — callbacks update the query */}
                     <div className="p-2" onKeyDown={(e) => e.stopPropagation()}>
-                      <Input
-                        ref={inputRef}
-                        placeholder="Search patients..."
-                        className="w-full"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => {
-                          const navKeys = ["ArrowDown", "ArrowUp", "Enter"];
-                          if (!navKeys.includes(e.key)) {
-                            e.stopPropagation(); // Only stop keys that affect select state
-                          }
+                      <PatientSearch
+                        onSearch={(criteria) => {
+                          setSearchCriteria(criteria);
+                          setIsSearchActive(true);
                         }}
+                        onClearSearch={() => {
+                          setSearchCriteria({
+                            searchTerm: "",
+                            searchBy: "name",
+                          });
+                          setIsSearchActive(false);
+                        }}
+                        isSearchActive={isSearchActive}
                       />
                     </div>
+
+                    {/* Prefill patient only if main list does not already include them */}
+                    {prefillPatient &&
+                      !patients.some(
+                        (p) => Number(p.id) === Number(prefillPatient.id)
+                      ) && (
+                        <SelectItem
+                          key={`prefill-${prefillPatient.id}`}
+                          value={prefillPatient.id?.toString() ?? ""}
+                        >
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">
+                              {prefillPatient.firstName}{" "}
+                              {prefillPatient.lastName}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              DOB:{" "}
+                              {prefillPatient.dateOfBirth
+                                ? new Date(
+                                    prefillPatient.dateOfBirth
+                                  ).toLocaleDateString()
+                                : ""}{" "}
+                              • {prefillPatient.phone ?? ""}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      )}
+
                     <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/30">
-                      {filteredPatients.length > 0 ? (
-                        filteredPatients.map((patient) => (
+                      {isFetchingPatients ? (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          Loading...
+                        </div>
+                      ) : patients && patients.length > 0 ? (
+                        patients.map((patient) => (
                           <SelectItem
                             key={patient.id}
                             value={patient.id?.toString() ?? ""}
                           >
-                            <div className="flex flex-col">
+                            <div className="flex flex-col items-start">
                               <span className="font-medium">
                                 {patient.firstName} {patient.lastName}
                               </span>
@@ -345,6 +504,7 @@ export function AppointmentForm({
                     </div>
                   </SelectContent>
                 </Select>
+
                 <FormMessage />
               </FormItem>
             )}

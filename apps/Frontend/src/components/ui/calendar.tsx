@@ -13,20 +13,34 @@ type CalendarProps =
       mode: "single";
       selected?: Date;
       onSelect?: (date: Date | undefined) => void;
+      closeOnSelect?: boolean /** whether to request closing after selection (default true for single) */;
+      onClose?: () => void;
     })
   | (BaseProps & {
       mode: "range";
       selected?: DateRange;
       onSelect?: (range: DateRange | undefined) => void;
+      closeOnSelect?: boolean; // will close only when range is complete
+      onClose?: () => void;
     })
   | (BaseProps & {
       mode: "multiple";
       selected?: Date[];
       onSelect?: (dates: Date[] | undefined) => void;
+      closeOnSelect?: boolean; // default false for multi
+      onClose?: () => void;
     });
 
 export function Calendar(props: CalendarProps) {
-  const { mode, selected, onSelect, className, ...rest } = props;
+  const {
+    mode,
+    selected,
+    onSelect,
+    className,
+    closeOnSelect,
+    onClose,
+    ...rest
+  } = props;
 
   const [internalSelected, setInternalSelected] =
     useState<typeof selected>(selected);
@@ -37,7 +51,30 @@ export function Calendar(props: CalendarProps) {
 
   const handleSelect = (value: typeof selected) => {
     setInternalSelected(value);
-    onSelect?.(value as any); // We'll narrow this properly below
+    // forward original callback
+    onSelect?.(value as any);
+
+    // Decide whether to request closing
+    const shouldClose =
+      typeof closeOnSelect !== "undefined"
+        ? closeOnSelect
+        : mode === "single"
+          ? true
+          : false;
+
+    if (!shouldClose) return;
+
+    // For range: only close when both from and to exist
+    if (mode === "range") {
+      const range = value as DateRange | undefined;
+      if (range?.from && range?.to) {
+        onClose?.();
+      }
+      return;
+    }
+
+    // For single or multiple (when allowed), close immediately
+    onClose?.();
   };
 
   return (

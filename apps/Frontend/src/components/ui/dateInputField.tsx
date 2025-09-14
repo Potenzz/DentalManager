@@ -16,6 +16,8 @@ interface DateInputFieldProps {
   disablePast?: boolean;
 }
 
+// THIS COMPONENT MADE FOR USING IN FORM FIELD INSIDE ANY FORM CONTROL, NOT AS INPUT FIELD NORMALLY.
+// Here, User can input/paste date in certain format, and also select via calendar
 export function DateInputField({
   control,
   name,

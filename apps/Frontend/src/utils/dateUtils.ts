@@ -139,3 +139,59 @@ export function convertOCRDate(input: string | number | null | undefined): Date 
 
   return new Date(year, month, day);
 }
+
+
+/**
+ * Format a Date or date string into "HH:mm" (24-hour) string.
+ *
+ * Options:
+ * - By default, hours/minutes are taken in local time.
+ * - Pass { asUTC: true } to format using UTC hours/minutes.
+ *
+ * Examples:
+ *   formatLocalTime(new Date(2025, 6, 15, 9, 5))       → "09:05"
+ *   formatLocalTime("2025-07-15")                      → "00:00"
+ *   formatLocalTime("2025-07-15T14:30:00Z")            → "20:30" (in +06:00)
+ *   formatLocalTime("2025-07-15T14:30:00Z", { asUTC:true }) → "14:30"
+ */
+export function formatLocalTime(
+  d: Date | string | undefined,
+  opts: { asUTC?: boolean } = {}
+): string {
+  if (!d) return "";
+
+  const { asUTC = false } = opts;
+  const pad2 = (n: number) => n.toString().padStart(2, "0");
+
+  let dateObj: Date;
+
+  if (d instanceof Date) {
+    if (isNaN(d.getTime())) return "";
+    dateObj = d;
+  } else if (typeof d === "string") {
+    const raw = d.trim();
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+
+    if (isDateOnly) {
+      // Parse yyyy-MM-dd safely as local midnight
+      try {
+        dateObj = parseLocalDate(raw);
+      } catch {
+        dateObj = new Date(raw); // fallback
+      }
+    } else {
+      // For full ISO/timestamp strings, let Date handle TZ
+      dateObj = new Date(raw);
+    }
+
+    if (isNaN(dateObj.getTime())) return "";
+  } else {
+    return "";
+  }
+
+  const hours = asUTC ? dateObj.getUTCHours() : dateObj.getHours();
+  const minutes = asUTC ? dateObj.getUTCMinutes() : dateObj.getMinutes();
+
+  return `${pad2(hours)}:${pad2(minutes)}`;
+}
+

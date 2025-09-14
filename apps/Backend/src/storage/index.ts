@@ -41,7 +41,7 @@ export interface IStorage {
   getPatientByInsuranceId(insuranceId: string): Promise<Patient | null>;
   getPatientsByUserId(userId: number): Promise<Patient[]>;
   getRecentPatients(limit: number, offset: number): Promise<Patient[]>;
-  getTotalPatientCount(): Promise<number>;
+  getPatientsByIds(ids: number[]): Promise<Patient[]>;
   createPatient(patient: InsertPatient): Promise<Patient>;
   updatePatient(id: number, patient: UpdatePatient): Promise<Patient>;
   deletePatient(id: number): Promise<void>;
@@ -62,6 +62,7 @@ export interface IStorage {
       status: string;
     }[]
   >;
+  getTotalPatientCount(): Promise<number>;
   countPatients(filters: any): Promise<number>; // optional but useful
 
   // Appointment methods
@@ -70,7 +71,7 @@ export interface IStorage {
   getAppointmentsByUserId(userId: number): Promise<Appointment[]>;
   getAppointmentsByPatientId(patientId: number): Promise<Appointment[]>;
   getRecentAppointments(limit: number, offset: number): Promise<Appointment[]>;
-  getAppointmentsOn(date: Date): Promise<Appointment[]>;
+  getAppointmentsOnRange(start: Date, end: Date): Promise<Appointment[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   updateAppointment(
     id: number,
@@ -290,6 +291,52 @@ export const storage: IStorage = {
     });
   },
 
+  async getPatientsByIds(ids: number[]): Promise<Patient[]> {
+    if (!ids || ids.length === 0) return [];
+    const uniqueIds = Array.from(new Set(ids));
+    return db.patient.findMany({
+      where: { id: { in: uniqueIds } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        email: true,
+        dateOfBirth: true,
+        gender: true,
+        insuranceId: true,
+        insuranceProvider: true,
+        status: true,
+        userId: true,
+        createdAt: true,
+      },
+    });
+  },
+
+  async createPatient(patient: InsertPatient): Promise<Patient> {
+    return await db.patient.create({ data: patient as Patient });
+  },
+
+  async updatePatient(id: number, updateData: UpdatePatient): Promise<Patient> {
+    try {
+      return await db.patient.update({
+        where: { id },
+        data: updateData,
+      });
+    } catch (err) {
+      throw new Error(`Patient with ID ${id} not found`);
+    }
+  },
+
+  async deletePatient(id: number): Promise<void> {
+    try {
+      await db.patient.delete({ where: { id } });
+    } catch (err) {
+      console.error("Error deleting patient:", err);
+      throw new Error(`Failed to delete patient: ${err}`);
+    }
+  },
+
   async searchPatients({
     filters,
     limit,
@@ -326,30 +373,6 @@ export const storage: IStorage = {
     return db.patient.count({ where: filters });
   },
 
-  async createPatient(patient: InsertPatient): Promise<Patient> {
-    return await db.patient.create({ data: patient as Patient });
-  },
-
-  async updatePatient(id: number, updateData: UpdatePatient): Promise<Patient> {
-    try {
-      return await db.patient.update({
-        where: { id },
-        data: updateData,
-      });
-    } catch (err) {
-      throw new Error(`Patient with ID ${id} not found`);
-    }
-  },
-
-  async deletePatient(id: number): Promise<void> {
-    try {
-      await db.patient.delete({ where: { id } });
-    } catch (err) {
-      console.error("Error deleting patient:", err);
-      throw new Error(`Failed to delete patient: ${err}`);
-    }
-  },
-
   // Appointment methods
   async getAppointment(id: number): Promise<Appointment | undefined> {
     const appointment = await db.appointment.findUnique({ where: { id } });
@@ -368,13 +391,7 @@ export const storage: IStorage = {
     return await db.appointment.findMany({ where: { patientId } });
   },
 
-  async getAppointmentsOn(date: Date): Promise<Appointment[]> {
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
-
+  async getAppointmentsOnRange(start: Date, end: Date): Promise<Appointment[]> {
     return db.appointment.findMany({
       where: {
         date: {
