@@ -27,8 +27,12 @@ export default function PaymentOCRBlock() {
   const [uploadedImages, setUploadedImages] = React.useState<File[]>([]);
   const [isDragging, setIsDragging] = React.useState(false);
   const [isExtracting, setIsExtracting] = React.useState(false);
+
+  // extracted rows shown only inside modal
   const [rows, setRows] = React.useState<Row[]>([]);
-  const [columns, setColumns] = React.useState<ColumnDef<Row>[]>([]);
+  const [modalColumns, setModalColumns] = React.useState<string[]>([]);
+  const [showModal, setShowModal] = React.useState(false);
+
   const [error, setError] = React.useState<string | null>(null);
 
   //Mutation
@@ -64,29 +68,10 @@ export default function PaymentOCRBlock() {
         }, new Set())
       );
 
-      setColumns(
-        allKeys.map((key) => ({
-          id: key, // ✅ unique identifier
-          header: key,
-          cell: ({ row }) => (
-            <input
-              className="w-full border rounded p-1"
-              value={(row.original[key] as string) ?? ""}
-              onChange={(e) => {
-                const newData = [...rows];
-                newData[row.index] = {
-                  ...newData[row.index],
-                  __id: newData[row.index]!.__id,
-                  [key]: e.target.value,
-                };
-                setRows(newData);
-              }}
-            />
-          ),
-        }))
-      );
+      setModalColumns(allKeys);
 
       setIsExtracting(false);
+      setShowModal(true);
     },
 
     onError: (error: any) => {
@@ -97,13 +82,6 @@ export default function PaymentOCRBlock() {
       });
       setIsExtracting(false);
     },
-  });
-
-  // ---- Table instance ----
-  const table = useReactTable({
-    data: rows,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
   });
 
   // ---- handlers (all in this file) -----------------------------------------
@@ -143,7 +121,7 @@ export default function PaymentOCRBlock() {
       const next = prev.filter((_, i) => i !== index);
       if (next.length === 0) {
         setRows([]);
-        setColumns([]);
+        setModalColumns([]);
         setError(null);
       }
       return next;
@@ -222,10 +200,12 @@ export default function PaymentOCRBlock() {
       // ✅ CLEAR UI: remove files and table rows
       setUploadedImages([]);
       setRows([]);
-      setColumns([]);
+      setModalColumns([]);
       setError(null);
       setIsDragging(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+
+      setShowModal(false);
     } catch (err: any) {
       toast({
         title: "Error",
@@ -233,19 +213,6 @@ export default function PaymentOCRBlock() {
         variant: "destructive",
       });
     }
-  };
-
-  //rows helper
-  const handleAddRow = () => {
-    const newRow: Row = { __id: rows.length };
-    columns.forEach((c) => {
-      if (c.id) newRow[c.id] = "";
-    });
-    setRows((prev) => [...prev, newRow]);
-  };
-
-  const handleDeleteRow = (index: number) => {
-    setRows((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -358,96 +325,183 @@ export default function PaymentOCRBlock() {
             </Button>
           </div>
 
-          {/* Results Table */}
-
+          {/* show extraction error if any */}
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-
-          {rows.length > 0 && (
-            <div className="space-y-4">
-              {/* Row/Column control buttons */}
-              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" onClick={handleAddRow}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Row
-                </Button>
-              </div>
-
-              {/* Table */}
-
-              <div className="overflow-x-auto">
-                <table className="border-collapse border border-gray-300 w-full table-auto min-w-max">
-                  <thead>
-                    {table.getHeaderGroups().map((hg) => (
-                      <tr key={hg.id} className="bg-gray-100">
-                        {hg.headers.map((header) => (
-                          <th
-                            key={header.id}
-                            className="border p-2 text-left whitespace-nowrap"
-                          >
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                          </th>
-                        ))}
-                        <th className="border p-2">Actions</th>
-                      </tr>
-                    ))}
-                  </thead>
-                  <tbody>
-                    {table.getRowModel().rows.map((row, rowIndex) => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map((cell) => {
-                          const colId = cell.column.id; // ✅ key for field
-                          return (
-                            <td
-                              key={cell.id}
-                              className="border p-2 whitespace-nowrap"
-                            >
-                              <input
-                                className="w-full border rounded p-1"
-                                value={
-                                  (rows[rowIndex]?.[colId] as string) ?? ""
-                                }
-                                onChange={(e) => {
-                                  const newData = [...rows];
-                                  newData[rowIndex] = {
-                                    ...newData[rowIndex],
-                                    __id: newData[rowIndex]!.__id, // keep id
-                                    [colId]: e.target.value,
-                                  };
-                                  setRows(newData);
-                                }}
-                              />
-                            </td>
-                          );
-                        })}
-                        <td className="border p-2">
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteRow(rowIndex)}
-                          >
-                            Delete
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <Button
-                className="w-full h-12 gap-2"
-                type="button"
-                variant="warning"
-                onClick={handleSave}
-              >
-                Save Edited Data
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
+
+      <OCRDetailsModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        onSave={handleSave}
+        rows={rows}
+        setRows={setRows}
+        columnKeys={modalColumns}
+      />
+    </div>
+  );
+}
+
+// ---------------- Simple Modal (in-app popup) ----------------
+
+export function OCRDetailsModal({
+  open,
+  onClose,
+  onSave,
+  rows,
+  setRows,
+  columnKeys,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  rows: Row[];
+  setRows: React.Dispatch<React.SetStateAction<Row[]>>;
+  columnKeys: string[];
+}) {
+  if (!open) return null;
+
+  //rows helper
+  const handleDeleteRow = (index: number) => {
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddRow = React.useCallback(() => {
+    setRows((prev) => {
+      const newRow: Row = { __id: prev.length };
+      columnKeys.forEach((k) => {
+        newRow[k] = "";
+      });
+      return [...prev, newRow];
+    });
+  }, [setRows, columnKeys]);
+
+  const modalColumns = React.useMemo<ColumnDef<Row>[]>(() => {
+    // ensure ICN (if present) is moved to the end of the data columns
+    const reorderedKeys = [
+      ...columnKeys.filter((k) => k !== "ICN"),
+      ...(columnKeys.includes("ICN") ? ["ICN"] : []),
+    ];
+
+    return reorderedKeys.map((key) => ({
+      id: key,
+      header: key,
+      cell: ({ row }) => {
+        const value = (row.original[key] ?? "") as string;
+        return (
+          <input
+            className="w-full border rounded p-1"
+            value={String(value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setRows((prev) => {
+                const next = [...prev];
+                next[row.index] = {
+                  ...next[row.index],
+                  __id: next[row.index]!.__id,
+                  [key]: v,
+                };
+                return next;
+              });
+            }}
+          />
+        );
+      },
+    }));
+  }, [columnKeys, setRows]);
+
+  const table = useReactTable({
+    data: rows,
+    columns: modalColumns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-6">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+        aria-hidden
+      />
+
+      {/* larger modal, column layout so footer sticks to bottom */}
+      <div className="relative z-10 w-full max-w-[1600px] h-[92vh] bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col">
+        {/* header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleAddRow}>
+              <Plus className="h-4 w-4 mr-2" /> Add Row
+            </Button>
+            <h3 className="text-lg font-medium ml-2">OCR Payment Details</h3>
+          </div>
+
+          <div>
+            <Button size="sm" variant="ghost" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+
+        {/* body (scrollable) */}
+        <div className="p-4 overflow-auto flex-1">
+          <div className="min-w-max">
+            <table className="border-collapse border border-gray-300 w-full">
+              <thead>
+                {table.getHeaderGroups().map((hg) => (
+                  <tr key={hg.id} className="bg-gray-100">
+                    {hg.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className="border p-2 text-left whitespace-nowrap"
+                      >
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                      </th>
+                    ))}
+                    <th className="border p-2">Actions</th>
+                  </tr>
+                ))}
+              </thead>
+
+              <tbody>
+                {table.getRowModel().rows.map((r) => (
+                  <tr key={r.id}>
+                    {r.getVisibleCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className="border p-2 whitespace-nowrap"
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </td>
+                    ))}
+                    <td className="border p-2">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteRow(r.index)}
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* footer (always visible) */}
+        <div className="p-4 border-t flex justify-end">
+          <Button type="button" className="h-12" onClick={onSave}>
+            Save Edited Data
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
