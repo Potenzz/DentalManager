@@ -272,7 +272,7 @@ export default function AppointmentsPage() {
     onSuccess: (appointment) => {
       toast({
         title: "Appointment Scheduled",
-        description: appointment.message || "Appointment created successfully.",
+        description: appointment.message || "Appointment updated successfully.",
       });
       queryClient.invalidateQueries({
         queryKey: qkAppointmentsDay(formattedSelectedDate),
