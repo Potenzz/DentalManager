@@ -19,6 +19,9 @@ interface DateInputProps {
   disablePast?: boolean;
 }
 
+// THIS COMPONENT IS MADE FOR GENERAL FIELD IN PAGE.
+// Here, User can input/paste date in certain format, and also select via calendar
+
 export function DateInput({
   label,
   value,
