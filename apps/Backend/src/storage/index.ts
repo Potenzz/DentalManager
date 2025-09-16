@@ -828,7 +828,7 @@ export const storage: IStorage = {
     offset: number
   ): Promise<PaymentWithExtras[]> {
     const payments = await db.payment.findMany({
-      where: { claim: { patientId } },
+      where: { patientId },
       orderBy: { createdAt: "desc" },
       skip: offset,
       take: limit,
@@ -859,7 +859,7 @@ export const storage: IStorage = {
 
   async getTotalPaymentCountByPatient(patientId: number): Promise<number> {
     return db.payment.count({
-      where: { claim: { patientId } },
+      where: { patientId },
     });
   },
 
