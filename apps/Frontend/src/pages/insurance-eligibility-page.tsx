@@ -194,15 +194,7 @@ export default function InsuranceEligibilityPage() {
 
       await handleSelenium();
 
-      await queryClient.invalidateQueries({
-        queryKey: [
-          "patients",
-          {
-            page: currentTablePage ?? 1,
-            search: currentTableSearchTerm ?? "recent",
-          },
-        ],
-      });
+      await queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
     } finally {
       setIsCheckingEligibility(false);
     }
