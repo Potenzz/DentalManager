@@ -357,34 +357,33 @@ router.put(
 );
 
 // Delete an appointment
-router.delete(
-  "/:id",
-
-  async (req: Request, res: Response): Promise<any> => {
-    try {
-      const appointmentIdParam = req.params.id;
-      if (!appointmentIdParam) {
-        return res.status(400).json({ message: "Appointment ID is required" });
-      }
-      const appointmentId = parseInt(appointmentIdParam);
-
-      // Check if appointment exists and belongs to user
-      const existingAppointment = await storage.getAppointment(appointmentId);
-      if (!existingAppointment) {
-        return res.status(404).json({ message: "Appointment not found" });
-      }
-
-      if (existingAppointment.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
-      // Delete appointment
-      await storage.deleteAppointment(appointmentId);
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete appointment" });
+router.delete("/:id", async (req: Request, res: Response): Promise<any> => {
+  try {
+    const appointmentIdParam = req.params.id;
+    if (!appointmentIdParam) {
+      return res.status(400).json({ message: "Appointment ID is required" });
     }
+    const appointmentId = parseInt(appointmentIdParam);
+
+    // Check if appointment exists and belongs to user
+    const existingAppointment = await storage.getAppointment(appointmentId);
+    if (!existingAppointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    if (existingAppointment.userId !== req.user!.id) {
+      return res.status(403).json({
+        message:
+          "Forbidden: Appointment belongs to a different user, you can't delete this.",
+      });
+    }
+
+    // Delete appointment
+    await storage.deleteAppointment(appointmentId);
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete appointment" });
   }
-);
+});
 
 export default router;

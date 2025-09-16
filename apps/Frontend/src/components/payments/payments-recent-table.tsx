@@ -304,7 +304,7 @@ export default function PaymentsRecentTable({
     onError: (error) => {
       toast({
         title: "Error",
-        description: `Failed to delete payment: ${error.message})`,
+        description: `Failed to delete payment: ${error.message}`,
         variant: "destructive",
       });
     },

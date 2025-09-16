@@ -102,9 +102,10 @@ router.delete("/:id", async (req: Request, res: Response): Promise<any> => {
 
     // 2) Ownership check
     if (existing.userId !== userId) {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: Not your credential" });
+      return res.status(403).json({
+        message:
+          "Forbidden: Credentials belongs to a different user, you can't delete this.",
+      });
     }
 
     // 3) Delete (storage method enforces userId + id)

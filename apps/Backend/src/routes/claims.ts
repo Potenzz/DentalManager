@@ -375,7 +375,10 @@ router.delete("/:id", async (req: Request, res: Response): Promise<any> => {
     }
 
     if (existingClaim.userId !== req.user!.id) {
-      return res.status(403).json({ message: "Forbidden" });
+      return res.status(403).json({
+        message:
+          "Forbidden: Claim belongs to a different user, you can't delete this.",
+      });
     }
 
     await storage.deleteClaim(claimId);
