@@ -1,5 +1,8 @@
-import { ClaimStatusSchema, ClaimUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
-import {z} from "zod";
+import {
+  ClaimStatusSchema,
+  ClaimUncheckedCreateInputObjectSchema,
+} from "@repo/db/usedSchemas";
+import { z } from "zod";
 import { Decimal } from "decimal.js";
 import { Staff } from "@repo/db/types";
 
@@ -21,7 +24,7 @@ export const updateClaimSchema = (
     updatedAt: true,
   })
   .partial();
-  
+
 export type UpdateClaim = z.infer<typeof updateClaimSchema>;
 
 // Extend the schema to inject `userId` manually (since it's not passed by the client)
@@ -34,7 +37,11 @@ export const ExtendedClaimSchema = (
 export type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
 export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
 
-
+export type ClaimFileMeta = {
+  id?: number;
+  filename: string;
+  mimeType?: string | null;
+};
 
 //used in claim-form
 export interface InputServiceLine {
@@ -64,4 +71,5 @@ export type ClaimWithServiceLines = Claim & {
     status: string;
   }[];
   staff?: Staff | null;
+  claimFiles?: ClaimFileMeta[] | null;
 };

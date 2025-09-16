@@ -8,7 +8,8 @@ import {
 import { Button } from "@/components/ui/button";
 import React from "react";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
-import { ClaimWithServiceLines } from "@repo/db/types";
+import { ClaimFileMeta, ClaimWithServiceLines } from "@repo/db/types";
+import { FileText, Paperclip } from "lucide-react";
 
 type ClaimViewModalProps = {
   isOpen: boolean;
@@ -25,6 +26,40 @@ export default function ClaimViewModal({
   claim,
   onEditClaim,
 }: ClaimViewModalProps) {
+  // Normalizer: supports both ClaimFile[] and nested-create shape { create: ClaimFile[] }
+  const getClaimFilesArray = (
+    c: ClaimWithServiceLines | null
+  ): ClaimFileMeta[] => {
+    if (!c) return [];
+
+    // If it's already a plain array (runtime from Prisma include), return it
+    const maybeFiles = (c as any).claimFiles;
+    if (!maybeFiles) return [];
+
+    if (Array.isArray(maybeFiles)) {
+      // ensure each item has filename field (best-effort)
+      return maybeFiles.map((f: any) => ({
+        id: f?.id,
+        filename: String(f?.filename ?? ""),
+        mimeType: f?.mimeType ?? f?.mime ?? null,
+      }));
+    }
+
+    // Nested-create shape: { create: [...] }
+    if (maybeFiles && Array.isArray(maybeFiles.create)) {
+      return maybeFiles.create.map((f: any) => ({
+        id: f?.id,
+        filename: String(f?.filename ?? ""),
+        mimeType: f?.mimeType ?? f?.mime ?? null,
+      }));
+    }
+
+    // No recognized shape -> empty
+    return [];
+  };
+
+  const claimFiles = getClaimFilesArray(claim);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
@@ -202,6 +237,37 @@ export default function ClaimViewModal({
                   <p className="text-gray-500">No service lines available.</p>
                 )}
               </div>
+            </div>
+
+            {/* Claim Files (metadata) */}
+            <div className="pt-4">
+              <h4 className="font-medium text-gray-900 flex items-center space-x-2">
+                <Paperclip className="w-4 h-4 inline-block" />
+                <span>Attached Files</span>
+              </h4>
+
+              {claimFiles.length > 0 ? (
+                <ul className="mt-3 space-y-2">
+                  {claimFiles.map((f) => (
+                    <li
+                      key={f.id ?? f.filename}
+                      className="flex items-center justify-between border rounded-md p-3 bg-white"
+                    >
+                      <div className="flex items-start space-x-3">
+                        <FileText className="w-5 h-5 text-gray-500 mt-1" />
+                        <div>
+                          <div className="font-medium">{f.filename}</div>
+                          <div className="text-xs text-gray-500">
+                            {f.mimeType || "unknown"}
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-gray-500">No files attached.</p>
+              )}
             </div>
 
             <div className="flex justify-end space-x-2 pt-4">

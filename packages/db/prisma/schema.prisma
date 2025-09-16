@@ -121,6 +121,7 @@ model Claim {
   staff       Staff?      @relation("ClaimStaff", fields: [staffId], references: [id])
 
   serviceLines ServiceLine[]
+  claimFiles   ClaimFile[]
   payment      Payment?
 }
 
@@ -160,6 +161,15 @@ enum ServiceLineStatus {
   ADJUSTED
   OVERPAID
   DENIED
+}
+
+model ClaimFile {
+  id         Int      @id @default(autoincrement())
+  claimId    Int
+  filename   String
+  mimeType   String
+
+  claim Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
 }
 
 model InsuranceCredential {

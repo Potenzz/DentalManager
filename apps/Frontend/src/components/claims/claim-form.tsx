@@ -48,6 +48,11 @@ import {
 } from "@/utils/procedureCombosMapping";
 import { COMBO_CATEGORIES, PROCEDURE_COMBOS } from "@/utils/procedureCombos";
 
+interface ClaimFileMeta {
+  filename: string;
+  mimeType: string;
+}
+
 interface ClaimFormData {
   patientId: number;
   appointmentId: number;
@@ -63,6 +68,7 @@ interface ClaimFormData {
   status: string; // default "pending"
   serviceLines: InputServiceLine[];
   claimId?: number;
+  claimFiles?: ClaimFileMeta[];
 }
 
 interface ClaimFormProps {
@@ -341,6 +347,13 @@ export function ClaimForm({
       (line) => line.procedureCode.trim() !== ""
     );
     const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
+
+    // build claimFiles metadata from uploadedFiles (only filename + mimeType)
+    const claimFilesMeta: ClaimFileMeta[] = (uploadedFiles || []).map((f) => ({
+      filename: f.name,
+      mimeType: f.type,
+    }));
+
     const createdClaim = await onSubmit({
       ...formToCreateClaim,
       serviceLines: filteredServiceLines,
@@ -348,6 +361,7 @@ export function ClaimForm({
       patientId: patientId,
       insuranceProvider: "MassHealth",
       appointmentId: appointmentId!,
+      claimFiles: claimFilesMeta,
     });
 
     // 4. sending form data to selenium service
@@ -415,6 +429,13 @@ export function ClaimForm({
       (line) => line.procedureCode.trim() !== ""
     );
     const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
+
+    // build claimFiles metadata from uploadedFiles (only filename + mimeType)
+    const claimFilesMeta: ClaimFileMeta[] = (uploadedFiles || []).map((f) => ({
+      filename: f.name,
+      mimeType: f.type,
+    }));
+
     const createdClaim = await onSubmit({
       ...formToCreateClaim,
       serviceLines: filteredServiceLines,
@@ -422,6 +443,7 @@ export function ClaimForm({
       patientId: patientId,
       insuranceProvider: "MassHealth",
       appointmentId: appointmentId!,
+      claimFiles: claimFilesMeta,
     });
 
     // 4. Close form

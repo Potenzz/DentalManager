@@ -246,6 +246,18 @@ router.get("/:id", async (req: Request, res: Response): Promise<any> => {
 // Create a new claim
 router.post("/", async (req: Request, res: Response): Promise<any> => {
   try {
+    // --- TRANSFORM claimFiles (if provided) into Prisma nested-create shape
+    if (Array.isArray(req.body.claimFiles)) {
+      // each item expected: { filename: string, mimeType: string }
+      req.body.claimFiles = {
+        create: req.body.claimFiles.map((f: any) => ({
+          filename: String(f.filename),
+          mimeType: String(f.mimeType || f.mime || ""),
+        })),
+      };
+    }
+
+    // --- TRANSFORM serviceLines
     if (Array.isArray(req.body.serviceLines)) {
       req.body.serviceLines = req.body.serviceLines.map(
         (line: InputServiceLine) => ({

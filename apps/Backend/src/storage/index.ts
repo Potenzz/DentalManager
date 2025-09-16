@@ -578,6 +578,7 @@ export const storage: IStorage = {
       include: {
         serviceLines: true,
         staff: true,
+        claimFiles: true,
       },
     });
   },
@@ -600,7 +601,7 @@ export const storage: IStorage = {
       orderBy: { createdAt: "desc" },
       skip: offset,
       take: limit,
-      include: { serviceLines: true, staff: true },
+      include: { serviceLines: true, staff: true, claimFiles: true },
     });
   },
 
