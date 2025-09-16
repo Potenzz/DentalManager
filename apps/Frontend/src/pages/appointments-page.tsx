@@ -15,6 +15,13 @@ import {
   ChevronRight,
   Move,
   Trash2,
+  ShieldCheck,
+  FileText,
+  CreditCard,
+  ClipboardList,
+  StickyNote,
+  Shield,
+  FileCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "@/components/ui/calendar";
@@ -643,6 +650,29 @@ export default function AppointmentsPage() {
     );
   }
 
+  // -------------------
+  const handleCheckEligibility = (appointmentId: number) => {
+    console.log(`Checking eligibility for appointment: ${appointmentId}`);
+  };
+
+  const handleClaimsPreAuth = (appointmentId: number) => {
+    console.log(`Opening Claims/PreAuth for appointment: ${appointmentId}`);
+  };
+
+  const handlePayments = (appointmentId: number) => {
+    console.log(`Processing payments for appointment: ${appointmentId}`);
+  };
+
+  const handleChartPlan = (appointmentId: number) => {
+    console.log(
+      `Viewing chart/treatment plan for appointment: ${appointmentId}`
+    );
+  };
+
+  const handleClinicNotes = (appointmentId: number) => {
+    console.log(`Opening clinic notes for appointment: ${appointmentId}`);
+  };
+
   return (
     <div className="">
       <div className="container mx-auto">
@@ -693,6 +723,50 @@ export default function AppointmentsPage() {
             <span className="flex items-center gap-2 text-red-600">
               <Trash2 className="h-4 w-4" />
               Delete Appointment
+            </span>
+          </Item>
+
+          {/* Check Eligibility */}
+          <Item
+            onClick={({ props }) => handleCheckEligibility(props.appointmentId)}
+          >
+            <span className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Check Eligibility
+            </span>
+          </Item>
+
+          {/* Claims / PreAuth */}
+          <Item
+            onClick={({ props }) => handleClaimsPreAuth(props.appointmentId)}
+          >
+            <span className="flex items-center gap-2">
+              <FileCheck className="h-4 w-4" />
+              Claims / PreAuth
+            </span>
+          </Item>
+
+          {/* Payments */}
+          <Item onClick={({ props }) => handlePayments(props.appointmentId)}>
+            <span className="flex items-center gap-2 text-green-600">
+              <CreditCard className="h-4 w-4" />
+              Payments
+            </span>
+          </Item>
+
+          {/* Chart / Treatment Plan */}
+          <Item onClick={({ props }) => handleChartPlan(props.appointmentId)}>
+            <span className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Chart / Treatment Plan
+            </span>
+          </Item>
+
+          {/* Clinic Notes */}
+          <Item onClick={({ props }) => handleClinicNotes(props.appointmentId)}>
+            <span className="flex items-center gap-2 text-yellow-600">
+              <StickyNote className="h-4 w-4" />
+              Clinic Notes
             </span>
           </Item>
         </Menu>
