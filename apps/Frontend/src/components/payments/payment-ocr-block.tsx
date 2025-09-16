@@ -1,9 +1,15 @@
 // PaymentOCRBlock.tsx
 import * as React from "react";
 
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Image as ImageIcon, X, Plus } from "lucide-react";
+import { Image as ImageIcon, X, Plus } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -16,16 +22,27 @@ import {
 } from "@tanstack/react-table";
 import { QK_PAYMENTS_RECENT_BASE } from "@/components/payments/payments-recent-table";
 import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
+import {
+  MultipleFileUploadZone,
+  MultipleFileUploadZoneHandle,
+} from "../file-upload/multiple-file-upload-zone";
 
 // ---------------- Types ----------------
 
 type Row = { __id: number } & Record<string, string | number | null>;
 
 export default function PaymentOCRBlock() {
-  // UI state
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [uploadedImages, setUploadedImages] = React.useState<File[]>([]);
-  const [isDragging, setIsDragging] = React.useState(false);
+  //Config
+  const MAX_FILES = 10;
+  const ACCEPTED_FILE_TYPES = "image/jpeg,image/jpg,image/png,image/webp";
+  const TITLE = "Payment Document OCR";
+  const DESCRIPTION =
+    "You can upload up to 10 files. Allowed types: JPG, PNG, WEBP.";
+
+  // FILE/ZONE state
+  const uploadZoneRef = React.useRef<MultipleFileUploadZoneHandle | null>(null);
+  const [filesForUI, setFilesForUI] = React.useState<File[]>([]); // reactive UI only
+  const [isUploading, setIsUploading] = React.useState(false); // forwarded to zone
   const [isExtracting, setIsExtracting] = React.useState(false);
 
   // extracted rows shown only inside modal
@@ -86,52 +103,27 @@ export default function PaymentOCRBlock() {
 
   // ---- handlers (all in this file) -----------------------------------------
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = Array.from(e.target.files || []);
-    if (!list.length) return;
-    if (list.length > 10) {
-      setError("You can only upload up to 10 images.");
-      return;
-    }
-    setUploadedImages(list);
+  // Called by zone when its internal list changes (keeps parent UI reactive)
+  const handleZoneFilesChange = React.useCallback((files: File[]) => {
+    setFilesForUI(files);
     setError(null);
-  };
+  }, []);
 
-  const handleImageDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const list = Array.from(e.dataTransfer.files || []).filter((f) =>
-      f.type.startsWith("image/")
-    );
-    if (!list.length) {
-      setError("Please drop image files (JPG/PNG/TIFF/BMP).");
-      return;
-    }
-    if (list.length > 10) {
-      setError("You can only upload up to 10 images.");
-      return;
-    }
+  // Remove a single file by asking the zone to remove it (zone exposes removeFile)
+  const removeUploadedFile = React.useCallback((index: number) => {
+    uploadZoneRef.current?.removeFile(index);
+    // zone will call onFilesChange and update filesForUI automatically
+  }, []);
 
-    setUploadedImages(list);
-    setError(null);
-  };
-
-  const removeUploadedImage = (index: number) => {
-    setUploadedImages((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      if (next.length === 0) {
-        setRows([]);
-        setModalColumns([]);
-        setError(null);
-      }
-      return next;
-    });
-  };
-
+  // Extract: read files from zone via ref and call mutation
   const handleExtract = () => {
-    if (!uploadedImages.length) return;
+    const files = uploadZoneRef.current?.getFiles() ?? [];
+    if (!files.length) {
+      setError("Please upload at least one file to extract.");
+      return;
+    }
     setIsExtracting(true);
-    extractPaymentOCR.mutate(uploadedImages);
+    extractPaymentOCR.mutate(files);
   };
 
   const handleSave = async () => {
@@ -197,14 +189,13 @@ export default function PaymentOCRBlock() {
         queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE }), // recent patients list
       ]);
 
-      // ✅ CLEAR UI: remove files and table rows
-      setUploadedImages([]);
+      // ✅ CLEAR UI: reset zone + modal + rows
+      uploadZoneRef.current?.reset();
+      setFilesForUI([]);
       setRows([]);
       setModalColumns([]);
       setError(null);
-      setIsDragging(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-
+      setIsExtracting(false);
       setShowModal(false);
     } catch (err: any) {
       toast({
@@ -217,107 +208,67 @@ export default function PaymentOCRBlock() {
 
   return (
     <div className="mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-medium text-gray-800">
-          Payment Document OCR
-        </h2>
-      </div>
-
       <Card>
-        <CardContent className="p-6 space-y-6">
+        <CardHeader>
+          <CardTitle>{TITLE}</CardTitle>
+          <CardDescription>{DESCRIPTION}</CardDescription>
+        </CardHeader>
+
+        <CardContent>
           {/* Upload block */}
-          <div
-            className={`flex-1 border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragging
-                ? "border-blue-400 bg-blue-50"
-                : uploadedImages.length
-                  ? "border-green-400 bg-green-50"
-                  : "border-gray-300 bg-gray-50 hover:border-gray-400"
-            }`}
-            onDrop={handleImageDrop}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onClick={() => {
-              if (fileInputRef.current) {
-                fileInputRef.current.value = ""; // ✅ reset before opening
-                fileInputRef.current.click();
-              }
-            }}
-          >
-            {uploadedImages.length ? (
-              <div className="space-y-4">
-                {uploadedImages.map((file, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between space-x-4 border rounded-md p-2 bg-white"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <ImageIcon className="h-6 w-6 text-green-500" />
-                      <div className="text-left">
-                        <p className="font-medium text-green-700">
-                          {file.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeUploadedImage(idx);
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Upload className="h-12 w-12 text-gray-400 mx-auto" />
-                <div>
-                  <p className="text-lg font-medium text-gray-700 mb-2">
-                    Upload Payment Documents
-                  </p>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Drag and drop up to 10 images or click to browse
-                  </p>
-                  <Button variant="outline" type="button">
-                    Choose Images
-                  </Button>
-                </div>
-                <p className="text-xs text-gray-400">
-                  Supported formats: JPG, PNG, TIFF, BMP • Max size: 10MB each
+          <div className="bg-gray-100 p-4 rounded-md space-y-4">
+            <MultipleFileUploadZone
+              ref={uploadZoneRef}
+              isUploading={isUploading}
+              acceptedFileTypes={ACCEPTED_FILE_TYPES}
+              maxFiles={MAX_FILES}
+              onFilesChange={handleZoneFilesChange} // reactive UI only
+            />
+
+            {/* Show list of files received from the upload zone (UI only) */}
+            {filesForUI.length > 0 && (
+              <div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Uploaded ({filesForUI.length}/{MAX_FILES})
                 </p>
+                <ul className="space-y-2 max-h-48 overflow-auto">
+                  {filesForUI.map((file, idx) => (
+                    <li
+                      key={`${file.name}-${file.size}-${idx}`}
+                      className="flex items-center justify-between border rounded-md p-2 bg-white"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ImageIcon className="h-6 w-6 text-green-500" />
+                        <div className="text-left">
+                          <p className="font-medium text-green-700 truncate">
+                            {file.name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeUploadedFile(idx)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-            <input
-              ref={fileInputRef}
-              id="image-upload-input"
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                handleImageSelect(e);
-                e.currentTarget.value = "";
-              }}
-              className="hidden"
-              multiple
-            />
           </div>
 
           {/* Extract */}
-          <div className="flex justify-end gap-4">
+          <div className="mt-4 flex justify-end gap-4">
             <Button
               className="w-full h-12 gap-2"
               type="button"
               onClick={handleExtract}
-              disabled={!uploadedImages.length || isExtracting}
+              disabled={isExtracting || !filesForUI.length}
             >
               {extractPaymentOCR.isPending
                 ? "Extracting..."

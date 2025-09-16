@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,7 +20,10 @@ import {
 } from "@/components/ui/popover";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { MultipleFileUploadZone } from "../file-upload/multiple-file-upload-zone";
+import {
+  MultipleFileUploadZone,
+  MultipleFileUploadZoneHandle,
+} from "../file-upload/multiple-file-upload-zone";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Tooltip,
@@ -281,53 +284,13 @@ export function ClaimForm({
   };
 
   // FILE UPLOAD ZONE
+  const uploadZoneRef = useRef<MultipleFileUploadZoneHandle | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleFileUpload = (files: File[]) => {
-    setIsUploading(true);
-
-    const allowedTypes = [
-      "application/pdf",
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/webp",
-    ];
-
-    const validFiles = files.filter((file) => allowedTypes.includes(file.type));
-
-    if (validFiles.length > 10) {
-      toast({
-        title: "Too Many Files",
-        description: "You can only upload up to 10 files (PDFs or images).",
-        variant: "destructive",
-      });
-      setIsUploading(false);
-      return;
-    }
-
-    if (validFiles.length === 0) {
-      toast({
-        title: "Invalid File Type",
-        description: "Only PDF and image files are allowed.",
-        variant: "destructive",
-      });
-      setIsUploading(false);
-      return;
-    }
-
-    setForm((prev) => ({
-      ...prev,
-      uploadedFiles: validFiles,
-    }));
-
-    toast({
-      title: "Files Selected",
-      description: `${validFiles.length} file(s) ready for processing.`,
-    });
-
-    setIsUploading(false);
-  };
+  // NO validation here — the upload zone handles validation, toasts, max files, sizes, etc.
+  const handleFilesChange = useCallback((files: File[]) => {
+    setForm((prev) => ({ ...prev, uploadedFiles: files }));
+  }, []);
 
   // 1st Button workflow - Mass Health Button Handler
   const handleMHSubmit = async () => {
@@ -865,7 +828,8 @@ export function ClaimForm({
               </p>
 
               <MultipleFileUploadZone
-                onFileUpload={handleFileUpload}
+                ref={uploadZoneRef}
+                onFilesChange={handleFilesChange}
                 isUploading={isUploading}
                 acceptedFileTypes="application/pdf,image/jpeg,image/jpg,image/png,image/webp"
                 maxFiles={10}
@@ -893,10 +857,7 @@ export function ClaimForm({
                 >
                   MH
                 </Button>
-                <Button
-                  className="w-32"
-                  variant="warning"
-                >
+                <Button className="w-32" variant="warning">
                   MH PreAuth
                 </Button>
                 <Button

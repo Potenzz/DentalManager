@@ -1,10 +1,10 @@
 import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { PatientTable, qkPatients } from "@/components/patients/patient-table";
+import { PatientTable } from "@/components/patients/patient-table";
 import { AddPatientModal } from "@/components/patients/add-patient-modal";
 import { FileUploadZone } from "@/components/file-upload/file-upload-zone";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, File, FilePlus } from "lucide-react";
+import { Plus, RefreshCw, FilePlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Card,
@@ -168,21 +168,22 @@ export default function PatientsPage() {
         </div>
 
         {/* File Upload Zone */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-medium text-gray-800">
-              Upload Patient Document
-            </h2>
-          </div>
+        <div className="space-y-8 py-8">
           <Card>
-            <CardContent className="p-6 space-y-6">
+            <CardHeader>
+              <CardTitle>Upload Patient Document</CardTitle>
+              <CardDescription>
+                You can upload 1 file. Allowed types: PDF
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <FileUploadZone
                 onFileUpload={handleFileUpload}
                 isUploading={isUploading}
                 acceptedFileTypes="application/pdf"
               />
 
-              <div className="flex justify-end gap-4">
+              <div className="mt-4">
                 <Button
                   className="w-full h-12 gap-2"
                   disabled={!uploadedFile || isExtracting}

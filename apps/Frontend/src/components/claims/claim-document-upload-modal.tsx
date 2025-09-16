@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -9,7 +9,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { RefreshCw, FilePlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { MultipleFileUploadZone } from "../file-upload/multiple-file-upload-zone";
+import {
+  MultipleFileUploadZone,
+  MultipleFileUploadZoneHandle,
+} from "../file-upload/multiple-file-upload-zone";
 
 export default function ClaimDocumentsUploadMultiple() {
   const { toast } = useToast();
@@ -22,14 +25,15 @@ export default function ClaimDocumentsUploadMultiple() {
   const DESCRIPTION =
     "You can upload up to 10 files. Allowed types: PDF, JPG, PNG, WEBP.";
 
-  // Internal state
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  // Zone ref + minimal UI state (parent does not own files)
+  const uploadZoneRef = useRef<MultipleFileUploadZoneHandle | null>(null);
+  const [filesForUI, setFilesForUI] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false); // forwarded to upload zone
   const [isExtracting, setIsExtracting] = useState(false);
 
-  // Called by MultipleFileUploadZone whenever its internal list changes.
-  const handleFileUpload = useCallback((files: File[]) => {
-    setUploadedFiles(files);
+  // Called by MultipleFileUploadZone when its internal list changes (UI-only)
+  const handleZoneFilesChange = useCallback((files: File[]) => {
+    setFilesForUI(files);
   }, []);
 
   // Dummy save (simulate async). Replace with real API call when needed.
@@ -42,9 +46,11 @@ export default function ClaimDocumentsUploadMultiple() {
     );
   }, []);
 
-  // Extract handler — calls handleSave (dummy) and shows toasts.
+  // Extract handler — reads files from the zone via ref and calls handleSave
   const handleExtract = useCallback(async () => {
-    if (uploadedFiles.length === 0) {
+    const files = uploadZoneRef.current?.getFiles() ?? [];
+
+    if (files.length === 0) {
       toast({
         title: "No files",
         description: "Please upload at least one file before extracting.",
@@ -57,17 +63,15 @@ export default function ClaimDocumentsUploadMultiple() {
     setIsExtracting(true);
 
     try {
-      await handleSave(uploadedFiles);
+      await handleSave(files);
 
       toast({
         title: "Extraction started",
-        description: `Processing ${uploadedFiles.length} file(s).`,
+        description: `Processing ${files.length} file(s).`,
         variant: "default",
       });
 
-      // If you want to clear the upload zone after extraction, you'll need a small
-      // change in MultipleFileUploadZone to accept a reset signal from parent.
-      // We intentionally leave files intact here.
+      // we intentionally leave files intact in the zone after extraction
     } catch (err) {
       toast({
         title: "Extraction failed",
@@ -80,7 +84,7 @@ export default function ClaimDocumentsUploadMultiple() {
     } finally {
       setIsExtracting(false);
     }
-  }, [uploadedFiles, handleSave, isExtracting, toast]);
+  }, [handleSave, isExtracting, toast]);
 
   return (
     <div className="space-y-8 py-8">
@@ -93,20 +97,21 @@ export default function ClaimDocumentsUploadMultiple() {
           {/* File Upload Section */}
           <div className="bg-gray-100 p-4 rounded-md space-y-4">
             <MultipleFileUploadZone
-              onFileUpload={handleFileUpload}
+              ref={uploadZoneRef}
+              onFilesChange={handleZoneFilesChange}
               isUploading={isUploading}
               acceptedFileTypes={ACCEPTED_FILE_TYPES}
               maxFiles={MAX_FILES}
             />
 
             {/* Show list of files received from the upload zone */}
-            {uploadedFiles.length > 0 && (
+            {filesForUI.length > 0 && (
               <div>
                 <p className="text-sm text-gray-600 mb-2">
-                  Uploaded ({uploadedFiles.length}/{MAX_FILES})
+                  Uploaded ({filesForUI.length}/{MAX_FILES})
                 </p>
                 <ul className="text-sm text-gray-700 list-disc ml-6 max-h-40 overflow-auto">
-                  {uploadedFiles.map((file, index) => (
+                  {filesForUI.map((file, index) => (
                     <li key={index} className="truncate" title={file.name}>
                       {file.name}
                     </li>
@@ -120,7 +125,7 @@ export default function ClaimDocumentsUploadMultiple() {
           <div className="mt-4">
             <Button
               className="w-full h-12 gap-2"
-              disabled={uploadedFiles.length === 0 || isExtracting}
+              disabled={filesForUI.length === 0 || isExtracting}
               onClick={handleExtract}
             >
               {isExtracting ? (
