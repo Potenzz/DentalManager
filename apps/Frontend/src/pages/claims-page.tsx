@@ -31,6 +31,7 @@ import {
   UpdateAppointment,
   UpdatePatient,
 } from "@repo/db/types";
+import ClaimDocumentsUploadMultiple from "@/components/claims/claim-document-upload-modal";
 
 export default function ClaimsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -458,6 +459,9 @@ export default function ClaimsPage() {
           />
         </CardContent>
       </Card>
+
+      {/* File Upload Zone */}
+      <ClaimDocumentsUploadMultiple/>
 
       {/* Claim Form Modal */}
       {isClaimFormOpen && selectedPatientId !== null && (
