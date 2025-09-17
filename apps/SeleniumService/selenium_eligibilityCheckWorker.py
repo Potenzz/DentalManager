@@ -121,7 +121,6 @@ class AutomationMassHealthEligibilityCheck:
     
     def step2(self):
         wait = WebDriverWait(self.driver, 90)
-
         def wait_for_pdf_download(timeout=60):
             for _ in range(timeout):
                 files = [f for f in os.listdir(self.download_dir) if f.endswith(".pdf")]
@@ -135,8 +134,11 @@ class AutomationMassHealthEligibilityCheck:
             f"//table[@id='Table3']//tr[td[contains(text(), '{self.memberId}')]]/td[3]")))
             eligibilityText = eligibilityElement.text
 
-            report_link = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Click here')]")))
-            report_link.click()
+            txReportElement = wait.until(EC.element_to_be_clickable((By.XPATH,
+            f"//table[@id='Table3']//tr[td[contains(text(), '{self.memberId}')]]//input[@value='Tx Report']"
+            )))
+
+            txReportElement.click()
 
             pdf_path = wait_for_pdf_download()
             print("PDF downloaded at:", pdf_path)

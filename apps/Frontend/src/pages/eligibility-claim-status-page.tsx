@@ -26,7 +26,7 @@ import { InsertPatient, Patient } from "@repo/db/types";
 import { DateInput } from "@/components/ui/dateInput";
 import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 
-export default function InsuranceEligibilityPage() {
+export default function EligibilityClaimStatusPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const dispatch = useAppDispatch();
@@ -34,15 +34,6 @@ export default function InsuranceEligibilityPage() {
     (state) => state.seleniumEligibilityCheckTask
   );
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [currentTablePage, setCurrentTablePage] = useState<number | null>(null);
-  const [currentTableSearchTerm, setCurrentTableSearchTerm] = useState<
-    string | null
-  >(null);
-
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
 
   // Insurance eligibility check form fields
   const [memberId, setMemberId] = useState("");
@@ -213,10 +204,10 @@ export default function InsuranceEligibilityPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Insurance Eligibility
+              Insurance Eligibility and Claim Status
             </h1>
             <p className="text-muted-foreground">
-              Check insurance eligibility and view patient information
+              Check insurance eligibility and Claim status.
             </p>
           </div>
         </div>
@@ -224,7 +215,7 @@ export default function InsuranceEligibilityPage() {
         {/* Insurance Eligibility Check Form */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Check Insurance Eligibility</CardTitle>
+            <CardTitle>Check Insurance Eligibility and Claim Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-4 md:grid-cols-4 gap-4 mb-4">
@@ -281,7 +272,7 @@ export default function InsuranceEligibilityPage() {
                 ) : (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    MH
+                    MH Eligibility
                   </>
                 )}
               </Button>
@@ -304,8 +295,6 @@ export default function InsuranceEligibilityPage() {
               allowCheckbox={true}
               allowEdit={true}
               onSelectPatient={setSelectedPatient}
-              onPageChange={setCurrentTablePage}
-              onSearchChange={setCurrentTableSearchTerm}
             />
           </CardContent>
         </Card>

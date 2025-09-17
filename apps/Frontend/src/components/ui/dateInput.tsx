@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -21,7 +21,6 @@ interface DateInputProps {
 
 // THIS COMPONENT IS MADE FOR GENERAL FIELD IN PAGE.
 // Here, User can input/paste date in certain format, and also select via calendar
-
 export function DateInput({
   label,
   value,
@@ -32,6 +31,19 @@ export function DateInput({
   const [inputValue, setInputValue] = useState(
     value ? format(value, "MM/dd/yyyy") : ""
   );
+  const [open, setOpen] = useState(false);
+
+  // Keep inputValue in sync when parent 'value' changes.
+  // Only overwrite if different to avoid stomping an in-progress user edit.
+  useEffect(() => {
+    if (value) {
+      const formatted = format(value, "MM/dd/yyyy");
+      setInputValue((prev) => (prev !== formatted ? formatted : prev));
+    } else {
+      // parent cleared the value
+      setInputValue("");
+    }
+  }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/\D/g, "");
@@ -62,7 +74,7 @@ export function DateInput({
           value={inputValue}
           onChange={handleInputChange}
         />
-        <Popover>
+        <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" className={cn("px-3")}>
               <CalendarIcon className="h-4 w-4 opacity-70" />
@@ -77,6 +89,7 @@ export function DateInput({
                 if (date) {
                   setInputValue(format(date, "MM/dd/yyyy"));
                   onChange(date);
+                  setOpen(false);
                 }
               }}
               disabled={
