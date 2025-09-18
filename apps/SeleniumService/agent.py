@@ -4,6 +4,7 @@ import uvicorn
 import asyncio
 from selenium_claimSubmitWorker import AutomationMassHealth
 from selenium_eligibilityCheckWorker import AutomationMassHealthEligibilityCheck
+from selenium_claimStatusCheckWorker import AutomationMassHealthClaimStatusCheck
 import os
 
 from dotenv import load_dotenv
@@ -69,6 +70,33 @@ async def start_workflow(request: Request):
             active_jobs += 1
         try:
             bot = AutomationMassHealthEligibilityCheck(data)
+            result = bot.main_workflow("https://providers.massdhp.com/providers_login.asp")
+
+            if result.get("status") != "success":
+                return {"status": "error", "message": result.get("message")}
+            
+            return result
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        finally:
+            async with lock:
+                active_jobs -= 1
+    
+# Endpoint: Step 3 — Start the automation of cheking claim status
+@app.post("/claim-status-check")
+async def start_workflow(request: Request):
+    global active_jobs, waiting_jobs
+    data = await request.json()
+
+    async with lock:
+        waiting_jobs += 1
+
+    async with semaphore:
+        async with lock:
+            waiting_jobs -= 1
+            active_jobs += 1
+        try:
+            bot = AutomationMassHealthClaimStatusCheck(data)
             result = bot.main_workflow("https://providers.massdhp.com/providers_login.asp")
 
             if result.get("status") != "success":
