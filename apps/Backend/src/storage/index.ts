@@ -1,5 +1,5 @@
 import { prisma as db } from "@repo/db/client";
-import { PdfCategory } from "@repo/db/generated/prisma";
+import { PdfCategory, PdfTitle } from "@repo/db/generated/prisma";
 import {
   Appointment,
   Claim,
@@ -162,11 +162,12 @@ export interface IStorage {
   createPdfGroup(
     patientId: number,
     title: string,
+    titleKey: PdfTitle,
     category: PdfCategory
   ): Promise<PdfGroup>;
-  findPdfGroupByPatientTitleAndCategory(
+  findPdfGroupByPatientTitleKeyAndCategory(
     patientId: number,
-    title: string,
+    titleKey: PdfTitle,
     category: PdfCategory
   ): Promise<PdfGroup | undefined>;
   getAllPdfGroups(): Promise<PdfGroup[]>;
@@ -738,22 +739,27 @@ export const storage: IStorage = {
   // PdfGroup CRUD
   // ----------------------
 
-  async createPdfGroup(patientId, title, category) {
+  async createPdfGroup(patientId, title, titleKey, category) {
     return db.pdfGroup.create({
       data: {
         patientId,
         title,
+        titleKey,
         category,
       },
     });
   },
 
-  async findPdfGroupByPatientTitleAndCategory(patientId, title, category) {
+  async findPdfGroupByPatientTitleKeyAndCategory(
+    patientId,
+    titleKey,
+    category
+  ) {
     return (
       (await db.pdfGroup.findFirst({
         where: {
           patientId,
-          title,
+          titleKey,
           category,
         },
       })) ?? undefined

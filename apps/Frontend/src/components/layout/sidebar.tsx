@@ -38,7 +38,7 @@ export function Sidebar() {
       },
       {
         name: "Eligibility/Claim Status",
-        path: "/eligibility-claim-status",
+        path: "/insurance-status",
         icon: <Shield className="h-5 w-5" />,
       },
       {

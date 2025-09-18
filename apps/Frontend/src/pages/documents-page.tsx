@@ -137,26 +137,28 @@ export default function DocumentsPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {groups.length === 0 ? (
-                <p className="text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   No groups found for this patient.
                 </p>
               ) : (
-                groups.map((group: any) => (
-                  <Button
-                    key={group.id}
-                    variant={
-                      group.id === selectedGroupId ? "default" : "outline"
-                    }
-                    onClick={() =>
-                      setSelectedGroupId((prevId) =>
-                        prevId === group.id ? null : group.id
-                      )
-                    }
-                  >
-                    <FolderOpen className="w-4 h-4 mr-2" />
-                    Group - {group.title}
-                  </Button>
-                ))
+                <div className="flex flex-col gap-2">
+                  {groups.map((group: any) => (
+                    <Button
+                      key={group.id}
+                      variant={
+                        group.id === selectedGroupId ? "default" : "outline"
+                      }
+                      onClick={() =>
+                        setSelectedGroupId((prevId) =>
+                          prevId === group.id ? null : group.id
+                        )
+                      }
+                    >
+                      <FolderOpen className="w-4 h-4 mr-2" />
+                      Group - {group.title}
+                    </Button>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

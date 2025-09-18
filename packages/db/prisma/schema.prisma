@@ -164,10 +164,10 @@ enum ServiceLineStatus {
 }
 
 model ClaimFile {
-  id         Int      @id @default(autoincrement())
-  claimId    Int
-  filename   String
-  mimeType   String
+  id       Int    @id @default(autoincrement())
+  claimId  Int
+  filename String
+  mimeType String
 
   claim Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
 }
@@ -187,7 +187,8 @@ model InsuranceCredential {
 
 model PdfGroup {
   id        Int         @id @default(autoincrement())
-  title     String // e.g., "June Claim Docs", "Eligibility Set A"
+  title     String
+  titleKey  PdfTitle?
   category  PdfCategory
   createdAt DateTime    @default(now())
   patientId Int
@@ -196,6 +197,7 @@ model PdfGroup {
 
   @@index([patientId])
   @@index([category])
+  @@index([titleKey])
 }
 
 model PdfFile {
@@ -209,9 +211,16 @@ model PdfFile {
   @@index([groupId])
 }
 
+enum PdfTitle {
+  INSURANCE_CLAIM
+  INSURANCE_STATUS_PDFs
+  OTHER
+}
+
 enum PdfCategory {
   CLAIM
-  ELIGIBILITY
+  ELIGIBILITY_STATUS
+  CLAIM_STATUS
   OTHER
 }
 

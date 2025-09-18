@@ -35,12 +35,14 @@ export default function EligibilityClaimStatusPage() {
   );
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
-  // Insurance eligibility check form fields
+  // Insurance eligibility and claim check form fields
   const [memberId, setMemberId] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
+  const [isCheckingEligibilityStatus, setIsCheckingEligibilityStatus] =
+    useState(false);
+  const [isCheckingClaimStatus, setIsCheckingClaimStatus] = useState(false);
 
   // Populate fields from selected patient
   useEffect(() => {
@@ -95,8 +97,8 @@ export default function EligibilityClaimStatusPage() {
     },
   });
 
-  // handle selenium
-  const handleSelenium = async () => {
+  // handle eligibility selenium
+  const handleEligibilityCheckSelenium = async () => {
     const formattedDob = dateOfBirth ? formatLocalDate(dateOfBirth) : "";
 
     const data = {
@@ -113,7 +115,7 @@ export default function EligibilityClaimStatusPage() {
       );
       const response = await apiRequest(
         "POST",
-        "/api/insuranceEligibility/check",
+        "/api/insurance-status/eligibility-check",
         { data: JSON.stringify(data) }
       );
       const result = await response.json();
@@ -148,6 +150,59 @@ export default function EligibilityClaimStatusPage() {
     }
   };
 
+  // Claim Status Check Selenium
+  const handleStatusCheckSelenium = async () => {
+    const formattedDob = dateOfBirth ? formatLocalDate(dateOfBirth) : "";
+
+    const data = {
+      memberId,
+      dateOfBirth: formattedDob,
+      insuranceSiteKey: "MH",
+    };
+    try {
+      dispatch(
+        setTaskStatus({
+          status: "pending",
+          message: "Sending Data to Selenium...",
+        })
+      );
+      const response = await apiRequest(
+        "POST",
+        "/api/insurance-status/claim-status-check",
+        { data: JSON.stringify(data) }
+      );
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+
+      dispatch(
+        setTaskStatus({
+          status: "success",
+          message:
+            "Claim status is updated, and its pdf is uploaded at Document Page.",
+        })
+      );
+
+      toast({
+        title: "Selenium service done.",
+        description:
+          "Your Claim Status is fetched and updated, Kindly search through the patient.",
+        variant: "default",
+      });
+    } catch (error: any) {
+      dispatch(
+        setTaskStatus({
+          status: "error",
+          message: error.message || "Selenium submission failed",
+        })
+      );
+      toast({
+        title: "Selenium service error",
+        description: error.message || "An error occurred.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleAddPatient = async () => {
     const newPatient: InsertPatient = {
       firstName,
@@ -162,8 +217,8 @@ export default function EligibilityClaimStatusPage() {
     await addPatientMutation.mutateAsync(newPatient);
   };
 
-  // Handle insurance provider button clicks
-  const handleMHButton = async () => {
+  // Handle insurance provider eligibility button clicks
+  const handleMHEligibilityButton = async () => {
     // Form Fields check
     if (!memberId || !dateOfBirth || !firstName) {
       toast({
@@ -175,7 +230,7 @@ export default function EligibilityClaimStatusPage() {
       return;
     }
 
-    setIsCheckingEligibility(true);
+    setIsCheckingEligibilityStatus(true);
 
     // Adding patient if same patient exists then it will skip.
     try {
@@ -183,11 +238,40 @@ export default function EligibilityClaimStatusPage() {
         await handleAddPatient();
       }
 
-      await handleSelenium();
+      await handleEligibilityCheckSelenium();
 
       await queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
     } finally {
-      setIsCheckingEligibility(false);
+      setIsCheckingEligibilityStatus(false);
+    }
+  };
+
+  // Handle insurance provider Status Check button clicks
+  const handleMHStatusButton = async () => {
+    // Form Fields check
+    if (!memberId || !dateOfBirth || !firstName) {
+      toast({
+        title: "Missing Fields",
+        description:
+          "Please fill in all the required fields: Member ID, Date of Birth, First Name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCheckingClaimStatus(true);
+
+    // Adding patient if same patient exists then it will skip.
+    try {
+      if (!selectedPatient) {
+        await handleAddPatient();
+      }
+
+      await handleStatusCheckSelenium();
+
+      await queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
+    } finally {
+      setIsCheckingClaimStatus(false);
     }
   };
 
@@ -258,13 +342,13 @@ export default function EligibilityClaimStatusPage() {
               </div>
             </div>
 
-            <div>
+            <div className="flex flex-col-2 gap-4">
               <Button
-                onClick={() => handleMHButton()}
+                onClick={() => handleMHEligibilityButton()}
                 className="w-full"
-                disabled={isCheckingEligibility}
+                disabled={isCheckingEligibilityStatus}
               >
-                {isCheckingEligibility ? (
+                {isCheckingEligibilityStatus ? (
                   <>
                     <LoaderCircleIcon className="h-4 w-4 mr-2 animate-spin" />
                     Processing...
@@ -272,7 +356,25 @@ export default function EligibilityClaimStatusPage() {
                 ) : (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    MH Eligibility
+                    MH Eligibility Check
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={() => handleMHStatusButton()}
+                className="w-full"
+                disabled={isCheckingClaimStatus}
+              >
+                {isCheckingClaimStatus ? (
+                  <>
+                    <LoaderCircleIcon className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    MH Status Check
                   </>
                 )}
               </Button>

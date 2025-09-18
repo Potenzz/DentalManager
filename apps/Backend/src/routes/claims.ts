@@ -125,13 +125,14 @@ router.post(
         responseType: "arraybuffer",
       });
 
-      const groupTitle = `Insurance Claim`;
+      const groupTitle = "Insurance Claim";
+      const groupTitleKey = "INSURANCE_CLAIM";
       const groupCategory = "CLAIM";
 
       // ✅ Find or create PDF group for this claim
-      let group = await storage.findPdfGroupByPatientTitleAndCategory(
+      let group = await storage.findPdfGroupByPatientTitleKeyAndCategory(
         parsedPatientId,
-        groupTitle,
+        groupTitleKey,
         groupCategory
       );
 
@@ -139,6 +140,7 @@ router.post(
         group = await storage.createPdfGroup(
           parsedPatientId,
           groupTitle,
+          groupTitleKey,
           groupCategory
         );
       }

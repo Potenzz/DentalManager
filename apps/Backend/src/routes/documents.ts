@@ -12,17 +12,18 @@ router.post(
   "/pdf-groups",
   async (req: Request, res: Response): Promise<any> => {
     try {
-      const { title, category, patientId } = req.body;
-      if (!title || !category || !patientId) {
+      const { patientId, groupTitle, groupTitleKey, groupCategory } = req.body;
+      if (!patientId || !groupTitle || groupTitleKey || !groupCategory) {
         return res
           .status(400)
-          .json({ error: "Missing title, category, or patientId" });
+          .json({ error: "Missing title, titleKey, category, or patientId" });
       }
 
       const group = await storage.createPdfGroup(
         parseInt(patientId),
-        title,
-        category
+        groupTitle,
+        groupTitleKey,
+        groupCategory
       );
 
       res.json(group);
@@ -89,8 +90,14 @@ router.put(
         return res.status(400).json({ error: "Missing ID" });
       }
       const id = parseInt(idParam);
-      const { title, category } = req.body;
-      const updated = await storage.updatePdfGroup(id, { title, category });
+      const { title, category, titleKey } = req.body;
+
+      const updates: any = {};
+      updates.title = title;
+      updates.category = category;
+      updates.titleKey = titleKey;
+
+      const updated = await storage.updatePdfGroup(id, updates);
       if (!updated) return res.status(404).json({ error: "Group not found" });
       res.json(updated);
     } catch (err) {
@@ -144,20 +151,22 @@ router.post(
   }
 );
 
-router.get("/pdf-files/group/:groupId", async (req: Request, res: Response):Promise<any> => {
-  try {
-    const idParam = req.params.groupId;
+router.get(
+  "/pdf-files/group/:groupId",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const idParam = req.params.groupId;
       if (!idParam) {
         return res.status(400).json({ error: "Missing Groupt ID" });
       }
-    const groupId = parseInt(idParam);
-    const files = await storage.getPdfFilesByGroupId(groupId); // implement this
-    res.json(files);
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+      const groupId = parseInt(idParam);
+      const files = await storage.getPdfFilesByGroupId(groupId);
+      res.json(files);
+    } catch (err) {
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
-});
-
+);
 
 router.get(
   "/pdf-files/:id",
@@ -167,13 +176,109 @@ router.get(
       if (!idParam) {
         return res.status(400).json({ error: "Missing ID" });
       }
-      const id = parseInt(idParam);
-      const pdf = await storage.getPdfFileById(id);
-      if (!pdf || !pdf.pdfData)
-        return res.status(404).json({ error: "PDF not found" });
+      const id = parseInt(idParam, 10);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
 
-      if (!Buffer.isBuffer(pdf.pdfData)) {
-        pdf.pdfData = Buffer.from(Object.values(pdf.pdfData));
+      const pdf = await storage.getPdfFileById(id);
+      if (!pdf || !pdf.pdfData) {
+        return res.status(404).json({ error: "PDF not found" });
+      }
+
+      const data: any = pdf.pdfData;
+
+      // Helper: try many plausible conversions into a Buffer
+      function normalizeToBuffer(d: any): Buffer | null {
+        // Already a Buffer
+        if (Buffer.isBuffer(d)) return d;
+
+        // Uint8Array or other typed arrays
+        if (d instanceof Uint8Array) return Buffer.from(d);
+
+        // ArrayBuffer
+        if (d instanceof ArrayBuffer) return Buffer.from(new Uint8Array(d));
+
+        // number[] (common)
+        if (Array.isArray(d) && d.every((n) => typeof n === "number")) {
+          return Buffer.from(d as number[]);
+        }
+
+        // Some drivers: { data: number[] }
+        if (
+          d &&
+          typeof d === "object" &&
+          Array.isArray(d.data) &&
+          d.data.every((n: any) => typeof n === "number")
+        ) {
+          return Buffer.from(d.data as number[]);
+        }
+
+        // Some drivers return object with numeric keys: { '0': 37, '1': 80, ... }
+        if (d && typeof d === "object") {
+          const keys = Object.keys(d);
+          const numericKeys = keys.filter((k) => /^\d+$/.test(k));
+          if (numericKeys.length > 0 && numericKeys.length === keys.length) {
+            // sort numeric keys to correct order and map to numbers
+            const sorted = numericKeys
+              .map((k) => parseInt(k, 10))
+              .sort((a, b) => a - b)
+              .map((n) => d[String(n)]);
+            if (sorted.every((v) => typeof v === "number")) {
+              return Buffer.from(sorted as number[]);
+            }
+          }
+        }
+
+        // Last resort: if Object.values(d) yields numbers (this is what you used originally)
+        try {
+          const vals = Object.values(d);
+          if (Array.isArray(vals) && vals.every((v) => typeof v === "number")) {
+            // coerce to number[] for TS safety
+            return Buffer.from(vals as number[]);
+          }
+        } catch {
+          // ignore
+        }
+
+        // give up
+        return null;
+      }
+
+      const pdfBuffer = normalizeToBuffer(data);
+
+      if (!pdfBuffer) {
+        console.error("Unsupported pdf.pdfData shape:", {
+          typeofData: typeof data,
+          constructorName:
+            data && data.constructor ? data.constructor.name : undefined,
+          keys:
+            data && typeof data === "object"
+              ? Object.keys(data).slice(0, 20)
+              : undefined,
+          sample: (() => {
+            if (Array.isArray(data)) return data.slice(0, 20);
+            if (data && typeof data === "object") {
+              const vals = Object.values(data);
+              return Array.isArray(vals) ? vals.slice(0, 20) : undefined;
+            }
+            return String(data).slice(0, 200);
+          })(),
+        });
+
+        // Try a safe textual fallback (may produce invalid PDF but avoids crashing)
+        try {
+          const fallback = Buffer.from(String(data));
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${pdf.filename}"; filename*=UTF-8''${encodeURIComponent(pdf.filename)}`
+          );
+          return res.send(fallback);
+        } catch (err) {
+          console.error("Failed fallback conversion:", err);
+          return res.status(500).json({ error: "Cannot process PDF data" });
+        }
       }
 
       res.setHeader("Content-Type", "application/pdf");
@@ -181,7 +286,7 @@ router.get(
         "Content-Disposition",
         `attachment; filename="${pdf.filename}"; filename*=UTF-8''${encodeURIComponent(pdf.filename)}`
       );
-      res.send(pdf.pdfData);
+      res.send(pdfBuffer);
     } catch (err) {
       console.error("Error downloading PDF file:", err);
       res.status(500).json({ error: "Internal server error" });
