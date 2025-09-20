@@ -127,21 +127,18 @@ router.post(
 
       const groupTitle = "Insurance Claim";
       const groupTitleKey = "INSURANCE_CLAIM";
-      const groupCategory = "CLAIM";
 
       // ✅ Find or create PDF group for this claim
-      let group = await storage.findPdfGroupByPatientTitleKeyAndCategory(
+      let group = await storage.findPdfGroupByPatientTitleKey(
         parsedPatientId,
-        groupTitleKey,
-        groupCategory
+        groupTitleKey
       );
 
       if (!group) {
         group = await storage.createPdfGroup(
           parsedPatientId,
           groupTitle,
-          groupTitleKey,
-          groupCategory
+          groupTitleKey
         );
       }
 

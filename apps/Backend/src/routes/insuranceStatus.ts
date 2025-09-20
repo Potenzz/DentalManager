@@ -60,14 +60,12 @@ router.post(
         if (result.pdf_path && result.pdf_path.endsWith(".pdf")) {
           const pdfBuffer = await fs.readFile(result.pdf_path);
 
-          const groupTitle = "Insurance Status PDFs";
-          const groupTitleKey = "INSURANCE_STATUS_PDFs";
-          const groupCategory = "ELIGIBILITY_STATUS";
+          const groupTitle = "Eligibility Status PDFs";
+          const groupTitleKey = "ELIGIBILITY_STATUS";
 
-          let group = await storage.findPdfGroupByPatientTitleKeyAndCategory(
+          let group = await storage.findPdfGroupByPatientTitleKey(
             patient.id,
-            groupTitleKey,
-            groupCategory
+            groupTitleKey
           );
 
           // Step 2b: Create group if it doesn’t exist
@@ -75,8 +73,7 @@ router.post(
             group = await storage.createPdfGroup(
               patient.id,
               groupTitle,
-              groupTitleKey,
-              groupCategory
+              groupTitleKey
             );
           }
 
@@ -220,13 +217,11 @@ router.post(
 
         if (pdfBuffer && generatedPdfPath) {
           const groupTitle = "Insurance Status PDFs";
-          const groupTitleKey = "INSURANCE_STATUS_PDFs";
-          const groupCategory = "CLAIM_STATUS";
+          const groupTitleKey = "CLAIM_STATUS";
 
-          let group = await storage.findPdfGroupByPatientTitleKeyAndCategory(
+          let group = await storage.findPdfGroupByPatientTitleKey(
             patient.id,
-            groupTitleKey,
-            groupCategory
+            groupTitleKey
           );
 
           // Create group if missing
@@ -234,8 +229,7 @@ router.post(
             group = await storage.createPdfGroup(
               patient.id,
               groupTitle,
-              groupTitleKey,
-              groupCategory
+              groupTitleKey
             );
           }
 

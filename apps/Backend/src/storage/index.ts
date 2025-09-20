@@ -1,5 +1,5 @@
 import { prisma as db } from "@repo/db/client";
-import { PdfCategory, PdfTitle } from "@repo/db/generated/prisma";
+import { PdfTitleKey } from "@repo/db/generated/prisma";
 import {
   Appointment,
   Claim,
@@ -150,7 +150,10 @@ export interface IStorage {
     pdfData: Buffer
   ): Promise<PdfFile>;
   getPdfFileById(id: number): Promise<PdfFile | undefined>;
-  getPdfFilesByGroupId(groupId: number): Promise<PdfFile[]>;
+  getPdfFilesByGroupId(
+    groupId: number,
+    opts?: { limit?: number; offset?: number; withGroup?: boolean }
+  ): Promise<PdfFile[] | { total: number; data: PdfFile[] }>;
   getRecentPdfFiles(limit: number, offset: number): Promise<PdfFile[]>;
   deletePdfFile(id: number): Promise<boolean>;
   updatePdfFile(
@@ -162,20 +165,18 @@ export interface IStorage {
   createPdfGroup(
     patientId: number,
     title: string,
-    titleKey: PdfTitle,
-    category: PdfCategory
+    titleKey: PdfTitleKey
   ): Promise<PdfGroup>;
-  findPdfGroupByPatientTitleKeyAndCategory(
+  findPdfGroupByPatientTitleKey(
     patientId: number,
-    titleKey: PdfTitle,
-    category: PdfCategory
+    titleKey: PdfTitleKey
   ): Promise<PdfGroup | undefined>;
   getAllPdfGroups(): Promise<PdfGroup[]>;
   getPdfGroupById(id: number): Promise<PdfGroup | undefined>;
   getPdfGroupsByPatientId(patientId: number): Promise<PdfGroup[]>;
   updatePdfGroup(
     id: number,
-    updates: Partial<Pick<PdfGroup, "title" | "category">>
+    updates: Partial<Pick<PdfGroup, "title">>
   ): Promise<PdfGroup | undefined>;
   deletePdfGroup(id: number): Promise<boolean>;
 
@@ -699,11 +700,70 @@ export const storage: IStorage = {
     return (await db.pdfFile.findUnique({ where: { id } })) ?? undefined;
   },
 
-  async getPdfFilesByGroupId(groupId) {
-    return db.pdfFile.findMany({
-      where: { groupId },
-      orderBy: { uploadedAt: "desc" },
-    });
+  /**
+   * getPdfFilesByGroupId: supports
+   * - getPdfFilesByGroupId(groupId) => Promise<PdfFile[]>
+   * - getPdfFilesByGroupId(groupId, { limit, offset }) => Promise<{ total, data }>
+   * - getPdfFilesByGroupId(groupId, { limit, offset, withGroup: true }) => Promise<{ total, data: PdfFileWithGroup[] }>
+   */
+  async getPdfFilesByGroupId(groupId, opts) {
+    // if pagination is requested (limit provided) return total + page
+    const wantsPagination =
+      !!opts &&
+      (typeof opts.limit === "number" || typeof opts.offset === "number");
+
+    if (wantsPagination) {
+      const limit = Math.min(Number(opts?.limit ?? 5), 1000);
+      const offset = Number(opts?.offset ?? 0);
+
+      if (opts?.withGroup) {
+        // return total + data with group included
+        const [total, data] = await Promise.all([
+          db.pdfFile.count({ where: { groupId } }),
+          db.pdfFile.findMany({
+            where: { groupId },
+            orderBy: { uploadedAt: "desc" },
+            take: limit,
+            skip: offset,
+            include: { group: true }, // only include
+          }),
+        ]);
+
+        return { total, data };
+      } else {
+        // return total + data with limited fields via select
+        const [total, data] = await Promise.all([
+          db.pdfFile.count({ where: { groupId } }),
+          db.pdfFile.findMany({
+            where: { groupId },
+            orderBy: { uploadedAt: "desc" },
+            take: limit,
+            skip: offset,
+            select: { id: true, filename: true, uploadedAt: true }, // only select
+          }),
+        ]);
+
+        // Note: selected shape won't have all PdfFile fields; cast if needed
+        return { total, data: data as unknown as PdfFile[] };
+      }
+    }
+
+    // non-paginated: return all files (keep descending order)
+    if (opts?.withGroup) {
+      const all = await db.pdfFile.findMany({
+        where: { groupId },
+        orderBy: { uploadedAt: "desc" },
+        include: { group: true },
+      });
+      return all as PdfFile[];
+    } else {
+      const all = await db.pdfFile.findMany({
+        where: { groupId },
+        orderBy: { uploadedAt: "desc" },
+        // no select or include -> returns full PdfFile
+      });
+      return all as PdfFile[];
+    }
   },
 
   async getRecentPdfFiles(limit: number, offset: number): Promise<PdfFile[]> {
@@ -739,28 +799,22 @@ export const storage: IStorage = {
   // PdfGroup CRUD
   // ----------------------
 
-  async createPdfGroup(patientId, title, titleKey, category) {
+  async createPdfGroup(patientId, title, titleKey) {
     return db.pdfGroup.create({
       data: {
         patientId,
         title,
         titleKey,
-        category,
       },
     });
   },
 
-  async findPdfGroupByPatientTitleKeyAndCategory(
-    patientId,
-    titleKey,
-    category
-  ) {
+  async findPdfGroupByPatientTitleKey(patientId, titleKey) {
     return (
       (await db.pdfGroup.findFirst({
         where: {
           patientId,
           titleKey,
-          category,
         },
       })) ?? undefined
     );

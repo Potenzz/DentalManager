@@ -186,12 +186,12 @@ model InsuranceCredential {
 }
 
 model PdfGroup {
-  id        Int          @id @default(autoincrement())
+  id        Int         @id @default(autoincrement())
   title     String
-  titleKey  PdfTitleKey?
-  createdAt DateTime     @default(now())
+  titleKey  PdfTitleKey @default(OTHER)
+  createdAt DateTime    @default(now())
   patientId Int
-  patient   Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient   Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
   pdfs      PdfFile[]
 
   @@index([patientId])

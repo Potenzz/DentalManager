@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Request, Response } from "express";
 import { storage } from "../storage";
 import multer from "multer";
+import { PdfFile } from "../../../../packages/db/types/pdf-types";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -12,18 +13,17 @@ router.post(
   "/pdf-groups",
   async (req: Request, res: Response): Promise<any> => {
     try {
-      const { patientId, groupTitle, groupTitleKey, groupCategory } = req.body;
-      if (!patientId || !groupTitle || groupTitleKey || !groupCategory) {
+      const { patientId, groupTitle, groupTitleKey } = req.body;
+      if (!patientId || !groupTitle || groupTitleKey) {
         return res
           .status(400)
-          .json({ error: "Missing title, titleKey, category, or patientId" });
+          .json({ error: "Missing title, titleKey, or patientId" });
       }
 
       const group = await storage.createPdfGroup(
         parseInt(patientId),
         groupTitle,
-        groupTitleKey,
-        groupCategory
+        groupTitleKey
       );
 
       res.json(group);
@@ -90,11 +90,10 @@ router.put(
         return res.status(400).json({ error: "Missing ID" });
       }
       const id = parseInt(idParam);
-      const { title, category, titleKey } = req.body;
+      const { title, titleKey } = req.body;
 
       const updates: any = {};
       updates.title = title;
-      updates.category = category;
       updates.titleKey = titleKey;
 
       const updated = await storage.updatePdfGroup(id, updates);
@@ -164,6 +163,69 @@ router.get(
       res.json(files);
     } catch (err) {
       res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+/**
+ * GET /pdf-files/group/:groupId
+ * Query params:
+ *   - limit (optional, defaults to 5): number of items per page (max 1000)
+ *   - offset (optional, defaults to 0): offset for pagination
+ *
+ * Response: { total: number, data: PdfFile[] }
+ */
+router.get(
+  "/recent-pdf-files/group/:groupId",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const rawGroupId = req.params.groupId;
+      if (!rawGroupId) {
+        return res.status(400).json({ error: "Missing groupId param" });
+      }
+
+      const groupId = Number(rawGroupId);
+      if (Number.isNaN(groupId) || groupId <= 0) {
+        return res.status(400).json({ error: "Invalid groupId" });
+      }
+
+      // Parse & sanitize query params
+      const limitQuery = req.query.limit;
+      const offsetQuery = req.query.offset;
+
+      const limit =
+        limitQuery !== undefined
+          ? Math.min(Math.max(Number(limitQuery), 1), 1000) // 1..1000
+          : undefined; // if undefined -> treat as "no pagination" (return all)
+      const offset =
+        offsetQuery !== undefined ? Math.max(Number(offsetQuery), 0) : 0;
+
+      // Decide whether client asked for paginated response
+      const wantsPagination = typeof limit === "number";
+
+      if (wantsPagination) {
+        // storage.getPdfFilesByGroupId with pagination should return { total, data }
+        const result = await storage.getPdfFilesByGroupId(groupId, {
+          limit,
+          offset,
+          withGroup: false, // do not include group relation in listing
+        });
+
+        // result should be { total, data }, but handle unexpected shapes defensively
+        if (Array.isArray(result)) {
+          // fallback: storage returned full array; compute total
+          return res.json({ total: result.length, data: result });
+        }
+
+        return res.json(result);
+      } else {
+        // no limit requested -> return all files for the group
+        const all = (await storage.getPdfFilesByGroupId(groupId)) as PdfFile[];
+        return res.json({ total: all.length, data: all });
+      }
+    } catch (err) {
+      console.error("GET /pdf-files/group/:groupId error:", err);
+      return res.status(500).json({ error: "Internal server error" });
     }
   }
 );
