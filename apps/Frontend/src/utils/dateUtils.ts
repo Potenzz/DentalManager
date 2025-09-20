@@ -122,41 +122,30 @@ export function formatDateToHumanReadable(dateInput?: string | Date): string {
 
   // date-only string -> show as-is
   if (typeof dateInput === "string" && isDateOnlyString(dateInput)) {
-    const parts = dateInput.split("-");
-    const [y, m, d] = parts;
-
-    // Defensive check so TypeScript and runtime are both happy
-    if (!y || !m || !d) {
-      console.error("Invalid date-only string:", dateInput);
-      return "Invalid Date";
-    }
-
-    const day = d.padStart(2, "0");
-    const monthIndex = parseInt(m, 10) - 1;
-    const monthName = MONTH_SHORT[monthIndex] ?? "Invalid";
-
-    return `${day} ${monthName} ${y}`;
+    const [y, m, d] = dateInput.split("-");
+    if (!y || !m || !d) return "Invalid Date";
+    return `${MONTH_SHORT[parseInt(m, 10) - 1]} ${d}, ${y}`;
   }
 
-  // Date object -> use its calendar fields (no TZ conversion)
+  // Handle Date object
   if (dateInput instanceof Date) {
     if (isNaN(dateInput.getTime())) return "Invalid Date";
-    const dd = String(dateInput.getDate()).padStart(2, "0");
+    const dd = String(dateInput.getDate());
     const mm = MONTH_SHORT[dateInput.getMonth()];
     const yy = dateInput.getFullYear();
-    return `${dd} ${mm} ${yy}`;
+    return `${mm} ${dd}, ${yy}`;
   }
 
-  // Otherwise (ISO/timestamp string) -> parse and use UTC date components
+  // Handle ISO/timestamp string (UTC-based to avoid shifting)
   const parsed = new Date(dateInput);
   if (isNaN(parsed.getTime())) {
     console.error("Invalid date input provided:", dateInput);
     return "Invalid Date";
   }
-  const dd = String(parsed.getUTCDate()).padStart(2, "0");
+  const dd = String(parsed.getUTCDate());
   const mm = MONTH_SHORT[parsed.getUTCMonth()];
   const yy = parsed.getUTCFullYear();
-  return `${dd} ${mm} ${yy}`;
+  return `${mm} ${dd}, ${yy}`;
 }
 
 /**
