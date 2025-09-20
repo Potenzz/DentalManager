@@ -131,6 +131,40 @@ router.get(
   }
 );
 
+/**
+ * GET /api/appointments/:id/patient
+ */
+router.get(
+  "/:id/patient",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const rawId = req.params.id;
+      if (!rawId) {
+        return res.status(400).json({ message: "Appointment ID is required" });
+      }
+
+      const apptId = parseInt(rawId, 10);
+      if (Number.isNaN(apptId) || apptId <= 0) {
+        return res.status(400).json({ message: "Invalid appointment ID" });
+      }
+
+      const patient = await storage.getPatientFromAppointmentId(apptId);
+
+      if (!patient) {
+        return res
+          .status(404)
+          .json({ message: "Patient not found for the given appointment" });
+      }
+
+      return res.json(patient);
+    } catch (err) {
+      return res
+        .status(500)
+        .json({ message: "Failed to retrieve patient for appointment" });
+    }
+  }
+);
+
 // Create a new appointment
 router.post(
   "/upsert",

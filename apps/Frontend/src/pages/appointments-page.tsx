@@ -15,8 +15,6 @@ import {
   ChevronRight,
   Move,
   Trash2,
-  ShieldCheck,
-  FileText,
   CreditCard,
   ClipboardList,
   StickyNote,
@@ -94,6 +92,8 @@ export default function AppointmentsPage() {
     open: boolean;
     appointmentId?: number;
   }>({ open: false });
+
+  const [, setLocation] = useLocation();
 
   // Create context menu hook
   const { show } = useContextMenu({
@@ -652,7 +652,7 @@ export default function AppointmentsPage() {
 
   // -------------------
   const handleCheckEligibility = (appointmentId: number) => {
-    console.log(`Checking eligibility for appointment: ${appointmentId}`);
+    setLocation(`/insurance-status?appointmentId=${appointmentId}`);
   };
 
   const handleClaimsPreAuth = (appointmentId: number) => {

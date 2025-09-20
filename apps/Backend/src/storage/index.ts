@@ -70,6 +70,9 @@ export interface IStorage {
   getAllAppointments(): Promise<Appointment[]>;
   getAppointmentsByUserId(userId: number): Promise<Appointment[]>;
   getAppointmentsByPatientId(patientId: number): Promise<Appointment[]>;
+  getPatientFromAppointmentId(
+    appointmentId: number
+  ): Promise<Patient | undefined>;
   getRecentAppointments(limit: number, offset: number): Promise<Appointment[]>;
   getAppointmentsOnRange(start: Date, end: Date): Promise<Appointment[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
@@ -391,6 +394,16 @@ export const storage: IStorage = {
 
   async getAppointmentsByPatientId(patientId: number): Promise<Appointment[]> {
     return await db.appointment.findMany({ where: { patientId } });
+  },
+
+  async getPatientFromAppointmentId(
+    appointmentId: number
+  ): Promise<Patient | undefined> {
+    const appointment = await db.appointment.findUnique({
+      where: { id: appointmentId },
+      include: { patient: true },
+    });
+    return appointment?.patient ?? undefined;
   },
 
   async getAppointmentsOnRange(start: Date, end: Date): Promise<Appointment[]> {

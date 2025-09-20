@@ -26,8 +26,9 @@ import { InsertPatient, Patient } from "@repo/db/types";
 import { DateInput } from "@/components/ui/dateInput";
 import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 import { PdfPreviewModal } from "@/components/insurance-status/pdf-preview-modal";
+import { useLocation } from "wouter";
 
-export default function EligibilityClaimStatusPage() {
+export default function InsuranceStatusPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const dispatch = useAppDispatch();
@@ -35,6 +36,7 @@ export default function EligibilityClaimStatusPage() {
     (state) => state.seleniumEligibilityCheckTask
   );
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [location] = useLocation();
 
   // Insurance eligibility and claim check form fields
   const [memberId, setMemberId] = useState("");
@@ -302,6 +304,60 @@ export default function EligibilityClaimStatusPage() {
       setIsCheckingClaimStatus(false);
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const appointmentId = params.get("appointmentId");
+    if (!appointmentId) return;
+
+    const id = Number(appointmentId);
+    if (Number.isNaN(id) || id <= 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await apiRequest("GET", `/api/appointments/${id}/patient`);
+        if (!res.ok) {
+          // try to read body for a helpful error message, otherwise show generic
+          let body: any = null;
+          try {
+            body = await res.json();
+          } catch {}
+          if (!cancelled) {
+            toast({
+              title: "Failed to load patient",
+              description:
+                body?.message ??
+                body?.error ??
+                `Could not fetch patient for appointment ${id}.`,
+              variant: "destructive",
+            });
+          }
+          return;
+        }
+
+        const data = await res.json();
+        // endpoint may return either { patient } or patient object directly
+        const patient = data?.patient ?? data;
+        if (!cancelled && patient) setSelectedPatient(patient as Patient);
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error("Error fetching patient for appointment:", err);
+          toast({
+            title: "Error",
+            description:
+              err?.message ?? "An error occurred while fetching patient.",
+            variant: "destructive",
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location]); // re-run when wouter location changes
 
   return (
     <div>
