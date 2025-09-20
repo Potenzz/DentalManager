@@ -186,17 +186,15 @@ model InsuranceCredential {
 }
 
 model PdfGroup {
-  id        Int         @id @default(autoincrement())
+  id        Int          @id @default(autoincrement())
   title     String
-  titleKey  PdfTitle?
-  category  PdfCategory
-  createdAt DateTime    @default(now())
+  titleKey  PdfTitleKey?
+  createdAt DateTime     @default(now())
   patientId Int
-  patient   Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient   Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
   pdfs      PdfFile[]
 
   @@index([patientId])
-  @@index([category])
   @@index([titleKey])
 }
 
@@ -211,14 +209,8 @@ model PdfFile {
   @@index([groupId])
 }
 
-enum PdfTitle {
+enum PdfTitleKey {
   INSURANCE_CLAIM
-  INSURANCE_STATUS_PDFs
-  OTHER
-}
-
-enum PdfCategory {
-  CLAIM
   ELIGIBILITY_STATUS
   CLAIM_STATUS
   OTHER
