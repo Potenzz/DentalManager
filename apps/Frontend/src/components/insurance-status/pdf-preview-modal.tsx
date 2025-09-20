@@ -1,26 +1,23 @@
+// src/components/insurance-status/pdf-preview-modal.tsx
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   pdfId?: number | null;
-  fallbackFilename?: string | null; // optional fallback
+  fallbackFilename?: string | null;
 }
 
-/**
- * Parse filename from Content-Disposition header.
- * Returns string | null.
- */
 function parseFilenameFromContentDisposition(header: string | null): string | null {
   if (!header) return null;
 
-  // filename* (RFC 5987): filename*=UTF-8''encoded
   const filenameStarMatch = header.match(/filename\*\s*=\s*([^;]+)/i);
   if (filenameStarMatch && filenameStarMatch[1]) {
     let raw = filenameStarMatch[1].trim();
-    raw = raw.replace(/^"(.*)"$/, "$1"); // remove quotes
+    raw = raw.replace(/^"(.*)"$/, "$1");
     const parts = raw.split("''");
     if (parts.length === 2 && parts[1]) {
       try {
@@ -36,7 +33,6 @@ function parseFilenameFromContentDisposition(header: string | null): string | nu
     }
   }
 
-  // filename="..." or filename=...
   const filenameMatchQuoted = header.match(/filename\s*=\s*"([^"]+)"/i);
   if (filenameMatchQuoted && filenameMatchQuoted[1]) {
     return filenameMatchQuoted[1].trim();
@@ -59,6 +55,7 @@ export function PdfPreviewModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resolvedFilename, setResolvedFilename] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -78,28 +75,21 @@ export function PdfPreviewModal({
       setResolvedFilename(null);
 
       try {
-        // Use the same apiRequest signature as DocumentsPage.
-        // We don't pass the AbortSignal into apiRequest to avoid signature mismatch.
         const res = await apiRequest("GET", `/api/documents/pdf-files/${pdfId}`);
-
         if (!res) {
           throw new Error("No response from server");
         }
-
         if (!res.ok) {
-          // try to get error text for better message
           const txt = await res.text().catch(() => "");
           throw new Error(txt || `Failed to fetch PDF: ${res.status}`);
         }
 
-        // read headers safely
         const contentDispHeader =
           res.headers?.get?.("content-disposition") ??
           res.headers?.get?.("Content-Disposition") ??
           null;
 
         const parsedFilename = parseFilenameFromContentDisposition(contentDispHeader);
-        // final name (string)
         const finalName = parsedFilename ?? fallbackFilename ?? `file_${pdfId}.pdf`;
         setResolvedFilename(finalName);
 
@@ -111,7 +101,6 @@ export function PdfPreviewModal({
         setFileBlobUrl(objectUrl);
       } catch (err: any) {
         if (err && (err.name === "AbortError" || err.message === "The user aborted a request.")) {
-          // ignore abort error
           return;
         }
         console.error("PdfPreviewModal fetch error:", err);
@@ -126,13 +115,12 @@ export function PdfPreviewModal({
     return () => {
       aborted = true;
       controller.abort();
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
       setFileBlobUrl(null);
       setError(null);
       setLoading(false);
       setResolvedFilename(null);
+      setIsFullscreen(false);
     };
   }, [open, pdfId, fallbackFilename]);
 
@@ -148,25 +136,46 @@ export function PdfPreviewModal({
     document.body.removeChild(a);
   };
 
+  const wrapperClass = isFullscreen
+    ? "fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+    : "fixed inset-0 z-50 flex items-center justify-center bg-black/50";
+
+  const containerClass = isFullscreen
+    ? "bg-white w-full h-full rounded-none m-0 shadow-none flex flex-col"
+    : "bg-white rounded-lg shadow-lg w-11/12 md:w-3/4 lg:w-4/5 xl:w-3/4 h-5/6 flex flex-col";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg w-11/12 md:w-3/4 lg:w-2/3 h-4/5 flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b">
-          <div>
-            <h3 className="text-lg font-semibold">{resolvedFilename ?? "PDF Preview"}</h3>
+    <div className={wrapperClass}>
+      <div className={containerClass}>
+        <div className="flex items-center justify-between p-3 md:p-4 border-b">
+          <div className="flex flex-col">
+            <h3 className="text-lg md:text-xl font-semibold">
+              {resolvedFilename ?? "PDF Preview"}
+            </h3>
             <p className="text-sm text-muted-foreground">{pdfId ? `ID: ${pdfId}` : ""}</p>
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsFullscreen((s) => !s)}
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
+
+            <Button variant="ghost" onClick={handleDownload} disabled={!fileBlobUrl || loading}>
+              Download
+            </Button>
+
             <Button variant="ghost" onClick={onClose}>
               Close
-            </Button>
-            <Button size="sm" onClick={handleDownload} disabled={!fileBlobUrl || loading}>
-              Download
             </Button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-auto p-2 md:p-4">
           {loading && <div>Loading PDF…</div>}
           {error && <div className="text-destructive">Error: {error}</div>}
           {fileBlobUrl && (
@@ -174,6 +183,7 @@ export function PdfPreviewModal({
               title="PDF Preview"
               src={fileBlobUrl}
               className="w-full h-full border"
+              style={{ minHeight: 0 }}
             />
           )}
         </div>
