@@ -46,6 +46,8 @@ router.post(
       const result =
         await forwardToSeleniumInsuranceEligibilityAgent(enrichedData);
 
+      let createdPdfFileId: number | null = null;
+
       // ✅ Step 1: Check result and update patient status
       const patient = await storage.getPatientByInsuranceId(
         insuranceEligibilityData.memberId
@@ -80,11 +82,17 @@ router.post(
           if (!group?.id) {
             throw new Error("PDF group creation failed: missing group ID");
           }
-          await storage.createPdfFile(
+
+          const created = await storage.createPdfFile(
             group.id,
             path.basename(result.pdf_path),
             pdfBuffer
           );
+
+          // created could be { id, filename } or just id, adapt to your storage API.
+          if (created && typeof created === "object" && "id" in created) {
+            createdPdfFileId = Number(created.id);
+          }
 
           await fs.unlink(result.pdf_path);
 
@@ -101,6 +109,7 @@ router.post(
       res.json({
         patientUpdateStatus: result.patientUpdateStatus,
         pdfUploadStatus: result.pdfUploadStatus,
+        pdfFileId: createdPdfFileId,
       });
     } catch (err: any) {
       console.error(err);
@@ -175,6 +184,8 @@ router.post(
       const result =
         await forwardToSeleniumInsuranceClaimStatusAgent(enrichedData);
 
+      let createdPdfFileId: number | null = null;
+
       // ✅ Step 1: Check result
       const patient = await storage.getPatientByInsuranceId(
         insuranceClaimStatusData.memberId
@@ -239,7 +250,15 @@ router.post(
 
           // Use the basename for storage
           const basename = path.basename(generatedPdfPath);
-          await storage.createPdfFile(group.id, basename, pdfBuffer);
+          const created = await storage.createPdfFile(
+            group.id,
+            basename,
+            pdfBuffer
+          );
+
+          if (created && typeof created === "object" && "id" in created) {
+            createdPdfFileId = Number(created.id);
+          }
 
           // Clean up temp files:
           try {
@@ -268,7 +287,9 @@ router.post(
 
       res.json({
         pdfUploadStatus: result.pdfUploadStatus,
+        pdfFileId: createdPdfFileId,
       });
+      return;
     } catch (err: any) {
       console.error(err);
       return res.status(500).json({

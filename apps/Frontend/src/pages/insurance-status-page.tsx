@@ -25,6 +25,7 @@ import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import { InsertPatient, Patient } from "@repo/db/types";
 import { DateInput } from "@/components/ui/dateInput";
 import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
+import { PdfPreviewModal } from "@/components/insurance-status/pdf-preview-modal";
 
 export default function EligibilityClaimStatusPage() {
   const { user } = useAuth();
@@ -43,6 +44,13 @@ export default function EligibilityClaimStatusPage() {
   const [isCheckingEligibilityStatus, setIsCheckingEligibilityStatus] =
     useState(false);
   const [isCheckingClaimStatus, setIsCheckingClaimStatus] = useState(false);
+
+  // PDF preview modal state
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewPdfId, setPreviewPdfId] = useState<number | null>(null);
+  const [previewFallbackFilename, setPreviewFallbackFilename] = useState<
+    string | null
+  >(null);
 
   // Populate fields from selected patient
   useEffect(() => {
@@ -135,6 +143,16 @@ export default function EligibilityClaimStatusPage() {
           "Your Patient Eligibility is fetched and updated, Kindly search through the patient.",
         variant: "default",
       });
+
+      // If server returned pdfFileId: open preview modal
+      if (result.pdfFileId) {
+        setPreviewPdfId(Number(result.pdfFileId));
+        // optional fallback name while header is parsed
+        setPreviewFallbackFilename(
+          result.pdfFilename ?? `eligibility_${memberId}.pdf`
+        );
+        setPreviewOpen(true);
+      }
     } catch (error: any) {
       dispatch(
         setTaskStatus({
@@ -188,6 +206,16 @@ export default function EligibilityClaimStatusPage() {
           "Your Claim Status is fetched and updated, Kindly search through the patient.",
         variant: "default",
       });
+
+      // If server returned pdfFileId: open preview modal
+      if (result.pdfFileId) {
+        setPreviewPdfId(Number(result.pdfFileId));
+        // optional fallback name while header is parsed
+        setPreviewFallbackFilename(
+          result.pdfFilename ?? `eligibility_${memberId}.pdf`
+        );
+        setPreviewOpen(true);
+      }
     } catch (error: any) {
       dispatch(
         setTaskStatus({
@@ -401,6 +429,18 @@ export default function EligibilityClaimStatusPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pdf preview modal */}
+      <PdfPreviewModal
+        open={previewOpen}
+        onClose={() => {
+          setPreviewOpen(false);
+          setPreviewPdfId(null);
+          setPreviewFallbackFilename(null);
+        }}
+        pdfId={previewPdfId ?? undefined}
+        fallbackFilename={previewFallbackFilename ?? undefined} // optional
+      />
     </div>
   );
 }
