@@ -1,95 +1,24 @@
 1. get db backup
 
 2. 
-npx prisma migrate dev --create-only --name pdfgroup_titlekey_setup
+npx prisma migrate dev --create-only --name remove-category-add-titlekey
 
 3. paste this code in migration file: 
 
 ```
--- migration: pdfgroup_titlekey_setup
+-- migration.sql
 BEGIN;
 
-------------------------------------------------------------------------
--- 1) Create PdfTitle enum type (if not exists) and add nullable column
-------------------------------------------------------------------------
+-- 0) Safety check: ensure table exists
+SELECT 1 FROM pg_tables WHERE schemaname = current_schema() AND tablename = 'PdfGroup';
+-- If above returns nothing, stop and check table name/casing.
+
+-- 1) Create the new enum type for Prisma final enum: PdfTitleKey
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'PdfTitle'
-  ) THEN
-    CREATE TYPE "PdfTitle" AS ENUM (
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PdfTitleKey') THEN
+    CREATE TYPE "PdfTitleKey" AS ENUM (
       'INSURANCE_CLAIM',
-      'INSURANCE_STATUS_PDFs',
-      'OTHER'
-    );
-  END IF;
-END$$;
-
-ALTER TABLE "PdfGroup"
-  ADD COLUMN IF NOT EXISTS "titleKey" "PdfTitle";
-
-------------------------------------------------------------------------
--- 2) Populate titleKey and rename title values
---    - 'Insurance Claim' -> titleKey = INSURANCE_CLAIM
---    - 'Eligibility PDFs' -> titleKey = INSURANCE_STATUS_PDFs and title -> 'Insurance Status PDFs'
-------------------------------------------------------------------------
-UPDATE "PdfGroup"
-SET "titleKey" = 'INSURANCE_CLAIM'
-WHERE TRIM("title") = 'Insurance Claim';
-
-UPDATE "PdfGroup"
-SET
-  "titleKey" = 'INSURANCE_STATUS_PDFs',
-  "title" = 'Insurance Status PDFs'
-WHERE TRIM("title") = 'Eligibility PDFs';
-
-------------------------------------------------------------------------
--- 3) Safely replace PdfCategory enum values:
---    Strategy:
---      a) change column type to text
---      b) normalize existing text values (map legacy names -> new names)
---      c) create new enum type with desired values
---      d) cast column from text -> new enum
---      e) drop old enum type and rename new enum to PdfCategory
-------------------------------------------------------------------------
-
--- a) Convert column to text (so we can freely rewrite strings)
-ALTER TABLE "PdfGroup"
-  ALTER COLUMN "category" TYPE text
-  USING "category"::text;
-
--- b) Normalize the textual values
--- mapping rules:
---   'ELIGIBILITY' -> 'ELIGIBILITY_STATUS'
---   'CLAIM'       -> 'CLAIM'
---   'OTHER'       -> 'OTHER'
---   'CLAIM_STATUS'-> 'CLAIM_STATUS'   (if somehow present as text)
--- Any unknown legacy values will be coerced to 'OTHER'
-UPDATE "PdfGroup"
-SET "category" =
-  CASE
-    WHEN LOWER(TRIM("category")) = 'eligibility' THEN 'ELIGIBILITY_STATUS'
-    WHEN LOWER(TRIM("category")) = 'claim' THEN 'CLAIM'
-    WHEN LOWER(TRIM("category")) = 'other' THEN 'OTHER'
-    WHEN LOWER(TRIM("category")) = 'claim_status' THEN 'CLAIM_STATUS'
-    WHEN LOWER(TRIM("category")) = 'claim status' THEN 'CLAIM_STATUS'
-    ELSE 'OTHER'
-  END;
-
--- c) Create the new enum type (with a temporary name)
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'PdfCategory_new'
-  ) THEN
-    CREATE TYPE "PdfCategory_new" AS ENUM (
-      'CLAIM',
       'ELIGIBILITY_STATUS',
       'CLAIM_STATUS',
       'OTHER'
@@ -97,32 +26,120 @@ BEGIN
   END IF;
 END$$;
 
--- d) Cast the column from text to the new enum
-ALTER TABLE "PdfGroup"
-  ALTER COLUMN "category" TYPE "PdfCategory_new"
-  USING ("category")::"PdfCategory_new";
+-- 2) Add the temporary nullable column titleKey_new of that enum type
+ALTER TABLE "PdfGroup" ADD COLUMN IF NOT EXISTS "titleKey_new" "PdfTitleKey";
 
--- e) Drop the old enum type (if present) and rename the new type to PdfCategory.
--- First drop old type if it exists
+-- 3) Populate titleKey_new from the existing columns
+--    Mapping rules:
+--      - If titleKey exists, prefer it (map INSURANCE_STATUS_PDFs -> ELIGIBILITY_STATUS)
+--      - Else, if category exists use that mapping
+--      - Else fallback to 'OTHER'
+UPDATE "PdfGroup"
+SET "titleKey_new" = (
+  CASE
+    WHEN "titleKey" IS NOT NULL THEN
+      CASE "titleKey"
+        WHEN 'INSURANCE_CLAIM' THEN 'INSURANCE_CLAIM'::"PdfTitleKey"
+        WHEN 'INSURANCE_STATUS_PDFs' THEN 'ELIGIBILITY_STATUS'::"PdfTitleKey"  -- renamed mapping
+        WHEN 'OTHER' THEN 'OTHER'::"PdfTitleKey"
+        ELSE 'OTHER'::"PdfTitleKey"
+      END
+    WHEN "category" IS NOT NULL THEN
+      CASE "category"
+        WHEN 'CLAIM' THEN 'INSURANCE_CLAIM'::"PdfTitleKey"
+        WHEN 'ELIGIBILITY_STATUS' THEN 'ELIGIBILITY_STATUS'::"PdfTitleKey"
+        WHEN 'CLAIM_STATUS' THEN 'CLAIM_STATUS'::"PdfTitleKey"
+        WHEN 'OTHER' THEN 'OTHER'::"PdfTitleKey"
+        ELSE 'OTHER'::"PdfTitleKey"
+      END
+    ELSE 'OTHER'::"PdfTitleKey"
+  END
+)
+WHERE "titleKey_new" IS NULL; -- only set rows that aren't populated
+
+-- 4) Sanity check: abort if any rows failed to populate
+--    If this returns > 0 you should inspect before continuing.
 DO $$
+DECLARE
+  cnt int;
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'PdfCategory'
-  ) THEN
-    EXECUTE 'DROP TYPE "PdfCategory"';
+  SELECT COUNT(*) INTO cnt FROM "PdfGroup" WHERE "titleKey_new" IS NULL;
+  IF cnt > 0 THEN
+    RAISE NOTICE 'Warning: % PdfGroup rows have NULL titleKey_new after mapping', cnt;
+    -- We don't abort automatically; you can uncomment next line to abort.
+    -- RAISE EXCEPTION 'Migration aborted: not all rows have titleKey_new';
   END IF;
-
-  -- rename new to canonical name
-  EXECUTE 'ALTER TYPE "PdfCategory_new" RENAME TO "PdfCategory"';
 END$$;
 
-------------------------------------------------------------------------
--- 4) Ensure indexes requested exist
-------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS "PdfGroup_patientId_idx" ON "PdfGroup" ("patientId");
-CREATE INDEX IF NOT EXISTS "PdfGroup_category_idx" ON "PdfGroup" ("category");
+-- 5) Drop index on category if it exists (index name varies by setup).
+--    We attempt to find any index that uses category on PdfGroup and drop it.
+DO $$
+DECLARE
+  idx record;
+BEGIN
+  FOR idx IN
+    SELECT indexname
+    FROM pg_indexes
+    WHERE tablename = 'PdfGroup' AND indexdef LIKE '%("category"%'
+  LOOP
+    EXECUTE format('DROP INDEX IF EXISTS %I;', idx.indexname);
+  END LOOP;
+END$$;
+
+-- 6) Drop the category column
+ALTER TABLE "PdfGroup" DROP COLUMN IF EXISTS "category";
+
+-- 7) Drop index on old titleKey if exists (index name may vary)
+DO $$
+DECLARE
+  idx record;
+BEGIN
+  FOR idx IN
+    SELECT indexname
+    FROM pg_indexes
+    WHERE tablename = 'PdfGroup' AND indexdef LIKE '%("titleKey"%'
+  LOOP
+    EXECUTE format('DROP INDEX IF EXISTS %I;', idx.indexname);
+  END LOOP;
+END$$;
+
+-- 8) Drop the old titleKey column (which uses the old enum PdfTitle)
+ALTER TABLE "PdfGroup" DROP COLUMN IF EXISTS "titleKey";
+
+-- 9) Rename the new column to titleKey
+ALTER TABLE "PdfGroup" RENAME COLUMN "titleKey_new" TO "titleKey";
+
+-- 10) Recreate index on titleKey
 CREATE INDEX IF NOT EXISTS "PdfGroup_titleKey_idx" ON "PdfGroup" ("titleKey");
+
+-- 11) Drop the old enum types if they are no longer used
+--    Only drop if no columns are using them.
+DO $$
+BEGIN
+  -- Drop old PdfTitle enum if exists and unused
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PdfTitle') THEN
+    IF NOT EXISTS (
+       SELECT 1 FROM pg_attribute a
+       JOIN pg_class c ON a.attrelid = c.oid
+       JOIN pg_namespace n ON c.relnamespace = n.oid
+       WHERE a.atttypid = (SELECT oid FROM pg_type WHERE typname = 'PdfTitle')
+    ) THEN
+      EXECUTE 'DROP TYPE IF EXISTS "PdfTitle"';
+    END IF;
+  END IF;
+
+  -- Drop old PdfCategory enum similarly
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PdfCategory') THEN
+    IF NOT EXISTS (
+       SELECT 1 FROM pg_attribute a
+       JOIN pg_class c ON a.attrelid = c.oid
+       JOIN pg_namespace n ON c.relnamespace = n.oid
+       WHERE a.atttypid = (SELECT oid FROM pg_type WHERE typname = 'PdfCategory')
+    ) THEN
+      EXECUTE 'DROP TYPE IF EXISTS "PdfCategory"';
+    END IF;
+  END IF;
+END$$;
 
 COMMIT;
 ```
