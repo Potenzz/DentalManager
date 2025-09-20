@@ -60,7 +60,7 @@ router.post(
         if (result.pdf_path && result.pdf_path.endsWith(".pdf")) {
           const pdfBuffer = await fs.readFile(result.pdf_path);
 
-          const groupTitle = "Eligibility Status PDFs";
+          const groupTitle = "Eligibility Status";
           const groupTitleKey = "ELIGIBILITY_STATUS";
 
           let group = await storage.findPdfGroupByPatientTitleKey(
@@ -216,7 +216,7 @@ router.post(
         }
 
         if (pdfBuffer && generatedPdfPath) {
-          const groupTitle = "Insurance Status PDFs";
+          const groupTitle = "Claim Status";
           const groupTitleKey = "CLAIM_STATUS";
 
           let group = await storage.findPdfGroupByPatientTitleKey(

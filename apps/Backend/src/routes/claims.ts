@@ -125,7 +125,7 @@ router.post(
         responseType: "arraybuffer",
       });
 
-      const groupTitle = "Insurance Claim";
+      const groupTitle = "Claims";
       const groupTitleKey = "INSURANCE_CLAIM";
 
       // ✅ Find or create PDF group for this claim
