@@ -54,6 +54,12 @@ export default function InsuranceStatusPage() {
     string | null
   >(null);
 
+  // 1) state to remember we should auto-run once patient arrives
+  const [pendingAutoAction, setPendingAutoAction] = useState<{
+    appointmentId: number;
+    action: "eligibility" | "claim";
+  } | null>(null);
+
   // Populate fields from selected patient
   useEffect(() => {
     if (selectedPatient) {
@@ -315,7 +321,6 @@ export default function InsuranceStatusPage() {
     if (!action || (action !== "eligibility" && action !== "claim")) return;
 
     let cancelled = false;
-    let inFlight = false;
 
     (async () => {
       try {
@@ -341,83 +346,10 @@ export default function InsuranceStatusPage() {
         const data = await res.json();
         const patient = data?.patient ?? data;
         if (!cancelled && patient) {
+          // set selectedPatient as before
           setSelectedPatient(patient as Patient);
 
-          // populate the form state (so UI updates immediately)
-          setMemberId(patient.insuranceId ?? "");
-          setFirstName(patient.firstName ?? "");
-          setLastName(patient.lastName ?? "");
-          const parsedDob =
-            patient?.dateOfBirth != null
-              ? typeof patient.dateOfBirth === "string"
-                ? parseLocalDate(patient.dateOfBirth)
-                : patient.dateOfBirth
-              : null;
-          setDateOfBirth(parsedDob ?? null);
-
-          // --- determine presence/validity from *patient* object (authoritative here) ---
-          const memberIdVal =
-            patient.insuranceId !== undefined &&
-            patient.insuranceId !== null &&
-            String(patient.insuranceId).trim() !== ""
-              ? String(patient.insuranceId).trim()
-              : "";
-
-          const firstNameVal =
-            patient.firstName !== undefined &&
-            patient.firstName !== null &&
-            String(patient.firstName).trim() !== ""
-              ? String(patient.firstName).trim()
-              : "";
-
-          // DOB check: accept valid Date objects or parseable non-empty strings
-          let dobIsValid = false;
-          if (patient.dateOfBirth != null) {
-            if (typeof patient.dateOfBirth === "string") {
-              const d = parseLocalDate(patient.dateOfBirth);
-              dobIsValid = d instanceof Date && !isNaN(d.getTime());
-            } else if (patient.dateOfBirth instanceof Date) {
-              dobIsValid = !isNaN(patient.dateOfBirth.getTime());
-            } else {
-              // some other format — treat as invalid
-              dobIsValid = false;
-            }
-          }
-
-          const missing: string[] = [];
-          if (!memberIdVal) missing.push("Member ID");
-          if (!firstNameVal) missing.push("First Name");
-          if (!dobIsValid) missing.push("Date of Birth");
-
-          if (missing.length > 0) {
-            // show toast and DO NOT auto-run
-            if (!cancelled) {
-              toast({
-                title: "Missing or invalid fields",
-                description: `Cannot auto-run. Please provide: ${missing.join(", ")}.`,
-                variant: "destructive",
-              });
-            }
-            return;
-          }
-
-          // all required fields present — run the correct handler once
-          setTimeout(async () => {
-            if (cancelled) return;
-            if (inFlight) return;
-            inFlight = true;
-            try {
-              if (action === "eligibility") {
-                await handleMHEligibilityButton();
-              } else {
-                await handleMHStatusButton();
-              }
-            } catch (err) {
-              console.error("Auto MH action failed:", err);
-            } finally {
-              inFlight = false;
-            }
-          }, 0); // 0ms gives React a tick to flush state
+          setPendingAutoAction({ appointmentId: id, action: action as any });
         }
       } catch (err: any) {
         if (!cancelled) {
@@ -436,6 +368,89 @@ export default function InsuranceStatusPage() {
       cancelled = true;
     };
   }, [location]);
+
+  // ---------- watcher effect: runs when selectedPatient AND form fields are ready ----------
+  useEffect(() => {
+    if (!pendingAutoAction) return;
+    if (!selectedPatient) return; // wait until fetch effect set it
+
+    if (
+      selectedPatient &&
+      memberId === "" &&
+      firstName === "" &&
+      dateOfBirth === null
+    ) {
+      // form hasn't been populated yet; do nothing and wait for the next re-render
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+
+    // helper: determine final values using both selectedPatient and current form state
+    const finalMemberId =
+      (selectedPatient?.insuranceId
+        ? String(selectedPatient.insuranceId).trim()
+        : "") || (memberId ? memberId.trim() : "");
+
+    const finalFirstName =
+      (selectedPatient?.firstName
+        ? String(selectedPatient.firstName).trim()
+        : "") || (firstName ? firstName.trim() : "");
+
+    // DOB: try component state first (user may have typed), else patient fallback
+    const parsedDobFromPatient =
+      selectedPatient?.dateOfBirth != null
+        ? typeof selectedPatient.dateOfBirth === "string"
+          ? parseLocalDate(selectedPatient.dateOfBirth)
+          : selectedPatient.dateOfBirth
+        : null;
+    const finalDob = dateOfBirth ?? parsedDobFromPatient ?? null;
+
+    const missing: string[] = [];
+    if (!finalMemberId) missing.push("Member ID");
+    if (!finalFirstName) missing.push("First Name");
+    if (!finalDob) missing.push("Date of Birth");
+
+    if (missing.length > 0) {
+      toast({
+        title: "Missing Fields",
+        description: `Cannot auto-run. Missing: ${missing.join(", ")}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If ready, call the requested handler once. Clear pendingAutoAction afterwards.
+    (async () => {
+      if (cancelled) return;
+      if (inFlight) return;
+      inFlight = true;
+
+      try {
+        if (pendingAutoAction.action === "eligibility") {
+          await handleMHEligibilityButton();
+        } else {
+          await handleMHStatusButton();
+        }
+      } catch (err) {
+        console.error("Auto MH action failed:", err);
+      } finally {
+        inFlight = false;
+        if (!cancelled) setPendingAutoAction(null); // clear so it doesn't run again
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    pendingAutoAction,
+    selectedPatient,
+    memberId,
+    firstName,
+    dateOfBirth,
+  ]);
 
   return (
     <div>
