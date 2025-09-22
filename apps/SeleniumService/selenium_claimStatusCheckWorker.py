@@ -120,6 +120,13 @@ class AutomationMassHealthClaimStatusCheck:
     
     def step2(self):
         try:
+            # Wait until page is fully loaded
+            WebDriverWait(self.driver, 30).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+            # Small buffer for async content/lazy load
+            time.sleep(2)
+
             # ---- Take full page screenshot ----
             screenshot_path = os.path.join(self.download_dir, f"ss_{self.memberId}.png")
 
@@ -152,12 +159,11 @@ class AutomationMassHealthClaimStatusCheck:
                 # Scroll to the position (do not trigger reload)
                 self.driver.execute_script(f"window.scrollTo(0, {scroll_y});")
                 # Allow time for lazy content to load after scroll (tweak if needed)
-                time.sleep(0.35)
+                time.sleep(1.5)
 
                 # capture viewport screenshot as PNG bytes
                 png = self.driver.get_screenshot_as_png()  # returns bytes
                 img = Image.open(BytesIO(png))
-
 
                 # If full page width > viewport width (rare), optionally resize/crop:
                 if img.width != total_width:
