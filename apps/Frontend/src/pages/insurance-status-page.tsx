@@ -440,7 +440,7 @@ export default function InsuranceStatusPage() {
                 ) : (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    MH Eligibility Check
+                    MH Eligibility
                   </>
                 )}
               </Button>
@@ -458,7 +458,7 @@ export default function InsuranceStatusPage() {
                 ) : (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    MH Status Check
+                    MH Status
                   </>
                 )}
               </Button>
