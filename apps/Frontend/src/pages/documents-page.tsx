@@ -14,14 +14,24 @@ import { Eye, Trash, Download, FolderOpen } from "lucide-react";
 import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 import { PatientTable } from "@/components/patients/patient-table";
 import { Patient, PdfFile } from "@repo/db/types";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export default function DocumentsPage() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [expandedGroupId, setExpandedGroupId] = useState<number | null>(null);
 
   // pagination state for the expanded group
+  // pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(5);
-  const [offset, setOffset] = useState<number>(0);
+  const offset = (currentPage - 1) * limit;
   const [totalForExpandedGroup, setTotalForExpandedGroup] = useState<
     number | null
   >(null);
@@ -37,7 +47,7 @@ export default function DocumentsPage() {
   useEffect(() => {
     setExpandedGroupId(null);
     setLimit(5);
-    setOffset(0);
+    setCurrentPage(1);
     setTotalForExpandedGroup(null);
     setFileBlobUrl(null);
   }, [selectedPatient]);
@@ -90,7 +100,7 @@ export default function DocumentsPage() {
     refetch: refetchGroupPdfs,
     isFetching: isFetchingPdfs,
   } = useQuery({
-    queryKey: ["groupPdfs", expandedGroupId, limit, offset],
+    queryKey: ["groupPdfs", expandedGroupId, currentPage, limit],
     enabled: !!expandedGroupId,
     queryFn: async () => {
       // API should accept ?limit & ?offset and also return total count
@@ -115,11 +125,9 @@ export default function DocumentsPage() {
     onSuccess: () => {
       setIsDeletePdfOpen(false);
       setCurrentPdf(null);
-      if (expandedGroupId != null) {
-        queryClient.invalidateQueries({
-          queryKey: ["groupPdfs", expandedGroupId],
-        });
-      }
+      queryClient.invalidateQueries({
+        queryKey: ["groupPdfs", expandedGroupId],
+      });
       toast({ title: "Success", description: "PDF deleted successfully!" });
     },
     onError: (error: any) => {
@@ -169,20 +177,43 @@ export default function DocumentsPage() {
   const toggleExpandGroup = (groupId: number) => {
     if (expandedGroupId === groupId) {
       setExpandedGroupId(null);
-      setOffset(0);
+      setCurrentPage(1);
       setLimit(5);
       setTotalForExpandedGroup(null);
     } else {
       setExpandedGroupId(groupId);
-      setOffset(0);
+      setCurrentPage(1);
       setLimit(5);
       setTotalForExpandedGroup(null);
     }
   };
 
-  const handleLoadMore = () => {
-    setOffset((prev) => prev + limit);
-  };
+  // pagintaion helper
+  const totalPages = totalForExpandedGroup
+    ? Math.ceil(totalForExpandedGroup / limit)
+    : 1;
+
+  const startItem = totalForExpandedGroup ? offset + 1 : 0;
+  const endItem = totalForExpandedGroup
+    ? Math.min(offset + limit, totalForExpandedGroup)
+    : 0;
+
+  function getPageNumbers(current: number, total: number) {
+    const delta = 2;
+    const range: (number | "...")[] = [];
+    for (
+      let i = Math.max(2, current - delta);
+      i <= Math.min(total - 1, current + delta);
+      i++
+    ) {
+      range.push(i);
+    }
+    if (current - delta > 2) range.unshift("...");
+    if (current + delta < total - 1) range.push("...");
+    range.unshift(1);
+    if (total > 1) range.push(total);
+    return range;
+  }
 
   return (
     <div>
@@ -309,28 +340,87 @@ export default function DocumentsPage() {
                                         </div>
                                       ))}
 
-                                      {/* pagination controls */}
-                                      <div className="flex items-center gap-2">
-                                        {totalForExpandedGroup !== null &&
-                                          totalForExpandedGroup >
-                                            offset + limit && (
-                                            <Button
-                                              size="sm"
-                                              onClick={handleLoadMore}
-                                            >
-                                              Load more
-                                            </Button>
-                                          )}
+                                      {/* Pagination */}
+                                      {totalPages > 1 && (
+                                        <div className="bg-white px-4 py-3 border-t border-gray-200 rounded">
+                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="text-sm text-muted-foreground mb-2 sm:mb-0 whitespace-nowrap">
+                                              Showing {startItem}–{endItem} of{" "}
+                                              {totalForExpandedGroup || 0}{" "}
+                                              results
+                                            </div>
+                                            <Pagination>
+                                              <PaginationContent>
+                                                <PaginationItem>
+                                                  <PaginationPrevious
+                                                    href="#"
+                                                    onClick={(e) => {
+                                                      e.preventDefault();
+                                                      if (currentPage > 1)
+                                                        setCurrentPage(
+                                                          currentPage - 1
+                                                        );
+                                                    }}
+                                                    className={
+                                                      currentPage === 1
+                                                        ? "pointer-events-none opacity-50"
+                                                        : ""
+                                                    }
+                                                  />
+                                                </PaginationItem>
 
-                                        <div className="ml-auto text-sm text-muted-foreground">
-                                          Showing{" "}
-                                          {Math.min(
-                                            offset + limit,
-                                            totalForExpandedGroup ?? 0
-                                          )}{" "}
-                                          of {totalForExpandedGroup ?? "?"}
+                                                {getPageNumbers(
+                                                  currentPage,
+                                                  totalPages
+                                                ).map((page, idx) => (
+                                                  <PaginationItem key={idx}>
+                                                    {page === "..." ? (
+                                                      <span className="px-2 text-gray-500">
+                                                        ...
+                                                      </span>
+                                                    ) : (
+                                                      <PaginationLink
+                                                        href="#"
+                                                        onClick={(e) => {
+                                                          e.preventDefault();
+                                                          setCurrentPage(
+                                                            page as number
+                                                          );
+                                                        }}
+                                                        isActive={
+                                                          currentPage === page
+                                                        }
+                                                      >
+                                                        {page}
+                                                      </PaginationLink>
+                                                    )}
+                                                  </PaginationItem>
+                                                ))}
+
+                                                <PaginationItem>
+                                                  <PaginationNext
+                                                    href="#"
+                                                    onClick={(e) => {
+                                                      e.preventDefault();
+                                                      if (
+                                                        currentPage < totalPages
+                                                      )
+                                                        setCurrentPage(
+                                                          currentPage + 1
+                                                        );
+                                                    }}
+                                                    className={
+                                                      currentPage === totalPages
+                                                        ? "pointer-events-none opacity-50"
+                                                        : ""
+                                                    }
+                                                  />
+                                                </PaginationItem>
+                                              </PaginationContent>
+                                            </Pagination>
+                                          </div>
                                         </div>
-                                      </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
