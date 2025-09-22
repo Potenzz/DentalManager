@@ -308,18 +308,19 @@ export default function InsuranceStatusPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const appointmentId = params.get("appointmentId");
+    const action = params.get("action"); // 'eligibility' | 'claim'
     if (!appointmentId) return;
-
     const id = Number(appointmentId);
     if (Number.isNaN(id) || id <= 0) return;
+    if (!action || (action !== "eligibility" && action !== "claim")) return;
 
     let cancelled = false;
+    const inFlight = { running: false }; // local guard to avoid concurrent calls
 
     (async () => {
       try {
         const res = await apiRequest("GET", `/api/appointments/${id}/patient`);
         if (!res.ok) {
-          // try to read body for a helpful error message, otherwise show generic
           let body: any = null;
           try {
             body = await res.json();
@@ -338,9 +339,52 @@ export default function InsuranceStatusPage() {
         }
 
         const data = await res.json();
-        // endpoint may return either { patient } or patient object directly
         const patient = data?.patient ?? data;
-        if (!cancelled && patient) setSelectedPatient(patient as Patient);
+        if (!cancelled && patient) {
+          setSelectedPatient(patient as Patient);
+
+          // Give the selectedPatient -> form fields effect a brief moment to run
+          setTimeout(() => {
+            if (cancelled) return;
+
+            const tryInvoke = async () => {
+              if (cancelled) return;
+              // prevent overlapping concurrent handler calls
+              if (inFlight.running) return;
+
+              const ready =
+                (memberId?.trim() ?? "") !== "" &&
+                (firstName?.trim() ?? "") !== "" &&
+                dateOfBirth !== null;
+
+              if (!ready) return;
+
+              inFlight.running = true;
+              try {
+                if (action === "eligibility") {
+                  await handleMHEligibilityButton();
+                } else {
+                  await handleMHStatusButton();
+                }
+              } catch (err) {
+                console.error("Auto MH action failed:", err);
+              } finally {
+                inFlight.running = false;
+              }
+            };
+
+            // single-shot attempt, plus one quick retry if fields weren't populated yet
+            (async () => {
+              await tryInvoke();
+              if (!cancelled && !inFlight.running) {
+                // if not ready previously, try again shortly (single retry)
+                setTimeout(async () => {
+                  await tryInvoke();
+                }, 150);
+              }
+            })();
+          }, 100); // small delay to let form state populate
+        }
       } catch (err: any) {
         if (!cancelled) {
           console.error("Error fetching patient for appointment:", err);
@@ -357,7 +401,7 @@ export default function InsuranceStatusPage() {
     return () => {
       cancelled = true;
     };
-  }, [location]); // re-run when wouter location changes
+  }, [location]);
 
   return (
     <div>

@@ -651,8 +651,17 @@ export default function AppointmentsPage() {
   }
 
   // -------------------
+  // appointment page — update these handlers
   const handleCheckEligibility = (appointmentId: number) => {
-    setLocation(`/insurance-status?appointmentId=${appointmentId}`);
+    setLocation(
+      `/insurance-status?appointmentId=${appointmentId}&action=eligibility`
+    );
+  };
+
+  const handleCheckClaimStatus = (appointmentId: number) => {
+    setLocation(
+      `/insurance-status?appointmentId=${appointmentId}&action=claim`
+    );
   };
 
   const handleClaimsPreAuth = (appointmentId: number) => {
@@ -732,7 +741,17 @@ export default function AppointmentsPage() {
           >
             <span className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
-              Check Eligibility
+              Eligibility Status
+            </span>
+          </Item>
+
+          {/* Check Eligibility */}
+          <Item
+            onClick={({ props }) => handleCheckClaimStatus(props.appointmentId)}
+          >
+            <span className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Claim Status
             </span>
           </Item>
 
