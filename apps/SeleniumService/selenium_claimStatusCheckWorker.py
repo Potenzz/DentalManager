@@ -8,8 +8,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 import time
 import os
 import base64
-from io import BytesIO
-from PIL import Image
 
 class AutomationMassHealthClaimStatusCheck:    
     def __init__(self, data):
