@@ -192,7 +192,7 @@ export default function ClaimViewModal({
                         </p>
                         <p>
                           <span className="text-gray-500">Procedure Date:</span>{" "}
-                          {formatDateToHumanReadable(line.procedureCode)}
+                          {formatDateToHumanReadable(line.procedureDate)}
                         </p>
                         {line.oralCavityArea && (
                           <p>
