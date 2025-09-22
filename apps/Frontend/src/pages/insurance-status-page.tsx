@@ -343,42 +343,57 @@ export default function InsuranceStatusPage() {
         if (!cancelled && patient) {
           setSelectedPatient(patient as Patient);
 
-          // derive values (use fetched patient as authoritative fallback)
-          const memberIdVal = (patient?.insuranceId ?? memberId ?? "")
-            .toString()
-            .trim();
-          const firstNameVal = (patient?.firstName ?? firstName ?? "")
-            .toString()
-            .trim();
-          const dobVal =
-            dateOfBirth !== null
-              ? dateOfBirth
-              : patient?.dateOfBirth
-                ? typeof patient.dateOfBirth === "string"
-                  ? parseLocalDate(patient.dateOfBirth)
-                  : patient.dateOfBirth
-                : null;
-
-          // if any required field is missing, show toast and don't auto-run
-          const missing: string[] = [];
-          if (!memberIdVal) missing.push("Member ID");
-          if (!firstNameVal) missing.push("First Name");
-          if (!dobVal) missing.push("Date of Birth");
-
-          // populate the form state (keeps inputs consistent with patient)
+          // populate the form state (so UI updates immediately)
           setMemberId(patient.insuranceId ?? "");
           setFirstName(patient.firstName ?? "");
           setLastName(patient.lastName ?? "");
-          setDateOfBirth(
-            typeof patient.dateOfBirth === "string"
-              ? parseLocalDate(patient.dateOfBirth)
-              : (patient.dateOfBirth ?? null)
-          );
+          const parsedDob =
+            patient?.dateOfBirth != null
+              ? typeof patient.dateOfBirth === "string"
+                ? parseLocalDate(patient.dateOfBirth)
+                : patient.dateOfBirth
+              : null;
+          setDateOfBirth(parsedDob ?? null);
+
+          // --- determine presence/validity from *patient* object (authoritative here) ---
+          const memberIdVal =
+            patient.insuranceId !== undefined &&
+            patient.insuranceId !== null &&
+            String(patient.insuranceId).trim() !== ""
+              ? String(patient.insuranceId).trim()
+              : "";
+
+          const firstNameVal =
+            patient.firstName !== undefined &&
+            patient.firstName !== null &&
+            String(patient.firstName).trim() !== ""
+              ? String(patient.firstName).trim()
+              : "";
+
+          // DOB check: accept valid Date objects or parseable non-empty strings
+          let dobIsValid = false;
+          if (patient.dateOfBirth != null) {
+            if (typeof patient.dateOfBirth === "string") {
+              const d = parseLocalDate(patient.dateOfBirth);
+              dobIsValid = d instanceof Date && !isNaN(d.getTime());
+            } else if (patient.dateOfBirth instanceof Date) {
+              dobIsValid = !isNaN(patient.dateOfBirth.getTime());
+            } else {
+              // some other format — treat as invalid
+              dobIsValid = false;
+            }
+          }
+
+          const missing: string[] = [];
+          if (!memberIdVal) missing.push("Member ID");
+          if (!firstNameVal) missing.push("First Name");
+          if (!dobIsValid) missing.push("Date of Birth");
 
           if (missing.length > 0) {
+            // show toast and DO NOT auto-run
             if (!cancelled) {
               toast({
-                title: "Missing Fields",
+                title: "Missing or invalid fields",
                 description: `Cannot auto-run. Please provide: ${missing.join(", ")}.`,
                 variant: "destructive",
               });
