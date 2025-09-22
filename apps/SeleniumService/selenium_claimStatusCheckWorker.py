@@ -137,9 +137,6 @@ class AutomationMassHealthClaimStatusCheck:
             ))
             dpr = float(self.driver.execute_script("return window.devicePixelRatio || 1;"))
 
-            # Debug
-            print(f"Requesting full-page capture: total: {total_width}x{total_height}, dpr: {dpr}")
-
             # Set device metrics to the full page size so Page.captureScreenshot captures everything
             # Note: Some pages are extremely tall; if you hit memory limits, you can capture in chunks.
             self.driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
