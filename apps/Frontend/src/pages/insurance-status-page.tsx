@@ -315,7 +315,7 @@ export default function InsuranceStatusPage() {
     if (!action || (action !== "eligibility" && action !== "claim")) return;
 
     let cancelled = false;
-    const inFlight = { running: false }; // local guard to avoid concurrent calls
+    let inFlight = false;
 
     (async () => {
       try {
@@ -343,47 +343,66 @@ export default function InsuranceStatusPage() {
         if (!cancelled && patient) {
           setSelectedPatient(patient as Patient);
 
-          // Give the selectedPatient -> form fields effect a brief moment to run
-          setTimeout(() => {
+          // derive values (use fetched patient as authoritative fallback)
+          const memberIdVal = (patient?.insuranceId ?? memberId ?? "")
+            .toString()
+            .trim();
+          const firstNameVal = (patient?.firstName ?? firstName ?? "")
+            .toString()
+            .trim();
+          const dobVal =
+            dateOfBirth !== null
+              ? dateOfBirth
+              : patient?.dateOfBirth
+                ? typeof patient.dateOfBirth === "string"
+                  ? parseLocalDate(patient.dateOfBirth)
+                  : patient.dateOfBirth
+                : null;
+
+          // if any required field is missing, show toast and don't auto-run
+          const missing: string[] = [];
+          if (!memberIdVal) missing.push("Member ID");
+          if (!firstNameVal) missing.push("First Name");
+          if (!dobVal) missing.push("Date of Birth");
+
+          // populate the form state (keeps inputs consistent with patient)
+          setMemberId(patient.insuranceId ?? "");
+          setFirstName(patient.firstName ?? "");
+          setLastName(patient.lastName ?? "");
+          setDateOfBirth(
+            typeof patient.dateOfBirth === "string"
+              ? parseLocalDate(patient.dateOfBirth)
+              : (patient.dateOfBirth ?? null)
+          );
+
+          if (missing.length > 0) {
+            if (!cancelled) {
+              toast({
+                title: "Missing Fields",
+                description: `Cannot auto-run. Please provide: ${missing.join(", ")}.`,
+                variant: "destructive",
+              });
+            }
+            return;
+          }
+
+          // all required fields present — run the correct handler once
+          setTimeout(async () => {
             if (cancelled) return;
-
-            const tryInvoke = async () => {
-              if (cancelled) return;
-              // prevent overlapping concurrent handler calls
-              if (inFlight.running) return;
-
-              const ready =
-                (memberId?.trim() ?? "") !== "" &&
-                (firstName?.trim() ?? "") !== "" &&
-                dateOfBirth !== null;
-
-              if (!ready) return;
-
-              inFlight.running = true;
-              try {
-                if (action === "eligibility") {
-                  await handleMHEligibilityButton();
-                } else {
-                  await handleMHStatusButton();
-                }
-              } catch (err) {
-                console.error("Auto MH action failed:", err);
-              } finally {
-                inFlight.running = false;
+            if (inFlight) return;
+            inFlight = true;
+            try {
+              if (action === "eligibility") {
+                await handleMHEligibilityButton();
+              } else {
+                await handleMHStatusButton();
               }
-            };
-
-            // single-shot attempt, plus one quick retry if fields weren't populated yet
-            (async () => {
-              await tryInvoke();
-              if (!cancelled && !inFlight.running) {
-                // if not ready previously, try again shortly (single retry)
-                setTimeout(async () => {
-                  await tryInvoke();
-                }, 150);
-              }
-            })();
-          }, 100); // small delay to let form state populate
+            } catch (err) {
+              console.error("Auto MH action failed:", err);
+            } finally {
+              inFlight = false;
+            }
+          }, 0); // 0ms gives React a tick to flush state
         }
       } catch (err: any) {
         if (!cancelled) {
