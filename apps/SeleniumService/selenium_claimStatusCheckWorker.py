@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import os
+import base64
 from io import BytesIO
 from PIL import Image
 
@@ -117,143 +118,73 @@ class AutomationMassHealthClaimStatusCheck:
             print(f"Error while step1 i.e Cheking the MemberId and DOB in: {e}")
             return "ERROR:STEP1"
 
-    
     def step2(self):
         try:
-            # Wait until page is fully loaded
             try:
                 WebDriverWait(self.driver, 30).until(
                     lambda d: d.execute_script("return document.readyState") == "complete"
                 )
             except Exception:
-                # proceed anyway if not perfect
                 print("Warning: document.readyState did not become 'complete' within timeout")
 
-            # ---- Take full page screenshot ----
-            screenshot_path = os.path.join(self.download_dir, f"ss_{self.memberId}.png")
+            # Give some time for lazy content to finish rendering (adjust if needed)
+            time.sleep(0.6)
 
-            # Get sizes and devicePixelRatio (DPR)
+            # Get total page size and DPR
             total_width = int(self.driver.execute_script(
                 "return Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, document.documentElement.clientWidth);"
             ))
             total_height = int(self.driver.execute_script(
                 "return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.documentElement.clientHeight);"
             ))
-            viewport_width = int(self.driver.execute_script("return document.documentElement.clientWidth;"))
-            viewport_height = int(self.driver.execute_script("return window.innerHeight;"))
             dpr = float(self.driver.execute_script("return window.devicePixelRatio || 1;"))
 
-            # Debug print
-            print(f"total: {total_width}x{total_height}, viewport: {viewport_width}x{viewport_height}, dpr: {dpr}")
-            
-             # Build slice rectangles in CSS pixels
-            rectangles = []
-            y = 0
-            while y < total_height:
-                top = y
-                height = viewport_height if (y + viewport_height) <= total_height else (total_height - y)
-                rectangles.append((0, top, viewport_width, top + height))
-                y += viewport_height
+            # Debug
+            print(f"Requesting full-page capture: total: {total_width}x{total_height}, dpr: {dpr}")
 
-            stitched_image = Image.new('RGB', (total_width, total_height))
+            # Set device metrics to the full page size so Page.captureScreenshot captures everything
+            # Note: Some pages are extremely tall; if you hit memory limits, you can capture in chunks.
+            self.driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+                "mobile": False,
+                "width": total_width,
+                "height": total_height,
+                "deviceScaleFactor": dpr,
+                "screenOrientation": {"angle": 0, "type": "portraitPrimary"}
+            })
 
+            # Small pause for layout to settle after emulation change
+            time.sleep(0.15)
 
-            for idx, rect in enumerate(rectangles):
-                scroll_y = rect[1]
-                # Scroll to target Y and wait until pageYOffset is near target
-                self.driver.execute_script(f"window.scrollTo(0, {scroll_y});")
+            # Capture screenshot (base64 PNG)
+            result = self.driver.execute_cdp_cmd("Page.captureScreenshot", {"format": "png", "fromSurface": True})
+            image_data = base64.b64decode(result.get('data', ''))
+            screenshot_path = os.path.join(self.download_dir, f"ss_{self.memberId}.png")
+            with open(screenshot_path, "wb") as f:
+                f.write(image_data)
 
-                # Wait until the browser actually reports the desired scroll position (with a tolerance)
-                max_wait = 5.0
-                start = time.time()
-                while time.time() - start < max_wait:
-                    try:
-                        cur = int(self.driver.execute_script("return Math.round(window.pageYOffset || window.scrollY || 0);"))
-                    except Exception:
-                        cur = -1
-                    # Accept small differences due to rounding / subpixel scrolling
-                    if abs(cur - scroll_y) <= 2:
-                        break
-                    time.sleep(0.05)
-                else:
-                    # timed out waiting for scroll to finish - print but continue
-                    print(f"Warning: scroll to {scroll_y} didn't reach expected offset (got {cur})")
+            # Restore original metrics to avoid affecting further interactions
+            try:
+                self.driver.execute_cdp_cmd('Emulation.clearDeviceMetricsOverride', {})
+            except Exception:
+                # non-fatal: continue
+                pass
 
-                # Small buffer to let lazy content for this slice load (tweak if needed)
-                time.sleep(0.6)
-
-                
-                # capture viewport screenshot as PNG bytes
-                png = self.driver.get_screenshot_as_png()
-                img = Image.open(BytesIO(png)).convert("RGB")
-
-                # The captured PNG width/height are in *device pixels* (scaled by dpr).
-                # Compute crop box in device pixels.
-                css_viewport_w = viewport_width
-                css_viewport_h = viewport_height
-                dev_viewport_w = int(round(css_viewport_w * dpr))
-                dev_viewport_h = int(round(css_viewport_h * dpr))
-
-                # If captured image dimensions differ from expected device viewport,
-                # try to adjust (some platforms include browser chrome etc.). We'll compute offsets intelligently.
-                cap_w, cap_h = img.width, img.height
-
-                # If cap_h > dev_viewport_h (e.g., when headless gives larger image),
-                # center vertically or just use top-left crop of size dev_viewport_h.
-                crop_left = 0
-                crop_top = 0
-                crop_right = min(cap_w, dev_viewport_w)
-                crop_bottom = min(cap_h, dev_viewport_h)
-
-                # Defensive: if screenshot is smaller than expected, adjust crop sizes
-                if crop_right <= crop_left or crop_bottom <= crop_top:
-                    print("Captured image smaller than expected viewport; using full captured image.")
-                    crop_left, crop_top, crop_right, crop_bottom = 0, 0, cap_w, cap_h
-
-                cropped = img.crop((crop_left, crop_top, crop_right, crop_bottom))
-
-                # Convert back to CSS pixels for paste: compute paste height based on rect height
-                paste_height_css = rect[3] - rect[1]  # CSS pixels
-                # The cropped image height in CSS pixels:
-                cropped_css_height = int(round(cropped.height / dpr))
-
-                # If the cropped CSS height is larger than required (last slice), crop it in CSS space
-                if cropped_css_height > paste_height_css:
-                    # compute pixels to keep in device pixels
-                    keep_dev_h = int(round(paste_height_css * dpr))
-                    cropped = cropped.crop((0, 0, cropped.width, keep_dev_h))
-                    cropped_css_height = paste_height_css
-
-                # Convert cropped (device pixels) back to image suitable for pasting:
-                # For pasting into stitched_image we need CSS-pixel sized image.
-                # Resize from device pixels to CSS pixels if DPR != 1
-                if dpr != 1.0:
-                    target_w = int(round(cropped.width / dpr))
-                    target_h = int(round(cropped.height / dpr))
-                    cropped = cropped.resize((target_w, target_h), Image.LANCZOS)
-
-                # Paste at the correct vertical CSS pixel position
-                paste_y = rect[1]
-                stitched_image.paste(cropped, (0, paste_y))
-
-            # Save final stitched image
-            stitched_image.save(screenshot_path)
             print("Screenshot saved at:", screenshot_path)
+            return {"status": "success", "ss_path": screenshot_path}
 
-            return {
-                "status": "success",
-                "ss_path":screenshot_path
-            }
         except Exception as e:
-            print(f"ERROR: {str(e)}")
-            return {
-                "status": "error",
-                "message": str(e),
-            }
+            print("ERROR in step2:", e)
+            return {"status": "error", "message": str(e)}
 
         finally:
+            # Keep your existing quit behavior; if you want the driver to remain open for further
+            # actions, remove or change this.
             if self.driver:
-                self.driver.quit()
+                try:
+                    self.driver.quit()
+                except Exception:
+                    pass
+    
 
     def main_workflow(self, url):
         try: 
