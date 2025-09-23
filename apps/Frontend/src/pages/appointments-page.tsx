@@ -665,7 +665,7 @@ export default function AppointmentsPage() {
   };
 
   const handleClaimsPreAuth = (appointmentId: number) => {
-    console.log(`Opening Claims/PreAuth for appointment: ${appointmentId}`);
+    setLocation(`/claims?appointmentId=${appointmentId}`);
   };
 
   const handlePayments = (appointmentId: number) => {
