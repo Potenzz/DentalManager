@@ -311,6 +311,26 @@ export default function InsuranceStatusPage() {
     }
   };
 
+  // small helper: remove given query params from the current URL (silent, no reload)
+  const clearUrlParams = (params: string[]) => {
+    try {
+      const url = new URL(window.location.href);
+      let changed = false;
+      for (const p of params) {
+        if (url.searchParams.has(p)) {
+          url.searchParams.delete(p);
+          changed = true;
+        }
+      }
+      if (changed) {
+        window.history.replaceState({}, document.title, url.toString());
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // handling case-1, when redirect happens from appointment page:
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const appointmentId = params.get("appointmentId");
@@ -350,6 +370,7 @@ export default function InsuranceStatusPage() {
           setSelectedPatient(patient as Patient);
 
           setPendingAutoAction({ appointmentId: id, action: action as any });
+          clearUrlParams(["appointmentId", "action"]);
         }
       } catch (err: any) {
         if (!cancelled) {
@@ -369,7 +390,7 @@ export default function InsuranceStatusPage() {
     };
   }, [location]);
 
-  // ---------- watcher effect: runs when selectedPatient AND form fields are ready ----------
+  // ---------- same case1: runs when selectedPatient AND form fields are ready ----------
   useEffect(() => {
     if (!pendingAutoAction) return;
     if (!selectedPatient) return; // wait until fetch effect set it
@@ -444,13 +465,7 @@ export default function InsuranceStatusPage() {
     return () => {
       cancelled = true;
     };
-  }, [
-    pendingAutoAction,
-    selectedPatient,
-    memberId,
-    firstName,
-    dateOfBirth,
-  ]);
+  }, [pendingAutoAction, selectedPatient, memberId, firstName, dateOfBirth]);
 
   return (
     <div>
