@@ -669,7 +669,7 @@ export default function AppointmentsPage() {
   };
 
   const handlePayments = (appointmentId: number) => {
-    console.log(`Processing payments for appointment: ${appointmentId}`);
+    setLocation(`/payments?appointmentId=${appointmentId}`);
   };
 
   const handleChartPlan = (appointmentId: number) => {

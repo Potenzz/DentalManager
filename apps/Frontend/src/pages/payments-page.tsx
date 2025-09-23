@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Card,
   CardHeader,
@@ -17,9 +17,93 @@ import {
 import PaymentsRecentTable from "@/components/payments/payments-recent-table";
 import PaymentsOfPatientModal from "@/components/payments/payments-of-patient-table";
 import PaymentOCRBlock from "@/components/payments/payment-ocr-block";
+import { useLocation } from "wouter";
+import { Patient } from "@repo/db/types";
+import { apiRequest } from "@/lib/queryClient";
+import { toast } from "@/hooks/use-toast";
 
 export default function PaymentsPage() {
   const [paymentPeriod, setPaymentPeriod] = useState<string>("all-time");
+
+  // for auto-open from appointment redirect
+  const [location] = useLocation();
+  const [initialPatientForModal, setInitialPatientForModal] =
+    useState<Patient | null>(null);
+  const [openPatientModalFromAppointment, setOpenPatientModalFromAppointment] =
+    useState(false);
+
+  // small helper: remove query params silently
+  const clearUrlParams = (params: string[]) => {
+    try {
+      const url = new URL(window.location.href);
+      let changed = false;
+      for (const p of params) {
+        if (url.searchParams.has(p)) {
+          url.searchParams.delete(p);
+          changed = true;
+        }
+      }
+      if (changed)
+        window.history.replaceState({}, document.title, url.toString());
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // case1: If payments page is opened via appointment-page, /payments?appointmentId=123 -> fetch patient and open modal
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const appointmentIdParam = params.get("appointmentId");
+    if (!appointmentIdParam) return;
+    const appointmentId = Number(appointmentIdParam);
+    if (!Number.isFinite(appointmentId) || appointmentId <= 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await apiRequest(
+          "GET",
+          `/api/appointments/${appointmentId}/patient`
+        );
+        if (!res.ok) {
+          let body: any = null;
+          try {
+            body = await res.json();
+          } catch {}
+          if (!cancelled) {
+            toast({
+              title: "Failed to load patient",
+              description:
+                body?.message ??
+                body?.error ??
+                `Could not fetch patient for appointment ${appointmentId}.`,
+              variant: "destructive",
+            });
+          }
+          return;
+        }
+
+        const data = await res.json();
+        const patient = data?.patient ?? data;
+        if (!cancelled && patient && patient.id) {
+          setInitialPatientForModal(patient as Patient);
+          setOpenPatientModalFromAppointment(true);
+
+          // remove query param so reload won't re-open
+          clearUrlParams(["appointmentId"]);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Error fetching patient for appointment:", err);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location]);
 
   return (
     <div>
@@ -122,7 +206,15 @@ export default function PaymentsPage() {
       </Card>
 
       {/* Recent Payments by Patients*/}
-      <PaymentsOfPatientModal />
+      <PaymentsOfPatientModal
+        initialPatient={initialPatientForModal}
+        openInitially={openPatientModalFromAppointment}
+        onClose={() => {
+          // reset the local flags when modal is closed
+          setOpenPatientModalFromAppointment(false);
+          setInitialPatientForModal(null);
+        }}
+      />
     </div>
   );
 }
