@@ -299,12 +299,17 @@ export function ClaimForm({
   }, []);
 
   // 1st Button workflow - Mass Health Button Handler
-  const handleMHSubmit = async () => {
+  const handleMHSubmit = async (
+    formToUse?: ClaimFormData & { uploadedFiles?: File[] }
+  ) => {
+    // Use the passed form, or fallback to current state
+    const f = formToUse ?? form;
+
     // 0. Validate required fields
     const missingFields: string[] = [];
 
-    if (!form.memberId?.trim()) missingFields.push("Member ID");
-    if (!form.dateOfBirth?.trim()) missingFields.push("Date of Birth");
+    if (!f.memberId?.trim()) missingFields.push("Member ID");
+    if (!f.dateOfBirth?.trim()) missingFields.push("Date of Birth");
     if (!patient?.firstName?.trim()) missingFields.push("First Name");
 
     if (missingFields.length > 0) {
@@ -319,7 +324,7 @@ export function ClaimForm({
     // 1. Create or update appointment
     const appointmentData = {
       patientId: patientId,
-      date: serviceDate,
+      date: f.serviceDate,
       staffId: staff?.id,
     };
     const appointmentId = await onHandleAppointmentSubmit(appointmentData);
@@ -343,10 +348,10 @@ export function ClaimForm({
 
     // 3. Create Claim(if not)
     // Filter out empty service lines (empty procedureCode)
-    const filteredServiceLines = form.serviceLines.filter(
+    const filteredServiceLines = f.serviceLines.filter(
       (line) => line.procedureCode.trim() !== ""
     );
-    const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
+    const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = f;
 
     // build claimFiles metadata from uploadedFiles (only filename + mimeType)
     const claimFilesMeta: ClaimFileMeta[] = (uploadedFiles || []).map((f) => ({
@@ -366,7 +371,7 @@ export function ClaimForm({
 
     // 4. sending form data to selenium service
     onHandleForMHSelenium({
-      ...form,
+      ...f,
       serviceLines: filteredServiceLines,
       staffId: Number(staff?.id),
       patientId: patientId,
@@ -448,6 +453,22 @@ export function ClaimForm({
 
     // 4. Close form
     onClose();
+  };
+
+  const applyComboAndThenMH = async (
+    comboId: keyof typeof PROCEDURE_COMBOS
+  ) => {
+    const nextForm = applyComboToForm(
+      form,
+      comboId,
+      patient?.dateOfBirth ?? "",
+      { replaceAll: true, lineDate: form.serviceDate }
+    );
+
+    setForm(nextForm);
+    setTimeout(() => scrollToLine(0), 0);
+
+    await handleMHSubmit(nextForm);
   };
 
   return (
@@ -544,82 +565,105 @@ export function ClaimForm({
                 Service Lines
               </h3>
 
-              <div className="flex justify-end items-center mb-2">
-                {/* Service Date */}
-                <div className="flex gap-2">
-                  <Label className="flex items-center">Service Date</Label>
-                  <Popover
-                    open={serviceDateOpen}
-                    onOpenChange={setServiceDateOpen}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-[140px] justify-start text-left font-normal mr-4"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.serviceDate}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto">
-                      <Calendar
-                        mode="single"
-                        selected={serviceDateValue}
-                        onSelect={(date) => {
-                          onServiceDateChange(date);
-                        }}
-                        onClose={() => setServiceDateOpen(false)}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {/* Treating doctor */}
-                  <Label className="flex items-center ml-2">
-                    Treating Doctor
-                  </Label>
-                  <Select
-                    value={staff?.id?.toString() || ""}
-                    onValueChange={(id) => {
-                      const selected = staffMembersRaw.find(
-                        (member) => member.id?.toString() === id
-                      );
-                      if (selected) {
-                        setStaff(selected);
-                        setForm((prev) => ({
-                          ...prev,
-                          staffId: Number(selected.id),
-                        }));
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-36">
-                      <SelectValue
-                        placeholder={staff ? staff.name : "Select Staff"}
-                      />
-                    </SelectTrigger>
-
-                    <SelectContent>
-                      {staffMembersRaw.map((member) => {
-                        if (member.id === undefined) return null;
-
-                        return (
-                          <SelectItem
-                            key={member.id}
-                            value={member.id.toString()}
-                          >
-                            {member.name}
-                          </SelectItem>
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-end items-center mb-4">
+                  {/* Service Date */}
+                  <div className="flex gap-2">
+                    <Label className="flex items-center">Service Date</Label>
+                    <Popover
+                      open={serviceDateOpen}
+                      onOpenChange={setServiceDateOpen}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-[140px] justify-start text-left font-normal mr-4"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {form.serviceDate}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto">
+                        <Calendar
+                          mode="single"
+                          selected={serviceDateValue}
+                          onSelect={(date) => {
+                            onServiceDateChange(date);
+                          }}
+                          onClose={() => setServiceDateOpen(false)}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {/* Treating doctor */}
+                    <Label className="flex items-center ml-2">
+                      Treating Doctor
+                    </Label>
+                    <Select
+                      value={staff?.id?.toString() || ""}
+                      onValueChange={(id) => {
+                        const selected = staffMembersRaw.find(
+                          (member) => member.id?.toString() === id
                         );
-                      })}
-                    </SelectContent>
-                  </Select>
+                        if (selected) {
+                          setStaff(selected);
+                          setForm((prev) => ({
+                            ...prev,
+                            staffId: Number(selected.id),
+                          }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue
+                          placeholder={staff ? staff.name : "Select Staff"}
+                        />
+                      </SelectTrigger>
 
-                  {/* Map Price Button */}
+                      <SelectContent>
+                        {staffMembersRaw.map((member) => {
+                          if (member.id === undefined) return null;
+
+                          return (
+                            <SelectItem
+                              key={member.id}
+                              value={member.id.toString()}
+                            >
+                              {member.name}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Map Price Button */}
+                    <Button
+                      className="ml-4"
+                      variant="success"
+                      onClick={onMapPrice}
+                    >
+                      Map Price
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex justify-start gap-2">
                   <Button
-                    className="ml-4"
-                    variant="success"
-                    onClick={onMapPrice}
+                    variant="warning"
+                    onClick={() => applyComboAndThenMH("childRecallDirect")}
                   >
-                    Map Price
+                    Child Recall Direct
+                  </Button>
+                  <Button
+                    variant="warning"
+                    onClick={() => applyComboAndThenMH("adultRecallDirect")}
+                  >
+                    Adult Recall Direct
+                  </Button>
+                  <Button
+                    variant="warning"
+                    onClick={() => applyComboAndThenMH("adultRecallDirect4bw")}
+                  >
+                    Adult Recall Direct 4BW
                   </Button>
                 </div>
               </div>
@@ -875,7 +919,7 @@ export function ClaimForm({
                 <Button
                   className="w-32"
                   variant="warning"
-                  onClick={handleMHSubmit}
+                  onClick={() => handleMHSubmit()}
                 >
                   MH
                 </Button>

@@ -1,22 +1,37 @@
 export const PROCEDURE_COMBOS: Record<
   string,
-  { id: string; label: string; codes: string[]; toothNumbers?: (string | null)[] }
+  {
+    id: string;
+    label: string;
+    codes: string[];
+    toothNumbers?: (string | null)[];
+  }
 > = {
   childRecall: {
     id: "childRecall",
     label: "Child Recall",
-    codes: [
-      "D0120",
-      "D1120",
-      "D0272",
-      "D1208",
-    ],
+    codes: ["D0120", "D1120", "D0272", "D1208"],
+  },
+  childRecallDirect: {
+    id: "childRecallDirect",
+    label: "Child Recall Direct(no x-ray)",
+    codes: ["D0120", "D1120", "D1208"],
   },
   adultRecall: {
     id: "adultRecall",
     label: "Adult Recall",
     codes: ["D0120", "D0220", "D0230", "D0274", "D1110"],
     toothNumbers: [null, "9", "24", null, null], // only these two need values
+  },
+  adultRecallDirect: {
+    id: "adultRecallDirect",
+    label: "Adult Recall Direct(no x-ray)",
+    codes: ["D0120", "D1110"],
+  },
+  adultRecallDirect4bw: {
+    id: "adultRecallDirect4bw",
+    label: "Adult Recall Direct - 4bw (no x-ray)",
+    codes: ["D0120", "D1110", "D0274"],
   },
   newChildPatient: {
     id: "newChildPatient",
@@ -159,9 +174,11 @@ export const PROCEDURE_COMBOS: Record<
   // add more…
 };
 
-
 // Which combos appear under which heading
-export const COMBO_CATEGORIES: Record<string, (keyof typeof PROCEDURE_COMBOS)[]> = {
+export const COMBO_CATEGORIES: Record<
+  string,
+  (keyof typeof PROCEDURE_COMBOS)[]
+> = {
   "Recalls & New Patients": [
     "childRecall",
     "adultRecall",
@@ -192,5 +209,9 @@ export const COMBO_CATEGORIES: Record<string, (keyof typeof PROCEDURE_COMBOS)[]>
   Endodontics: ["rctAnterior", "rctPremolar", "rctMolar", "postCore"],
   Prosthodontics: ["crown"],
   Periodontics: ["deepCleaning"],
-  Extractions: ["simpleExtraction", "surgicalExtraction", "babyTeethExtraction"],
+  Extractions: [
+    "simpleExtraction",
+    "surgicalExtraction",
+    "babyTeethExtraction",
+  ],
 };
