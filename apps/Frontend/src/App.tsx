@@ -25,6 +25,7 @@ const DatabaseManagementPage = lazy(
   () => import("./pages/database-management-page")
 );
 const ReportsPage = lazy(() => import("./pages/reports-page"));
+const CloudStoragePage = lazy(() => import("./pages/cloud-storage-page"));
 const NotFound = lazy(() => import("./pages/not-found"));
 
 function Router() {
@@ -50,7 +51,8 @@ function Router() {
         path="/database-management"
         component={() => <DatabaseManagementPage />}
       />
-      <ProtectedRoute path="/reports/" component={() => <ReportsPage />} />
+      <ProtectedRoute path="/reports" component={() => <ReportsPage />} />
+      <ProtectedRoute path="/cloud-storage" component={() => <CloudStoragePage />} />
       <Route path="/auth" component={() => <AuthPage />} />
       <Route component={() => <NotFound />} />
     </Switch>

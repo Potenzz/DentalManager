@@ -10,6 +10,7 @@ import {
   FolderOpen,
   Database,
   FileText,
+  Cloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
@@ -60,6 +61,11 @@ export function Sidebar() {
         name: "Reports",
         path: "/reports",
         icon: <FileText className="h-5 w-5" />,
+      },
+      {
+        name: "Cloud storage",
+        path: "/cloud-storage",
+        icon: <Cloud className="h-5 w-5" />,
       },
       {
         name: "Backup Database",
