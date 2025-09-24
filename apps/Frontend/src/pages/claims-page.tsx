@@ -49,28 +49,6 @@ export default function ClaimsPage() {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  // Add patient mutation
-  const addPatientMutation = useMutation({
-    mutationFn: async (patient: InsertPatient) => {
-      const res = await apiRequest("POST", "/api/patients/", patient);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Patient added successfully!",
-        variant: "default",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to add patient: ${error.message}`,
-        variant: "destructive",
-      });
-    },
-  });
-
   // Update patient mutation
   const updatePatientMutation = useMutation({
     mutationFn: async ({
@@ -147,22 +125,6 @@ export default function ClaimsPage() {
     },
   });
 
-  // helpers
-  const getPatientByInsuranceId = async (insuranceId: string) => {
-    const res = await apiRequest(
-      "GET",
-      `/api/patients/by-insurance-id?insuranceId=${encodeURIComponent(insuranceId)}`
-    );
-
-    if (!res.ok) {
-      throw new Error(
-        `Failed to fetch patient by insuranceId (status ${res.status})`
-      );
-    }
-
-    return res.json();
-  };
-
   // small helper: remove given query params from the current URL (silent, no reload)
   const clearUrlParams = (params: string[]) => {
     try {
@@ -182,17 +144,11 @@ export default function ClaimsPage() {
     }
   };
 
-  // case1: - this params are set by pdf extraction/patient page. then used in claim page here.
+  // case1: - this params are set by pdf extraction/patient page or either by patient-add-form. then used in claim page here.
   const [location] = useLocation();
-  const { name, memberId, dob, newPatient } = useMemo(() => {
-    const search = window.location.search;
-    const params = new URLSearchParams(search);
-    return {
-      newPatient: params.get("newPatient"),
-      name: params.get("name") || "",
-      memberId: params.get("memberId") || "",
-      dob: params.get("dob") || "",
-    };
+  const { newPatient } = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return { newPatient: params.get("newPatient") };
   }, [location]);
 
   const handleNewClaim = (patientId: number) => {
@@ -200,7 +156,7 @@ export default function ClaimsPage() {
     setIsClaimFormOpen(true);
   };
 
-  //  case2: redirect from patient-add-form. if ?newPatient=<id> is present, open claim form directly
+  // if ?newPatient=<id> is present, open claim form directly
   useEffect(() => {
     if (!newPatient) return;
 
@@ -211,67 +167,7 @@ export default function ClaimsPage() {
     clearUrlParams(["newPatient"]);
   }, [newPatient]);
 
-  // case3: only runs when there is no ?newPatient and we have memberId+dob
-  useEffect(() => {
-    if (!memberId || !dob) return;
-
-    let cancelled = false;
-
-    // if matching patient found then simply send its id to claim form,
-    // if not then create new patient then send its id to claim form.
-    const fetchMatchingPatient = async () => {
-      try {
-        const matchingPatient = await getPatientByInsuranceId(memberId);
-
-        if (cancelled) return;
-
-        if (matchingPatient) {
-          handleNewClaim(matchingPatient.id);
-          clearUrlParams(["memberId", "dob", "name"]);
-        } else {
-          const [firstName, ...rest] = name.trim().split(" ");
-          const lastName = rest.join(" ") || "";
-          const parsedDob = parse(dob, "M/d/yyyy", new Date()); // robust for "4/17/1964", "12/1/1975", etc.
-
-          const newPatient: InsertPatient = {
-            firstName,
-            lastName,
-            dateOfBirth: formatLocalDate(parsedDob),
-            gender: "",
-            phone: "",
-            userId: user?.id ?? 1,
-            status: "active",
-            insuranceId: memberId,
-          };
-
-          addPatientMutation.mutate(newPatient, {
-            onSuccess: (created) => {
-              if (cancelled) return;
-              handleNewClaim(created.id);
-              clearUrlParams(["memberId", "dob", "name"]);
-            },
-          });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error("Error checking/creating patient:", err);
-          toast({
-            title: "Error",
-            description: "Error checking/creating patient from URL params.",
-            variant: "destructive",
-          });
-        }
-      }
-    };
-
-    fetchMatchingPatient();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [memberId]);
-
-  // case4 - redirect from appointment page:
+  // case2 - redirect from appointment page:
   // If ?appointmentId= is present (and no ?newPatient param), fetch appointment->patient and open claim form
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -510,14 +406,7 @@ export default function ClaimsPage() {
     setSelectedPatientId(null);
     setIsClaimFormOpen(false);
 
-    // Remove query parameters without reload
-    const url = new URL(window.location.href);
-    url.searchParams.delete("memberId");
-    url.searchParams.delete("dob");
-    url.searchParams.delete("name");
-
-    // Use history.replaceState to update the URL without reloading
-    window.history.replaceState({}, document.title, url.toString());
+    clearUrlParams(["newPatient", "appointmentId"]);
   };
 
   return (
