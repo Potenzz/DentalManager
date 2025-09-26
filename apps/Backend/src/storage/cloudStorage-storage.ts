@@ -1,17 +1,52 @@
 import { prisma as db } from "@repo/db/client";
-import { CloudFile, CloudFolder } from "@repo/db/types";
+import { CloudFolder, CloudFile } from "@repo/db/types";
 import { serializeFile } from "../utils/prismaFileUtils";
 
+/**
+ * Cloud storage implementation
+ *
+ * - Clear, self-describing method names
+ * - Folder timestamp propagation helper: updateFolderTimestampsRecursively
+ * - File upload lifecycle: initializeFileUpload -> appendFileChunk -> finalizeFileUpload
+ */
+
+/* ------------------------------- Helpers ------------------------------- */
+async function updateFolderTimestampsRecursively(folderId: number | null) {
+  if (folderId == null) return;
+  let currentId: number | null = folderId;
+  const MAX_DEPTH = 50;
+  let depth = 0;
+
+  while (currentId != null && depth < MAX_DEPTH) {
+    depth += 1;
+    try {
+      // touch updatedAt and fetch parentId
+      const row = (await db.cloudFolder.update({
+        where: { id: currentId },
+        data: { updatedAt: new Date() },
+        select: { parentId: true },
+      })) as { parentId: number | null };
+
+      currentId = row.parentId ?? null;
+    } catch (err: any) {
+      // Stop walking if folder removed concurrently (Prisma P2025)
+      if (err?.code === "P2025") break;
+      throw err;
+    }
+  }
+}
+
+/* ------------------------------- IStorage ------------------------------- */
 export interface IStorage {
-  // CloudFolder methods
+  // Folders
   getFolder(id: number): Promise<CloudFolder | null>;
-  getFoldersByUser(
-    userId: number,
+  listFoldersByParent(
     parentId: number | null,
     limit: number,
     offset: number
   ): Promise<CloudFolder[]>;
-  getRecentFolders(limit: number, offset: number): Promise<CloudFolder[]>;
+  countFoldersByParent(parentId: number | null): Promise<number>;
+  listRecentFolders(limit: number, offset: number): Promise<CloudFolder[]>;
   createFolder(
     userId: number,
     name: string,
@@ -22,23 +57,19 @@ export interface IStorage {
     updates: Partial<{ name?: string; parentId?: number | null }>
   ): Promise<CloudFolder | null>;
   deleteFolder(id: number): Promise<boolean>;
+  countFolders(filter?: {
+    userId?: number;
+    nameContains?: string | null;
+  }): Promise<number>;
 
-  // CloudFile methods
+  // Files
   getFile(id: number): Promise<CloudFile | null>;
-  listFilesByFolderByUser(
-    userId: number,
+  listFilesInFolder(
     folderId: number | null,
     limit: number,
     offset: number
   ): Promise<CloudFile[]>;
-  listFilesByFolder(
-    folderId: number | null,
-    limit: number,
-    offset: number
-  ): Promise<CloudFile[]>;
-
-  // chunked upload methods
-  createFileInit(
+  initializeFileUpload(
     userId: number,
     name: string,
     mimeType?: string | null,
@@ -46,59 +77,74 @@ export interface IStorage {
     totalChunks?: number | null,
     folderId?: number | null
   ): Promise<CloudFile>;
-  addChunk(fileId: number, seq: number, data: Buffer): Promise<void>;
-  completeFile(fileId: number): Promise<{ ok: true; size: string }>;
+  appendFileChunk(fileId: number, seq: number, data: Buffer): Promise<void>;
+  finalizeFileUpload(fileId: number): Promise<{ ok: true; size: string }>;
   deleteFile(fileId: number): Promise<boolean>;
+  updateFile(
+    id: number,
+    updates: Partial<Pick<CloudFile, "name" | "mimeType" | "folderId">>
+  ): Promise<CloudFile | null>;
+  renameFile(id: number, name: string): Promise<CloudFile | null>;
+  countFilesInFolder(folderId: number | null): Promise<number>;
+  countFiles(filter?: {
+    userId?: number;
+    nameContains?: string | null;
+    mimeType?: string | null;
+  }): Promise<number>;
 
-  // search
-  searchByName(
-    userId: number,
+  // Search
+  searchFolders(
     q: string,
     limit: number,
     offset: number
-  ): Promise<{
-    folders: CloudFolder[];
-    files: CloudFile[];
-    foldersTotal: number;
-    filesTotal: number;
-  }>;
+  ): Promise<{ data: CloudFolder[]; total: number }>;
+  searchFiles(
+    q: string,
+    type: string | undefined,
+    limit: number,
+    offset: number
+  ): Promise<{ data: CloudFile[]; total: number }>;
 
-  // helper: stream file chunks via Node.js stream
+  // Streaming
   streamFileTo(resStream: NodeJS.WritableStream, fileId: number): Promise<void>;
 }
 
-export const cloudStorageStorage: IStorage = {
-  // --- Folders ---
+/* ------------------------------- Implementation ------------------------------- */
+export const cloudStorage: IStorage = {
+  // --- FOLDERS ---
   async getFolder(id: number) {
     const folder = await db.cloudFolder.findUnique({
       where: { id },
       include: { files: false },
     });
-    return folder ?? null;
+    return (folder as unknown as CloudFolder) ?? null;
   },
 
-  async getFoldersByUser(
-    userId: number,
+  async listFoldersByParent(
     parentId: number | null = null,
     limit = 50,
     offset = 0
   ) {
     const folders = await db.cloudFolder.findMany({
-      where: { userId, parentId },
+      where: { parentId },
       orderBy: { name: "asc" },
       skip: offset,
       take: limit,
     });
-    return folders;
+    return folders as unknown as CloudFolder[];
   },
 
-  async getRecentFolders(limit = 50, offset = 0) {
+  async countFoldersByParent(parentId: number | null = null) {
+    return db.cloudFolder.count({ where: { parentId } });
+  },
+
+  async listRecentFolders(limit = 50, offset = 0) {
     const folders = await db.cloudFolder.findMany({
-      orderBy: { name: "asc" },
+      orderBy: { updatedAt: "desc" },
       skip: offset,
       take: limit,
     });
-    return folders;
+    return folders as unknown as CloudFolder[];
   },
 
   async createFolder(
@@ -109,7 +155,9 @@ export const cloudStorageStorage: IStorage = {
     const created = await db.cloudFolder.create({
       data: { userId, name, parentId },
     });
-    return created;
+    // mark parent(s) as updated
+    await updateFolderTimestampsRecursively(parentId);
+    return created as unknown as CloudFolder;
   },
 
   async updateFolder(
@@ -121,24 +169,51 @@ export const cloudStorageStorage: IStorage = {
         where: { id },
         data: updates,
       });
-      return updated;
+      if (updates.parentId !== undefined) {
+        await updateFolderTimestampsRecursively(updates.parentId ?? null);
+      } else {
+        // touch this folder's parent (to mark modification)
+        const f = await db.cloudFolder.findUnique({
+          where: { id },
+          select: { parentId: true },
+        });
+        await updateFolderTimestampsRecursively(f?.parentId ?? null);
+      }
+      return updated as unknown as CloudFolder;
     } catch (err) {
-      return null;
+      throw err;
     }
   },
 
   async deleteFolder(id: number) {
     try {
+      const folder = await db.cloudFolder.findUnique({
+        where: { id },
+        select: { parentId: true },
+      });
+      const parentId = folder?.parentId ?? null;
       await db.cloudFolder.delete({ where: { id } });
+      await updateFolderTimestampsRecursively(parentId);
       return true;
-    } catch (err) {
-      console.error("deleteFolder error", err);
-      return false;
+    } catch (err: any) {
+      if (err?.code === "P2025") return false;
+      throw err;
     }
   },
 
-  // --- Files ---
-  async getFile(id: number): Promise<CloudFile | null> {
+  async countFolders(filter?: {
+    userId?: number;
+    nameContains?: string | null;
+  }) {
+    const where: any = {};
+    if (filter?.userId) where.userId = filter.userId;
+    if (filter?.nameContains)
+      where.name = { contains: filter.nameContains, mode: "insensitive" };
+    return db.cloudFolder.count({ where });
+  },
+
+  // --- FILES ---
+  async getFile(id: number) {
     const file = await db.cloudFile.findUnique({
       where: { id },
       include: { chunks: { orderBy: { seq: "asc" } } },
@@ -146,32 +221,7 @@ export const cloudStorageStorage: IStorage = {
     return (file as unknown as CloudFile) ?? null;
   },
 
-  async listFilesByFolderByUser(
-    userId: number,
-    folderId: number | null = null,
-    limit = 50,
-    offset = 0
-  ) {
-    const files = await db.cloudFile.findMany({
-      where: { userId, folderId },
-      orderBy: { createdAt: "desc" },
-      skip: offset,
-      take: limit,
-      select: {
-        id: true,
-        name: true,
-        mimeType: true,
-        fileSize: true,
-        folderId: true,
-        isComplete: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-    return files.map(serializeFile);
-  },
-
-  async listFilesByFolder(
+  async listFilesInFolder(
     folderId: number | null = null,
     limit = 50,
     offset = 0
@@ -192,17 +242,16 @@ export const cloudStorageStorage: IStorage = {
         updatedAt: true,
       },
     });
-    return files.map(serializeFile);
+    return files.map(serializeFile) as unknown as CloudFile[];
   },
 
-  // --- Chunked upload methods ---
-  async createFileInit(
-    userId,
-    name,
-    mimeType = null,
-    expectedSize = null,
-    totalChunks = null,
-    folderId = null
+  async initializeFileUpload(
+    userId: number,
+    name: string,
+    mimeType: string | null = null,
+    expectedSize: bigint | null = null,
+    totalChunks: number | null = null,
+    folderId: number | null = null
   ) {
     const created = await db.cloudFile.create({
       data: {
@@ -215,81 +264,178 @@ export const cloudStorageStorage: IStorage = {
         isComplete: false,
       },
     });
-    return serializeFile(created);
+    await updateFolderTimestampsRecursively(folderId);
+    return serializeFile(created) as unknown as CloudFile;
   },
 
-  async addChunk(fileId: number, seq: number, data: Buffer) {
-    // Ensure file exists & belongs to owner will be done by caller (route)
-    // Attempt insert; if unique violation => ignore (idempotent)
+  async appendFileChunk(fileId: number, seq: number, data: Buffer) {
     try {
-      await db.cloudFileChunk.create({
-        data: {
-          fileId,
-          seq,
-          data,
-        },
-      });
+      await db.cloudFileChunk.create({ data: { fileId, seq, data } });
     } catch (err: any) {
-      // If unique constraint violation (duplicate chunk), ignore
+      // idempotent: ignore duplicate chunk constraint
       if (
         err?.code === "P2002" ||
         err?.message?.includes("Unique constraint failed")
       ) {
-        // duplicate chunk, ignore
         return;
       }
       throw err;
     }
   },
 
-  async completeFile(fileId: number) {
-    // Compute total size from chunks and mark complete inside a transaction
+  async finalizeFileUpload(fileId: number) {
     const chunks = await db.cloudFileChunk.findMany({ where: { fileId } });
-    if (!chunks.length) {
-      throw new Error("No chunks uploaded");
-    }
+    if (!chunks.length) throw new Error("No chunks uploaded");
+
+    // compute total size
     let total = 0;
     for (const c of chunks) total += c.data.length;
 
-    // Update file
-    await db.cloudFile.update({
-      where: { id: fileId },
-      data: {
-        fileSize: BigInt(total),
-        isComplete: true,
-      },
+    // transactionally update file and read folderId
+    const updated = await db.$transaction(async (tx) => {
+      await tx.cloudFile.update({
+        where: { id: fileId },
+        data: { fileSize: BigInt(total), isComplete: true },
+      });
+      return tx.cloudFile.findUnique({
+        where: { id: fileId },
+        select: { folderId: true },
+      });
     });
+
+    const folderId = (updated as any)?.folderId ?? null;
+    await updateFolderTimestampsRecursively(folderId);
+
     return { ok: true, size: BigInt(total).toString() };
   },
 
   async deleteFile(fileId: number) {
     try {
+      const file = await db.cloudFile.findUnique({
+        where: { id: fileId },
+        select: { folderId: true },
+      });
+      if (!file) return false;
+      const folderId = file.folderId ?? null;
       await db.cloudFile.delete({ where: { id: fileId } });
-      // chunks cascade-delete via Prisma relation onDelete: Cascade
+      await updateFolderTimestampsRecursively(folderId);
       return true;
-    } catch (err) {
-      console.error("deleteFile error", err);
-      return false;
+    } catch (err: any) {
+      if (err?.code === "P2025") return false;
+      throw err;
     }
   },
 
-  // --- Search ---
-  async searchByName(userId: number, q: string, limit = 20, offset = 0) {
-    const [folders, files, foldersTotal, filesTotal] = await Promise.all([
+  async updateFile(
+    id: number,
+    updates: Partial<Pick<CloudFile, "name" | "mimeType" | "folderId">>
+  ) {
+    try {
+      let prevFolderId: number | null = null;
+      if (updates.folderId !== undefined) {
+        const f = await db.cloudFile.findUnique({
+          where: { id },
+          select: { folderId: true },
+        });
+        prevFolderId = f?.folderId ?? null;
+      }
+
+      const updated = await db.cloudFile.update({
+        where: { id },
+        data: updates,
+      });
+
+      // touch affected folders
+      if (updates.folderId !== undefined) {
+        await updateFolderTimestampsRecursively(updates.folderId ?? null);
+        if (
+          prevFolderId != null &&
+          prevFolderId !== (updates.folderId ?? null)
+        ) {
+          await updateFolderTimestampsRecursively(prevFolderId);
+        }
+      } else {
+        const f = await db.cloudFile.findUnique({
+          where: { id },
+          select: { folderId: true },
+        });
+        await updateFolderTimestampsRecursively(f?.folderId ?? null);
+      }
+
+      return serializeFile(updated) as unknown as CloudFile;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  async renameFile(id: number, name: string) {
+    try {
+      const updated = await db.cloudFile.update({
+        where: { id },
+        data: { name },
+      });
+      const f = await db.cloudFile.findUnique({
+        where: { id },
+        select: { folderId: true },
+      });
+      await updateFolderTimestampsRecursively(f?.folderId ?? null);
+      return serializeFile(updated) as unknown as CloudFile;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  async countFilesInFolder(folderId: number | null) {
+    return db.cloudFile.count({ where: { folderId } });
+  },
+
+  async countFiles(filter?: {
+    userId?: number;
+    nameContains?: string | null;
+    mimeType?: string | null;
+  }) {
+    const where: any = {};
+    if (filter?.userId) where.userId = filter.userId;
+    if (filter?.nameContains)
+      where.name = { contains: filter.nameContains, mode: "insensitive" };
+    if (filter?.mimeType)
+      where.mimeType = { startsWith: filter.mimeType, mode: "insensitive" };
+    return db.cloudFile.count({ where });
+  },
+
+  // --- SEARCH ---
+  async searchFolders(q: string, limit = 20, offset = 0) {
+    const [folders, total] = await Promise.all([
       db.cloudFolder.findMany({
-        where: {
-          userId,
-          name: { contains: q, mode: "insensitive" },
-        },
+        where: { name: { contains: q, mode: "insensitive" } },
         orderBy: { name: "asc" },
         skip: offset,
         take: limit,
       }),
+      db.cloudFolder.count({
+        where: { name: { contains: q, mode: "insensitive" } },
+      }),
+    ]);
+    return { data: folders as unknown as CloudFolder[], total };
+  },
+
+  async searchFiles(
+    q: string,
+    type: string | undefined,
+    limit = 20,
+    offset = 0
+  ) {
+    const where: any = {};
+    if (q) where.name = { contains: q, mode: "insensitive" };
+    if (type) {
+      if (!type.includes("/"))
+        where.mimeType = { startsWith: `${type}/`, mode: "insensitive" };
+      else where.mimeType = { startsWith: type, mode: "insensitive" };
+    }
+
+    const [files, total] = await Promise.all([
       db.cloudFile.findMany({
-        where: {
-          userId,
-          name: { contains: q, mode: "insensitive" },
-        },
+        where,
         orderBy: { createdAt: "desc" },
         skip: offset,
         take: limit,
@@ -304,30 +450,14 @@ export const cloudStorageStorage: IStorage = {
           updatedAt: true,
         },
       }),
-      db.cloudFolder.count({
-        where: {
-          userId,
-          name: { contains: q, mode: "insensitive" },
-        },
-      }),
-      db.cloudFile.count({
-        where: {
-          userId,
-          name: { contains: q, mode: "insensitive" },
-        },
-      }),
+      db.cloudFile.count({ where }),
     ]);
-    return {
-      folders,
-      files: files.map(serializeFile),
-      foldersTotal,
-      filesTotal,
-    };
+
+    return { data: files.map(serializeFile) as unknown as CloudFile[], total };
   },
 
-  // --- Streaming helper ---
+  // --- STREAM ---
   async streamFileTo(resStream: NodeJS.WritableStream, fileId: number) {
-    // Stream chunks in batches to avoid loading everything at once.
     const batchSize = 100;
     let offset = 0;
     while (true) {
@@ -338,12 +468,11 @@ export const cloudStorageStorage: IStorage = {
         skip: offset,
       });
       if (!chunks.length) break;
-      for (const c of chunks) {
-        resStream.write(Buffer.from(c.data));
-      }
+      for (const c of chunks) resStream.write(Buffer.from(c.data));
       offset += chunks.length;
       if (chunks.length < batchSize) break;
     }
-    // caller will end the response stream
   },
 };
+
+export default cloudStorage;

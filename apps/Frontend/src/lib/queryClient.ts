@@ -38,16 +38,52 @@ export async function apiRequest(
   const isFormData =
     typeof FormData !== "undefined" && data instanceof FormData;
 
+  const isFileLike =
+    (typeof File !== "undefined" && data instanceof File) ||
+    (typeof Blob !== "undefined" && data instanceof Blob);
+
+  const isArrayBufferLike =
+    (typeof ArrayBuffer !== "undefined" && data instanceof ArrayBuffer) ||
+    (typeof Uint8Array !== "undefined" && data instanceof Uint8Array) ||
+    (data != null && (data as any)?.constructor?.name === "Buffer"); // Node Buffer
+
+  // Decide Content-Type header appropriately:
   const headers: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    // Only set Content-Type if not using FormData
-    ...(isFormData ? {} : { "Content-Type": "application/json" }),
   };
+
+  if (!isFormData) {
+    if (isFileLike) {
+      // File/Blob: use its own MIME type if present, otherwise fallback
+      const mime = (data as File | Blob).type || "application/octet-stream";
+      headers["Content-Type"] = mime;
+    } else if (isArrayBufferLike) {
+      // ArrayBuffer / Buffer / Uint8Array: use generic octet-stream
+      headers["Content-Type"] = "application/octet-stream";
+    } else {
+      // Normal JSON body
+      headers["Content-Type"] = "application/json";
+    }
+  }
+  // If FormData, we must NOT set Content-Type (browser will set multipart boundary)
+
+  // Build final body
+  const finalBody = isFormData
+    ? (data as FormData)
+    : isFileLike
+      ? // File/Blob can be passed directly as BodyInit
+        (data as BodyInit)
+      : isArrayBufferLike
+        ? // ArrayBuffer / Uint8Array / Buffer -> convert to Uint8Array if needed
+          (data as BodyInit)
+        : data !== undefined
+          ? JSON.stringify(data)
+          : undefined;
 
   const res = await fetch(`${API_BASE_URL}${url}`, {
     method,
     headers,
-    body: isFormData ? (data as FormData) : JSON.stringify(data),
+    body: finalBody,
     credentials: "include",
   });
 
