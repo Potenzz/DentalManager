@@ -69,9 +69,7 @@ router.get(
       return res.json({
         error: false,
         data: paged,
-        total: folders.length,
-        limit,
-        offset,
+        totalCount: folders.length,
       });
     } catch (err) {
       return sendError(res, 500, "Failed to load child folders", err);
@@ -103,9 +101,9 @@ router.get(
 
     try {
       const files = await storage.listFilesInFolder(parentId, limit, offset);
-      const total = await storage.countFilesInFolder(parentId);
+      const totalCount = await storage.countFilesInFolder(parentId);
       const serialized = files.map(serializeFile);
-      return res.json({ error: false, data: serialized, total, limit, offset });
+      return res.json({ error: false, data: serialized, totalCount });
     } catch (err) {
       return sendError(res, 500, "Failed to load files for folder", err);
     }
@@ -121,20 +119,40 @@ router.get(
     const limit = parsePositiveInt(req.query.limit, 50);
     const offset = parsePositiveInt(req.query.offset, 0);
     try {
-      const folders = await storage.listRecentFolders(limit, offset);
-      const total = await storage.countFolders();
-      return res.json({ error: false, data: folders, total, limit, offset });
+      // Always request top-level folders (parentId = null)
+      const parentId: number | null = null;
+      const folders = await storage.listRecentFolders(limit, offset, parentId);
+      const totalCount = await storage.countFoldersByParent(parentId);
+
+      return res.json({
+        error: false,
+        data: folders,
+        totalCount,
+      });
     } catch (err) {
       return sendError(res, 500, "Failed to load recent folders");
     }
   }
 );
 
-/* ---------- Folder CRUD ----------
-   POST /folders         { userId, name, parentId? }
-   PUT /folders/:id      { name?, parentId? }
-   DELETE /folders/:id
-*/
+// ---------- Folder CRUD ----------
+router.get(
+  "/folders/:id",
+  async (req: Request, res: Response): Promise<any> => {
+    const id = Number.parseInt(req.params.id ?? "", 10);
+    if (!Number.isInteger(id) || id <= 0)
+      return sendError(res, 400, "Invalid folder id");
+
+    try {
+      const folder = await storage.getFolder(id);
+      if (!folder) return sendError(res, 404, "Folder not found");
+      return res.json({ error: false, data: folder });
+    } catch (err) {
+      return sendError(res, 500, "Failed to load folder");
+    }
+  }
+);
+
 router.post("/folders", async (req: Request, res: Response): Promise<any> => {
   const { userId, name, parentId } = req.body;
   if (!userId || typeof name !== "string" || !name.trim()) {
@@ -210,9 +228,9 @@ router.get(
 
     try {
       const files = await storage.listFilesInFolder(folderId, limit, offset);
-      const total = await storage.countFilesInFolder(folderId);
+      const totalCount = await storage.countFilesInFolder(folderId);
       const serialized = files.map(serializeFile);
-      return res.json({ error: false, data: serialized, total, limit, offset });
+      return res.json({ error: false, data: serialized, totalCount });
     } catch (err) {
       return sendError(res, 500, "Failed to list files for folder");
     }
@@ -415,7 +433,7 @@ router.get(
 
     try {
       const { data, total } = await storage.searchFolders(q, limit, offset);
-      return res.json({ error: false, data, total, limit, offset });
+      return res.json({ error: false, data, totalCount: total });
     } catch (err) {
       return sendError(res, 500, "Folder search failed");
     }
@@ -440,7 +458,7 @@ router.get(
     try {
       const { data, total } = await storage.searchFiles(q, type, limit, offset);
       const serialized = data.map(serializeFile);
-      return res.json({ error: false, data: serialized, total, limit, offset });
+      return res.json({ error: false, data: serialized, totalCount: total });
     } catch (err) {
       return sendError(res, 500, "File search failed");
     }

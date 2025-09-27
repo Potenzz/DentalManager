@@ -40,13 +40,16 @@ async function updateFolderTimestampsRecursively(folderId: number | null) {
 export interface IStorage {
   // Folders
   getFolder(id: number): Promise<CloudFolder | null>;
-  listFoldersByParent(
-    parentId: number | null,
+  listRecentFolders(
     limit: number,
-    offset: number
+    offset: number,
+    parentId?: number | null
   ): Promise<CloudFolder[]>;
   countFoldersByParent(parentId: number | null): Promise<number>;
-  listRecentFolders(limit: number, offset: number): Promise<CloudFolder[]>;
+  countFolders(filter?: {
+    userId?: number;
+    nameContains?: string | null;
+  }): Promise<number>;
   createFolder(
     userId: number,
     name: string,
@@ -57,10 +60,6 @@ export interface IStorage {
     updates: Partial<{ name?: string; parentId?: number | null }>
   ): Promise<CloudFolder | null>;
   deleteFolder(id: number): Promise<boolean>;
-  countFolders(filter?: {
-    userId?: number;
-    nameContains?: string | null;
-  }): Promise<number>;
 
   // Files
   getFile(id: number): Promise<CloudFile | null>;
@@ -120,31 +119,28 @@ export const cloudStorage: IStorage = {
     return (folder as unknown as CloudFolder) ?? null;
   },
 
-  async listFoldersByParent(
-    parentId: number | null = null,
-    limit = 50,
-    offset = 0
-  ) {
+  async listRecentFolders(limit = 50, offset = 0, parentId?: number | null) {
+    const where: any = {};
+
+    // parentId === undefined → no filter (global recent)
+    // parentId === null      → top-level folders (parent IS NULL)
+    // parentId === number    → children of that folder
+    if (parentId !== undefined) {
+      where.parentId = parentId;
+    }
+
     const folders = await db.cloudFolder.findMany({
-      where: { parentId },
-      orderBy: { name: "asc" },
+      where,
+      orderBy: { updatedAt: "desc" },
       skip: offset,
       take: limit,
     });
+
     return folders as unknown as CloudFolder[];
   },
 
   async countFoldersByParent(parentId: number | null = null) {
     return db.cloudFolder.count({ where: { parentId } });
-  },
-
-  async listRecentFolders(limit = 50, offset = 0) {
-    const folders = await db.cloudFolder.findMany({
-      orderBy: { updatedAt: "desc" },
-      skip: offset,
-      take: limit,
-    });
-    return folders as unknown as CloudFolder[];
   },
 
   async createFolder(
