@@ -646,25 +646,40 @@ export function ClaimForm({
                   </div>
                 </div>
 
-                <div className="flex justify-start gap-2">
-                  <Button
-                    variant="warning"
-                    onClick={() => applyComboAndThenMH("childRecallDirect")}
-                  >
-                    Child Recall Direct
-                  </Button>
-                  <Button
-                    variant="warning"
-                    onClick={() => applyComboAndThenMH("adultRecallDirect")}
-                  >
-                    Adult Recall Direct
-                  </Button>
-                  <Button
-                    variant="warning"
-                    onClick={() => applyComboAndThenMH("adultRecallDirect4bw")}
-                  >
-                    Adult Recall Direct 4BW
-                  </Button>
+                <div className="space-y-4">
+                  <div className="mb-3 text-sm font-semibold opacity-70">
+                    Direct Claim Submittion Buttons
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      variant="secondary"
+                      onClick={() => applyComboAndThenMH("childRecallDirect")}
+                    >
+                      Child Recall Direct
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => applyComboAndThenMH("adultRecallDirect")}
+                    >
+                      Adult Recall Direct
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        applyComboAndThenMH("adultRecallDirect4bw")
+                      }
+                    >
+                      Adult Recall Direct 4BW
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        applyComboAndThenMH("adultRecallDirect4bw2pa")
+                      }
+                    >
+                      Adult Recall Direct 4BW2PA
+                    </Button>
+                  </div>
                 </div>
               </div>
 
