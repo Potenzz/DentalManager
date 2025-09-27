@@ -37,6 +37,7 @@ export const PROCEDURE_COMBOS: Record<
     id: "adultRecallDirect4bw",
     label: "Adult Recall Direct - 4bw (no x-ray)",
     codes: ["D0120", "D0220", "D0230", "D0274", "D1110"],
+    toothNumbers: [null, "9", "24", null, null], // only these two need values
   },
   newChildPatient: {
     id: "newChildPatient",
