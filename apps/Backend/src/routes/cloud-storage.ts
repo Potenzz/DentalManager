@@ -1,7 +1,5 @@
-// src/routes/cloudStorage.routes.ts
 import express, { Request, Response } from "express";
-// import storage from "../storage";
-import { cloudStorage as storage } from "../storage/cloudStorage-storage";
+import storage from "../storage";
 import { serializeFile } from "../utils/prismaFileUtils";
 import { CloudFolder } from "@repo/db/types";
 
@@ -242,6 +240,9 @@ router.get(
    PUT  /files/:id          { name?, mimeType?, folderId? }
    DELETE /files/:id
 */
+const MAX_FILE_MB = 20;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
 router.post(
   "/folders/:id/files",
   async (req: Request, res: Response): Promise<any> => {
@@ -260,11 +261,25 @@ router.post(
     let expectedSize: bigint | null = null;
     if (req.body.expectedSize != null) {
       try {
+        // coerce to BigInt safely
+        const asNum = Number(req.body.expectedSize);
+        if (!Number.isFinite(asNum) || asNum < 0) {
+          return sendError(res, 400, "Invalid expectedSize");
+        }
+        if (asNum > MAX_FILE_BYTES) {
+          // Payload Too Large
+          return sendError(
+            res,
+            413,
+            `File too large. Max allowed is ${MAX_FILE_MB} MB`
+          );
+        }
         expectedSize = BigInt(String(req.body.expectedSize));
       } catch {
         return sendError(res, 400, "Invalid expectedSize");
       }
     }
+
     let totalChunks: number | null = null;
     if (req.body.totalChunks != null) {
       const tc = Number(req.body.totalChunks);
@@ -308,23 +323,20 @@ router.post(
       return sendError(res, 400, "Invalid seq");
 
     const body = req.body as Buffer;
-    console.log(
-      `[chunk upload] fileId=${id} seq=${seq} contentType=${String(req.headers["content-type"])} bodyIsBuffer=${Buffer.isBuffer(body)} bodyLength=${body?.length ?? 0}`
-    );
 
     if (!body || !(body instanceof Buffer)) {
       return sendError(res, 400, "Expected raw binary body (Buffer)");
+    }
+
+    // strict size guard: any single chunk must not exceed MAX_FILE_BYTES
+    if (body.length > MAX_FILE_BYTES) {
+      return sendError(res, 413, `Chunk size exceeds ${MAX_FILE_MB} MB limit`);
     }
 
     try {
       await storage.appendFileChunk(id, seq, body);
       return res.json({ error: false, data: { fileId: id, seq } });
     } catch (err: any) {
-      console.error(
-        "[chunk upload] appendFileChunk failed:",
-        err && (err.stack || err.message || err)
-      );
-
       return sendError(res, 500, "Failed to add chunk");
     }
   }
@@ -339,6 +351,28 @@ router.post(
       return sendError(res, 400, "Invalid file id");
 
     try {
+      // Ask storage for the file (includes chunks in your implementation)
+      const file = await storage.getFile(id);
+      if (!file) return sendError(res, 404, "File not found");
+
+      // Sum chunks' sizes (storage.getFile returns chunks ordered by seq in your impl)
+      const chunks = (file as any).chunks ?? [];
+      if (!chunks.length) return sendError(res, 400, "No chunks uploaded");
+
+      let total = 0;
+      for (const c of chunks) {
+        // c.data is Bytes / Buffer-like
+        total += c.data.length;
+        // early bailout
+        if (total > MAX_FILE_BYTES) {
+          return sendError(
+            res,
+            413,
+            `Assembled file is too large (${Math.round(total / 1024 / 1024)} MB). Max allowed is ${MAX_FILE_MB} MB.`
+          );
+        }
+      }
+
       const result = await storage.finalizeFileUpload(id);
       return res.json({ error: false, data: result });
     } catch (err: any) {
@@ -384,9 +418,56 @@ router.delete(
   }
 );
 
-/* ---------- Download (stream) ----------
-   GET /files/:id/download
-*/
+/* GET /files/:id -> return serialized metadata (used by preview modal) */
+router.get("/files/:id", async (req: Request, res: Response): Promise<any> => {
+  const id = Number.parseInt(req.params.id ?? "", 10);
+  if (!Number.isInteger(id) || id <= 0)
+    return sendError(res, 400, "Invalid file id");
+
+  try {
+    const file = await storage.getFile(id);
+    if (!file) return sendError(res, 404, "File not found");
+    return res.json({ error: false, data: serializeFile(file as any) });
+  } catch (err) {
+    return sendError(res, 500, "Failed to load file");
+  }
+});
+
+/* GET /files/:id/content -> stream file with inline disposition for preview */
+router.get(
+  "/files/:id/content",
+  async (req: Request, res: Response): Promise<any> => {
+    const id = Number.parseInt(req.params.id ?? "", 10);
+    if (!Number.isInteger(id) || id <= 0)
+      return sendError(res, 400, "Invalid file id");
+
+    try {
+      const file = await storage.getFile(id);
+      if (!file) return sendError(res, 404, "File not found");
+
+      const filename = (file.name ?? `file-${(file as any).id}`).replace(
+        /["\\]/g,
+        ""
+      );
+
+      if ((file as any).mimeType)
+        res.setHeader("Content-Type", (file as any).mimeType);
+      // NOTE: inline instead of attachment so browser can render (images, pdfs)
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${encodeURIComponent(filename)}"`
+      );
+
+      await storage.streamFileTo(res, id);
+
+      if (!res.writableEnded) res.end();
+    } catch (err) {
+      if (res.headersSent) return res.end();
+      return sendError(res, 500, "Failed to stream file");
+    }
+  }
+);
+/* GET /files/:id/download */
 router.get(
   "/files/:id/download",
   async (req: Request, res: Response): Promise<any> => {

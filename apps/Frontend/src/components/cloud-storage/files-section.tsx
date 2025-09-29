@@ -35,7 +35,7 @@ import {
 import { getPageNumbers } from "@/utils/pageNumberGenerator";
 import { NewFolderModal } from "./new-folder-modal";
 import { toast } from "@/hooks/use-toast";
-import { Description } from "@radix-ui/react-toast";
+import FilePreviewModal from "./file-preview-modal";
 
 export type FilesSectionProps = {
   parentId: number | null;
@@ -45,6 +45,8 @@ export type FilesSectionProps = {
 };
 
 const FILES_LIMIT_DEFAULT = 20;
+const MAX_FILE_MB = 10;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 
 function fileIcon(mime?: string) {
   if (!mime) return <FileIcon className="h-6 w-6" />;
@@ -70,6 +72,7 @@ export default function FilesSection({
   const [isLoading, setIsLoading] = useState(false);
 
   // upload modal and ref
+  const [uploading, setUploading] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const uploadRef = useRef<any>(null);
 
@@ -78,8 +81,13 @@ export default function FilesSection({
   const [renameTargetId, setRenameTargetId] = useState<number | null>(null);
   const [renameInitial, setRenameInitial] = useState("");
 
+  // delete dialog
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CloudFile | null>(null);
+
+  // preview modal
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
 
   useEffect(() => {
     loadPage(currentPage);
@@ -198,20 +206,74 @@ export default function FilesSection({
     }
   }
 
-  // download
-  function handleDownload(file: CloudFile) {
-    // Open download endpoint in new tab so the browser handles attachment headers
-    const url = `/api/cloud-storage/files/${file.id}/download`;
-    window.open(url, "_blank");
-    contextMenu.hideAll();
+  // download (context menu) - (fetch bytes from backend host via wrapper)
+  async function handleDownload(file: CloudFile) {
+    try {
+      const res = await apiRequest(
+        "GET",
+        `/api/cloud-storage/files/${file.id}/download`
+      );
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.message || `Download failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.name ?? `file-${file.id}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      // revoke after a bit
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      contextMenu.hideAll();
+    } catch (err: any) {
+      toast({
+        title: "Download failed",
+        description: err?.message ?? String(err),
+        variant: "destructive",
+      });
+    }
   }
 
   // upload: get files from MultipleFileUploadZone (imperative handle)
   async function handleUploadSubmit() {
     const files: File[] = uploadRef.current?.getFiles?.() ?? [];
-    if (!files.length) return;
+    if (!files.length) {
+      toast({
+        title: "No files selected",
+        description: "Please choose files to upload before clicking Upload.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    // pre-check all files and show errors / skip too-large files
+    const oversized = files.filter((f) => f.size > MAX_FILE_BYTES);
+    if (oversized.length) {
+      oversized.slice(0, 5).forEach((f) =>
+        toast({
+          title: "File too large",
+          description: `${f.name} is ${Math.round(f.size / 1024 / 1024)} MB — max ${MAX_FILE_MB} MB allowed.`,
+          variant: "destructive",
+        })
+      );
+      // Remove oversized files from the upload list (upload the rest)
+    }
+
+    const toUpload = files.filter((f) => f.size <= MAX_FILE_BYTES);
+    if (toUpload.length === 0) {
+      // nothing to upload
+      return;
+    }
+
     try {
-      for (const f of files) {
+      for (const f of toUpload) {
         const fid = parentId === null ? "null" : String(parentId);
         const initRes = await apiRequest(
           "POST",
@@ -254,12 +316,22 @@ export default function FilesSection({
         description: err?.message ?? String(err),
         variant: "destructive",
       });
+    } finally {
+      setUploading(false);
     }
   }
 
+  // Pagination
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const startItem = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(total, currentPage * pageSize);
+
+  // open preview (single click)
+  function openPreview(file: CloudFile) {
+    setPreviewFileId(Number(file.id));
+    setIsPreviewOpen(true);
+    contextMenu.hideAll();
+  }
 
   return (
     <Card className={className}>
@@ -290,7 +362,7 @@ export default function FilesSection({
                   key={file.id}
                   className="p-3 rounded border hover:bg-gray-50 cursor-pointer"
                   onContextMenu={(e) => showMenu(e, file)}
-                  onDoubleClick={() => onFileOpen?.(Number(file.id))}
+                  onClick={() => openPreview(file)}
                 >
                   <div className="flex flex-col items-center">
                     <div className="h-10 w-10 text-gray-500 mb-2 flex items-center justify-center">
@@ -405,12 +477,21 @@ export default function FilesSection({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white p-6 rounded-md w-[90%] max-w-2xl">
             <h3 className="text-lg font-semibold mb-4">Upload files</h3>
-            <MultipleFileUploadZone ref={uploadRef} />
+            <MultipleFileUploadZone
+              ref={uploadRef}
+              acceptedFileTypes="application/pdf,image/*"
+              maxFiles={10}
+              maxFileSizeMB={10}
+              maxFileSizeByType={{ "application/pdf": 10, "image/*": 5 }}
+              isUploading={uploading}
+            />
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setIsUploadOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleUploadSubmit}>Upload</Button>
+              <Button onClick={handleUploadSubmit} disabled={uploading}>
+                {uploading ? "Uploading..." : "Upload"}
+              </Button>
             </div>
           </div>
         </div>
@@ -429,6 +510,15 @@ export default function FilesSection({
         onSubmit={submitRename}
       />
 
+      {/* FIle Preview Modal */}
+      <FilePreviewModal
+        fileId={previewFileId}
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewFileId(null);
+        }}
+      />
       {/* delete confirm */}
       <DeleteConfirmationDialog
         isOpen={isDeleteOpen}

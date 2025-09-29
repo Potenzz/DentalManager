@@ -21,6 +21,10 @@ interface FileUploadZoneProps {
   isUploading?: boolean;
   acceptedFileTypes?: string;
   maxFiles?: number;
+  //OPTIONAL: default max per-file (MB) when no per-type rule matches
+  maxFileSizeMB?: number;
+  //OPTIONAL: per-mime (or wildcard) map in MB: { "application/pdf": 10, "image/*": 2 }
+  maxFileSizeByType?: Record<string, number>;
 }
 
 export const MultipleFileUploadZone = forwardRef<
@@ -33,6 +37,8 @@ export const MultipleFileUploadZone = forwardRef<
       isUploading = false,
       acceptedFileTypes = "application/pdf,image/jpeg,image/jpg,image/png,image/webp",
       maxFiles = 10,
+      maxFileSizeMB = 10, // default fallback per-file size (MB)
+      maxFileSizeByType, // optional per-type overrides, e.g. { "application/pdf": 10, "image/*": 2 }
     },
     ref
   ) => {
@@ -41,24 +47,72 @@ export const MultipleFileUploadZone = forwardRef<
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const allowedTypes = acceptedFileTypes
+    const parsedAccept = acceptedFileTypes
       .split(",")
-      .map((type) => type.trim());
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
 
+    // helper: convert MB -> bytes
+    const mbToBytes = (mb: number) => Math.round(mb * 1024 * 1024);
+
+    // human readable size
+    const humanSize = (bytes: number) => {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+    };
+
+    // Determine allowed bytes for a given file mime:
+    // Priority: exact mime -> wildcard major/* -> default maxFileSizeMB
+    const allowedBytesForMime = (mime: string | undefined) => {
+      if (!mime) return mbToBytes(maxFileSizeMB);
+      // exact match
+      if (maxFileSizeByType && maxFileSizeByType[mime] != null) {
+        return mbToBytes(maxFileSizeByType[mime]!);
+      }
+      // wildcard match: image/*, audio/* etc.
+      const parts = mime.split("/");
+      if (parts.length === 2) {
+        const wildcard = `${parts[0]}/*`;
+        if (maxFileSizeByType && maxFileSizeByType[wildcard] != null) {
+          return mbToBytes(maxFileSizeByType[wildcard]!);
+        }
+      }
+      // fallback default
+      return mbToBytes(maxFileSizeMB);
+    };
+
+    const isMimeAllowed = (fileType: string) => {
+      const ft = (fileType || "").toLowerCase();
+      for (const a of parsedAccept) {
+        if (a === ft) return true;
+        if (a === "*/*") return true;
+        if (a.endsWith("/*")) {
+          const major = a.split("/")[0];
+          if (ft.startsWith(`${major}/`)) return true;
+        }
+      }
+      return false;
+    };
+
+    // Validation uses allowedBytesForMime
     const validateFile = (file: File) => {
-      if (!allowedTypes.includes(file.type)) {
+      if (!isMimeAllowed(file.type)) {
         toast({
           title: "Invalid file type",
-          description: "Only PDF and image files are allowed.",
+          description: "Only the allowed file types are permitted.",
           variant: "destructive",
         });
         return false;
       }
 
-      if (file.size > 5 * 1024 * 1024) {
+      const allowed = allowedBytesForMime(file.type);
+      if (file.size > allowed) {
         toast({
           title: "File too large",
-          description: "File size must be less than 5MB.",
+          description: `${file.name} is ${humanSize(
+            file.size
+          )} — max allowed for this type is ${humanSize(allowed)}.`,
           variant: "destructive",
         });
         return false;
@@ -309,6 +363,9 @@ export const MultipleFileUploadZone = forwardRef<
                     className="flex justify-between items-center border-b pb-1"
                   >
                     <span className="text-sm">{file.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {humanSize(file.size)} • {file.type || "unknown"}
+                    </span>
                     <button
                       className="ml-2 p-1 text-muted-foreground hover:text-red-500"
                       onClick={(e) => {
@@ -321,12 +378,63 @@ export const MultipleFileUploadZone = forwardRef<
                   </li>
                 ))}
               </ul>
+              {/* prominent per-type size badges */}
+              <div className="flex flex-wrap gap-2 justify-center mt-2">
+                {parsedAccept.map((t) => {
+                  const display =
+                    t === "image/*"
+                      ? "Images"
+                      : t.includes("/")
+                        ? t!.split("/")[1]!.toUpperCase()
+                        : t.toUpperCase();
+                  const mb =
+                    (maxFileSizeByType &&
+                      (maxFileSizeByType[t] ??
+                        maxFileSizeByType[`${t.split("/")[0]}/*`])) ??
+                    maxFileSizeMB;
+                  return (
+                    <span
+                      key={t}
+                      className="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700"
+                      title={`${display} — max ${mb} MB`}
+                    >
+                      {display} ≤ {mb} MB
+                    </span>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">
               <FilePlus className="h-12 w-12 text-primary/70" />
               <div>
                 <p className="font-medium text-primary">{uploadTitle}</p>
+                {/* show same badges above file list so user sees limits after selecting */}
+                <div className="flex flex-wrap gap-2 justify-center mt-2">
+                  {parsedAccept.map((t) => {
+                    const display =
+                      t === "image/*"
+                        ? "Images"
+                        : t.includes("/")
+                          ? t!.split("/")[1]!.toUpperCase()
+                          : t.toUpperCase();
+                    const mb =
+                      (maxFileSizeByType &&
+                        (maxFileSizeByType[t] ??
+                          maxFileSizeByType[`${t.split("/")[0]}/*`])) ??
+                      maxFileSizeMB;
+                    return (
+                      <span
+                        key={t + "-list"}
+                        className="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700"
+                        title={`${display} — max ${mb} MB`}
+                      >
+                        {display} ≤ {mb} MB
+                      </span>
+                    );
+                  })}
+                </div>
+
                 <p className="text-sm text-muted-foreground mt-1">
                   Or click to browse files
                 </p>

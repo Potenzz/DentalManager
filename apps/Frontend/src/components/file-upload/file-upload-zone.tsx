@@ -8,17 +8,91 @@ interface FileUploadZoneProps {
   onFileUpload: (file: File) => void;
   isUploading: boolean;
   acceptedFileTypes?: string;
+  // OPTIONAL: fallback max file size MB
+  maxFileSizeMB?: number;
+  // OPTIONAL: per-type size map in MB, e.g. { "application/pdf": 10, "image/*": 2 }
+  maxFileSizeByType?: Record<string, number>;
 }
 
 export function FileUploadZone({
   onFileUpload,
   isUploading,
   acceptedFileTypes = "application/pdf",
+  maxFileSizeMB = 10, // default 10mb
+  maxFileSizeByType,
 }: FileUploadZoneProps) {
   const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // helpers
+  const mbToBytes = (mb: number) => Math.round(mb * 1024 * 1024);
+  const humanSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  };
+
+  const parsedAccept = acceptedFileTypes
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+
+  const allowedBytesForMime = (mime: string | undefined) => {
+    if (!mime) return mbToBytes(maxFileSizeMB);
+    if (maxFileSizeByType && maxFileSizeByType[mime] != null) {
+      return mbToBytes(maxFileSizeByType[mime]!);
+    }
+    const parts = mime.split("/");
+    if (parts.length === 2) {
+      const wildcard = `${parts[0]}/*`;
+      if (maxFileSizeByType && maxFileSizeByType[wildcard] != null) {
+        return mbToBytes(maxFileSizeByType[wildcard]!);
+      }
+    }
+    return mbToBytes(maxFileSizeMB);
+  };
+
+  const isMimeAllowed = (fileType: string | undefined) => {
+    if (!fileType) return false;
+    const ft = fileType.toLowerCase();
+    for (const a of parsedAccept) {
+      if (a === ft) return true;
+      if (a === "*/*") return true;
+      if (a.endsWith("/*")) {
+        const major = a.split("/")[0];
+        if (ft.startsWith(`${major}/`)) return true;
+      }
+    }
+    return false;
+  };
+
+  const validateFile = (file: File) => {
+    // <<< CHANGED: use isMimeAllowed instead of strict include
+    if (!isMimeAllowed(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a supported file type.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const allowedBytes = allowedBytesForMime(file.type);
+    if (file.size > allowedBytes) {
+      toast({
+        title: "File too large",
+        description: `${file.name} is ${humanSize(file.size)} — max for this type is ${humanSize(
+          allowedBytes
+        )}`,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
 
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -42,30 +116,6 @@ export function FileUploadZone({
     },
     [isDragging]
   );
-
-  const validateFile = (file: File) => {
-    // Check file type
-    if (!file.type.match(acceptedFileTypes)) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload a PDF file.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    // Check file size (limit to 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "File size should be less than 5MB.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    return true;
-  };
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -108,6 +158,20 @@ export function FileUploadZone({
   const handleRemoveFile = () => {
     setUploadedFile(null);
   };
+
+  const typeBadges = parsedAccept.map((t) => {
+    const display =
+      t === "image/*"
+        ? "Images"
+        : t.includes("/")
+          ? t!.split("/")[1]!.toUpperCase()
+          : t.toUpperCase();
+    const mb =
+      (maxFileSizeByType &&
+        (maxFileSizeByType[t] ?? maxFileSizeByType[`${t.split("/")[0]}/*`])) ??
+      maxFileSizeMB;
+    return { key: t, label: `${display} ≤ ${mb} MB`, mb };
+  });
 
   return (
     <div className="w-full">
@@ -159,7 +223,10 @@ export function FileUploadZone({
             <div>
               <p className="font-medium text-primary">{uploadedFile.name}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {(uploadedFile.size / 1024).toFixed(1)} KB
+                {humanSize(uploadedFile.size)} • allowed{" "}
+                {humanSize(allowedBytesForMime(uploadedFile.type))}
+                {" • "}
+                {uploadedFile.type || "unknown"}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -173,6 +240,17 @@ export function FileUploadZone({
               <p className="font-medium text-primary">
                 Drag and drop a PDF file here
               </p>
+              <div className="flex flex-wrap gap-2 justify-center mt-2">
+                {typeBadges.map((b) => (
+                  <span
+                    key={b.key}
+                    className="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700"
+                    title={b.label}
+                  >
+                    {b.label}
+                  </span>
+                ))}
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
                 Or click to browse files
               </p>
@@ -188,7 +266,7 @@ export function FileUploadZone({
               Browse files
             </Button>
             <p className="text-xs text-muted-foreground">
-              Accepts PDF files up to 5MB
+              Accepts {acceptedFileTypes} — max {maxFileSizeMB} MB (default)
             </p>
           </div>
         )}

@@ -109,7 +109,7 @@ export interface IStorage {
 }
 
 /* ------------------------------- Implementation ------------------------------- */
-export const cloudStorage: IStorage = {
+export const cloudStorageStorage: IStorage = {
   // --- FOLDERS ---
   async getFolder(id: number) {
     const folder = await db.cloudFolder.findUnique({
@@ -471,4 +471,4 @@ export const cloudStorage: IStorage = {
   },
 };
 
-export default cloudStorage;
+export default cloudStorageStorage;
