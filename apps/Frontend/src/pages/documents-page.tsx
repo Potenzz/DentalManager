@@ -22,6 +22,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import DocumentsFilePreviewModal from "@/components/documents/file-preview-modal";
 
 export default function DocumentsPage() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -37,7 +38,11 @@ export default function DocumentsPage() {
   >(null);
 
   // PDF view state - viewing / downloading
-  const [fileBlobUrl, setFileBlobUrl] = useState<string | null>(null);
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewFileNameHint, setPreviewFileNameHint] = useState<string | null>(
+    null
+  );
   const [currentPdf, setCurrentPdf] = useState<PdfFile | null>(null);
 
   // Delete dialog
@@ -49,7 +54,11 @@ export default function DocumentsPage() {
     setLimit(5);
     setCurrentPage(1);
     setTotalForExpandedGroup(null);
-    setFileBlobUrl(null);
+
+    // close the preview modal and clear any preview hints
+    setIsPreviewOpen(false);
+    setPreviewFileId(null);
+    setPreviewFileNameHint(null);
   }, [selectedPatient]);
 
   // FETCH GROUPS for patient (includes `category` on each group)
@@ -151,12 +160,10 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleViewPdf = async (pdfId: number) => {
-    const res = await apiRequest("GET", `/api/documents/pdf-files/${pdfId}`);
-    const arrayBuffer = await res.arrayBuffer();
-    const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-    setFileBlobUrl(url);
+  const handleViewPdf = (pdfId: number, filename?: string) => {
+    setPreviewFileNameHint(filename ?? null);
+    setPreviewFileId(pdfId);
+    setIsPreviewOpen(true);
   };
 
   const handleDownloadPdf = async (pdfId: number, filename: string) => {
@@ -309,7 +316,10 @@ export default function DocumentsPage() {
                                               variant="ghost"
                                               size="sm"
                                               onClick={() =>
-                                                handleViewPdf(Number(pdf.id))
+                                                handleViewPdf(
+                                                  Number(pdf.id),
+                                                  pdf.filename
+                                                )
                                               }
                                             >
                                               <Eye className="w-4 h-4" />
@@ -437,29 +447,16 @@ export default function DocumentsPage() {
           </Card>
         )}
 
-        {fileBlobUrl && (
-          <Card>
-            <CardHeader className="flex justify-between items-center">
-              <CardTitle>Viewing PDF</CardTitle>
-              <Button
-                variant="outline"
-                className="ml-auto text-red-600 border-red-500 hover:bg-red-100 hover:border-red-600"
-                onClick={() => {
-                  setFileBlobUrl(null);
-                }}
-              >
-                ✕ Close
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <iframe
-                src={fileBlobUrl}
-                className="w-full h-[80vh] border rounded"
-                title="PDF Viewer"
-              />
-            </CardContent>
-          </Card>
-        )}
+        <DocumentsFilePreviewModal
+          fileId={previewFileId}
+          isOpen={isPreviewOpen}
+          onClose={() => {
+            setIsPreviewOpen(false);
+            setPreviewFileId(null);
+            setPreviewFileNameHint(null);
+          }}
+          initialFileName={previewFileNameHint}
+        />
 
         <Card>
           <CardHeader>
