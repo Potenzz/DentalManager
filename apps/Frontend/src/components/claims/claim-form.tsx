@@ -471,15 +471,27 @@ export function ClaimForm({
     await handleMHSubmit(nextForm);
   };
 
+  // overlay click handler (close when clicking backdrop)
+  const onOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // only close if clicked the backdrop itself (not inner modal)
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <Card className="w-full max-w-5xl max-h-[90vh] overflow-y-auto bg-white">
-        <CardHeader className="flex flex-row items-center justify-between pb-2 border-b">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"
+      onMouseDown={onOverlayMouseDown}
+    >
+      <Card className="w-[90vw] h-[90vh] max-w-none overflow-auto bg-white relative">
+        <CardHeader className="sticky top-0 z-20 flex flex-row items-center justify-between pb-2 border-b bg-white/95 backdrop-blur-sm">
           <CardTitle className="text-xl font-bold">
             Insurance Claim Form
           </CardTitle>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
+          <Button onClick={onClose}>
+            {" "}
+            <X className="w-4 h-4" />
           </Button>
         </CardHeader>
         <CardContent className="pt-4">
