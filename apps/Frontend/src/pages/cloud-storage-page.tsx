@@ -10,6 +10,11 @@ import { useAuth } from "@/hooks/use-auth";
 import RecentTopLevelFoldersCard, {
   recentTopLevelFoldersQueryKey,
 } from "@/components/cloud-storage/recent-top-level-folder-modal";
+import CloudSearchBar, {
+  cloudSearchQueryKeyRoot,
+} from "@/components/cloud-storage/search-bar";
+import FilePreviewModal from "@/components/cloud-storage/file-preview-modal";
+import { cloudFilesQueryKeyRoot } from "@/components/cloud-storage/files-section";
 
 export default function CloudStoragePage() {
   const { toast } = useToast();
@@ -27,6 +32,21 @@ export default function CloudStoragePage() {
 
   // New folder modal
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+
+  // searchbar - file preview modal state
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // searchbar - handlers
+  function handleOpenFolder(folderId: number | null) {
+    setPanelInitialFolderId(folderId);
+    setPanelOpen(true);
+  }
+
+  function handleSelectFile(fileId: number) {
+    setPreviewFileId(fileId);
+    setIsPreviewOpen(true);
+  }
 
   // create folder handler (page-level)
   async function handleCreateFolder(name: string) {
@@ -72,20 +92,20 @@ export default function CloudStoragePage() {
         </div>
 
         <div className="flex gap-2 items-center">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              /* search flow omitted - wire your search UI here */
-            }}
-          >
-            <SearchIcon className="h-4 w-4 mr-2" /> Search
-          </Button>
-
           <Button onClick={() => setIsNewFolderOpen(true)}>
             <FolderIcon className="h-4 w-4 mr-2" /> New Folder
           </Button>
         </div>
       </div>
+
+      <CloudSearchBar
+        onOpenFolder={(folderId) => {
+          handleOpenFolder(folderId);
+        }}
+        onSelectFile={(fileId) => {
+          handleSelectFile(fileId);
+        }}
+      />
 
       {/* Recent folders card (delegated component) */}
       <RecentTopLevelFoldersCard
@@ -115,6 +135,36 @@ export default function CloudStoragePage() {
           }}
         />
       )}
+      {/* File preview modal */}
+      <FilePreviewModal
+        fileId={previewFileId}
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewFileId(null);
+        }}
+        onDeleted={() => {
+          // close preview (modal may already close, but be explicit)
+          setIsPreviewOpen(false);
+          setPreviewFileId(null);
+
+          // refresh the recent folders card
+          qc.invalidateQueries({ queryKey: recentTopLevelFoldersQueryKey(1) });
+
+          // invalidate file lists and search results
+          qc.invalidateQueries({
+            queryKey: cloudFilesQueryKeyRoot,
+            exact: false,
+          });
+          qc.invalidateQueries({
+            queryKey: cloudSearchQueryKeyRoot,
+            exact: false,
+          });
+
+          // remount the recent card so it clears internal selection (UX nicety)
+          setRecentKey((k) => k + 1);
+        }}
+      />
 
       {/* New folder modal (reusable) */}
       <NewFolderModal

@@ -513,7 +513,14 @@ router.get(
     if (!q) return sendError(res, 400, "Missing search query parameter 'q'");
 
     try {
-      const { data, total } = await storage.searchFolders(q, limit, offset);
+      const parentId = null;
+
+      const { data, total } = await storage.searchFolders(
+        q,
+        limit,
+        offset,
+        parentId
+      );
       return res.json({ error: false, data, totalCount: total });
     } catch (err) {
       return sendError(res, 500, "Folder search failed");

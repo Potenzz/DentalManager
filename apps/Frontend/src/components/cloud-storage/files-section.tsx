@@ -36,6 +36,7 @@ import { getPageNumbers } from "@/utils/pageNumberGenerator";
 import { NewFolderModal } from "./new-folder-modal";
 import { toast } from "@/hooks/use-toast";
 import FilePreviewModal from "./file-preview-modal";
+import { cloudSearchQueryKeyRoot } from "./search-bar";
 
 export type FilesSectionProps = {
   parentId: number | null;
@@ -43,6 +44,24 @@ export type FilesSectionProps = {
   className?: string;
   onFileOpen?: (fileId: number) => void;
 };
+
+// canonical root key for files list queries (per-parent)
+export const cloudFilesQueryKeyRoot = ["cloud-files"];
+/**
+ * Build a full query key for files list under a parent folder with page parameters.
+ * Example usage:
+ *   cloudFilesQueryKeyBase(parentId, page, pageSize)
+ */
+export const cloudFilesQueryKeyBase = (
+  parentId: number | null,
+  page: number,
+  pageSize: number
+) => [
+  "cloud-files",
+  parentId === null ? "null" : String(parentId),
+  page,
+  pageSize,
+];
 
 const FILES_LIMIT_DEFAULT = 20;
 const MAX_FILE_MB = 10;
@@ -164,6 +183,8 @@ export default function FilesSection({
       qc.invalidateQueries({
         queryKey: ["/api/cloud-storage/folders/recent", 1],
       });
+      qc.invalidateQueries({ queryKey: cloudFilesQueryKeyRoot, exact: false });
+      qc.invalidateQueries({ queryKey: cloudSearchQueryKeyRoot, exact: false });
     } catch (err: any) {
       toast({
         title: "Rename failed",
@@ -194,9 +215,14 @@ export default function FilesSection({
 
       // reload current page (ensure page index valid)
       loadPage(currentPage);
+
       qc.invalidateQueries({
         queryKey: ["/api/cloud-storage/folders/recent", 1],
       });
+      // invalidate any cloud-files lists (so file lists refresh)
+      qc.invalidateQueries({ queryKey: cloudFilesQueryKeyRoot, exact: false });
+      // invalidate any cloud-search queries so search results refresh
+      qc.invalidateQueries({ queryKey: cloudSearchQueryKeyRoot, exact: false });
     } catch (err: any) {
       toast({
         title: "Delete failed",
@@ -310,6 +336,8 @@ export default function FilesSection({
       qc.invalidateQueries({
         queryKey: ["/api/cloud-storage/folders/recent", 1],
       });
+      qc.invalidateQueries({ queryKey: cloudFilesQueryKeyRoot, exact: false });
+      qc.invalidateQueries({ queryKey: cloudSearchQueryKeyRoot, exact: false });
     } catch (err: any) {
       toast({
         title: "Upload failed",
@@ -518,7 +546,29 @@ export default function FilesSection({
           setIsPreviewOpen(false);
           setPreviewFileId(null);
         }}
+        onDeleted={() => {
+          // close preview
+          setIsPreviewOpen(false);
+          setPreviewFileId(null);
+
+          // reload this folder page
+          loadPage(currentPage);
+
+          // invalidate caches
+          qc.invalidateQueries({
+            queryKey: ["/api/cloud-storage/folders/recent", 1],
+          });
+          qc.invalidateQueries({
+            queryKey: cloudFilesQueryKeyRoot,
+            exact: false,
+          });
+          qc.invalidateQueries({
+            queryKey: cloudSearchQueryKeyRoot,
+            exact: false,
+          });
+        }}
       />
+
       {/* delete confirm */}
       <DeleteConfirmationDialog
         isOpen={isDeleteOpen}

@@ -1,21 +1,32 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
-import { Download, Maximize2, Minimize2, X } from "lucide-react";
+import { Download, Maximize2, Minimize2, Trash2, X } from "lucide-react";
+import { DeleteConfirmationDialog } from "../ui/deleteDialog";
+import { QueryClient } from "@tanstack/react-query";
+import { cloudFilesQueryKeyRoot } from "./files-section";
 
 type Props = {
   fileId: number | null;
   isOpen: boolean;
   onClose: () => void;
+  onDeleted?: () => void;
 };
 
-export default function FilePreviewModal({ fileId, isOpen, onClose }: Props) {
+export default function FilePreviewModal({
+  fileId,
+  isOpen,
+  onClose,
+  onDeleted,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [meta, setMeta] = useState<any | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !fileId) return;
@@ -107,6 +118,49 @@ export default function FilePreviewModal({ fileId, isOpen, onClose }: Props) {
     }
   }
 
+  async function confirmDelete() {
+    if (!fileId) return;
+
+    setIsDeleteOpen(false);
+    setDeleting(true);
+
+    try {
+      const res = await apiRequest(
+        "DELETE",
+        `/api/cloud-storage/files/${fileId}`
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.message || `Delete failed (${res.status})`);
+      }
+
+      toast({
+        title: "Deleted",
+        description: `File "${meta?.name ?? `file-${fileId}`}" deleted.`,
+      });
+
+      // notify parent to refresh lists if they provided callback
+      if (typeof onDeleted === "function") {
+        try {
+          onDeleted();
+        } catch (e) {
+          // ignore parent errors
+        }
+      }
+
+      // close modal
+      onClose();
+    } catch (err: any) {
+      toast({
+        title: "Delete failed",
+        description: err?.message ?? String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   // container sizing classes
   const containerBase =
     "bg-white rounded-md p-3 flex flex-col overflow-hidden shadow-xl";
@@ -144,6 +198,13 @@ export default function FilePreviewModal({ fileId, isOpen, onClose }: Props) {
             </button>
             <Button variant="ghost" onClick={handleDownload}>
               <Download className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setIsDeleteOpen(true)}
+              disabled={deleting}
+            >
+              <Trash2 className="w-4 h-4" />
             </Button>
             <Button onClick={onClose}>
               {" "}
@@ -211,6 +272,13 @@ export default function FilePreviewModal({ fileId, isOpen, onClose }: Props) {
             )}
         </div>
       </div>
+
+      <DeleteConfirmationDialog
+        isOpen={isDeleteOpen}
+        entityName={meta?.name ?? undefined}
+        onCancel={() => setIsDeleteOpen(false)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

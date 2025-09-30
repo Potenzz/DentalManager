@@ -95,7 +95,8 @@ export interface IStorage {
   searchFolders(
     q: string,
     limit: number,
-    offset: number
+    offset: number,
+    parentId?: number | null
   ): Promise<{ data: CloudFolder[]; total: number }>;
   searchFiles(
     q: string,
@@ -400,16 +401,34 @@ export const cloudStorageStorage: IStorage = {
   },
 
   // --- SEARCH ---
-  async searchFolders(q: string, limit = 20, offset = 0) {
+  async searchFolders(
+    q: string,
+    limit = 20,
+    offset = 0,
+    parentId?: number | null
+  ) {
+    // Build where clause
+    const where: any = {
+      name: { contains: q, mode: "insensitive" },
+    };
+
+    // If parentId is explicitly provided:
+    // - parentId === null -> top-level folders (parent IS NULL)
+    // - parentId === number -> children of that folder
+    // If parentId is undefined -> search across all folders (no parent filter)
+    if (parentId !== undefined) {
+      where.parentId = parentId;
+    }
+
     const [folders, total] = await Promise.all([
       db.cloudFolder.findMany({
-        where: { name: { contains: q, mode: "insensitive" } },
+        where,
         orderBy: { name: "asc" },
         skip: offset,
         take: limit,
       }),
       db.cloudFolder.count({
-        where: { name: { contains: q, mode: "insensitive" } },
+        where,
       }),
     ]);
     return { data: folders as unknown as CloudFolder[], total };

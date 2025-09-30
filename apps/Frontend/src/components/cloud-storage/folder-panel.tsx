@@ -1,6 +1,3 @@
-// Updated components to support: 1) navigating into child folders (FolderSection -> FolderPanel)
-// 2) a breadcrumb / path strip in FolderPanel so user can see & click parent folders
-
 import React, { useEffect, useRef, useState } from "react";
 import FolderSection from "@/components/cloud-storage/folder-section";
 import FilesSection from "@/components/cloud-storage/files-section";
@@ -116,9 +113,8 @@ export default function FolderPanel({
         <h2 className="text-2xl font-semibold">
           {currentFolderId == null
             ? "My Cloud Storage"
-            : `Folder ${currentFolderId}`}
+            : `Folder : ${path[path.length - 1]?.name ?? currentFolderId}`}
         </h2>
-
         <div>
           {onClose && (
             <button
