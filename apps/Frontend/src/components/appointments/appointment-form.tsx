@@ -579,7 +579,6 @@ export function AppointmentForm({
             control={form.control}
             name="date"
             label="Date"
-            disablePast
           />
 
           <div className="grid grid-cols-2 gap-4">
