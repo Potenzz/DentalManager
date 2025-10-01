@@ -39,6 +39,11 @@ export const PROCEDURE_COMBOS: Record<
     codes: ["D0120", "D0220", "D0230", "D0274", "D1110"],
     toothNumbers: [null, "9", "24", null, null], // only these two need values
   },
+  adultRecallDirectPano: {
+    id: "adultRecallDirectPano",
+    label: "Adult Recall Direct - Pano",
+    codes: ["D0120", "D1110", "D0330"],
+  },
   newChildPatient: {
     id: "newChildPatient",
     label: "New Child Patient",

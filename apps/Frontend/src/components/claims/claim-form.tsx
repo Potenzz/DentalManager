@@ -77,7 +77,7 @@ interface ClaimFormProps {
   onSubmit: (data: ClaimFormData) => Promise<Claim>;
   onHandleAppointmentSubmit: (
     appointmentData: InsertAppointment | UpdateAppointment
-  ) => void;
+  ) => Promise<number | { id: number }>;
   onHandleUpdatePatient: (patient: UpdatePatient & { id: number }) => void;
   onHandleForMHSelenium: (data: ClaimFormData) => void;
   onClose: () => void;
@@ -347,6 +347,13 @@ export function ClaimForm({
     setForm({ ...form, serviceLines: updatedLines });
   };
 
+  // normalize for display while typing: uppercase and allow letters, commas and spaces
+  function normalizeToothSurface(raw?: string): string {
+    if (!raw) return "";
+    // Uppercase and remove characters that are not A-Z, comma or space
+    return raw.toUpperCase().replace(/[^A-Z,\s]/g, "");
+  }
+
   // for serviceLine rows, to auto scroll when it got updated by combo buttons and all.
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -400,12 +407,22 @@ export function ClaimForm({
     }
 
     // 1. Create or update appointment
-    const appointmentData = {
-      patientId: patientId,
-      date: f.serviceDate,
-      staffId: staff?.id,
-    };
-    const appointmentId = await onHandleAppointmentSubmit(appointmentData);
+    let appointmentIdToUse = appointmentId;
+
+    if (appointmentIdToUse == null) {
+      const appointmentData = {
+        patientId: patientId,
+        date: serviceDate,
+        staffId: staff?.id,
+      };
+      const created = await onHandleAppointmentSubmit(appointmentData);
+
+      if (typeof created === "number" && created > 0) {
+        appointmentIdToUse = created;
+      } else if (created && typeof (created as any).id === "number") {
+        appointmentIdToUse = (created as any).id;
+      }
+    }
 
     // 2. Update patient
     if (patient && typeof patient.id === "number") {
@@ -443,7 +460,7 @@ export function ClaimForm({
       staffId: Number(staff?.id),
       patientId: patientId,
       insuranceProvider: "MassHealth",
-      appointmentId: appointmentId!,
+      appointmentId: appointmentIdToUse!,
       claimFiles: claimFilesMeta,
     });
 
@@ -454,7 +471,7 @@ export function ClaimForm({
       staffId: Number(staff?.id),
       patientId: patientId,
       insuranceProvider: "Mass Health",
-      appointmentId: appointmentId!,
+      appointmentId: appointmentIdToUse!,
       insuranceSiteKey: "MH",
       claimId: createdClaim.id,
     });
@@ -482,12 +499,22 @@ export function ClaimForm({
     }
 
     // 1. Create or update appointment
-    const appointmentData = {
-      patientId: patientId,
-      date: serviceDate,
-      staffId: staff?.id,
-    };
-    const appointmentId = await onHandleAppointmentSubmit(appointmentData);
+    let appointmentIdToUse = appointmentId;
+
+    if (appointmentIdToUse == null) {
+      const appointmentData = {
+        patientId: patientId,
+        date: serviceDate,
+        staffId: staff?.id,
+      };
+      const created = await onHandleAppointmentSubmit(appointmentData);
+
+      if (typeof created === "number" && created > 0) {
+        appointmentIdToUse = created;
+      } else if (created && typeof (created as any).id === "number") {
+        appointmentIdToUse = (created as any).id;
+      }
+    }
 
     // 2. Update patient
     if (patient && typeof patient.id === "number") {
@@ -525,7 +552,7 @@ export function ClaimForm({
       staffId: Number(staff?.id),
       patientId: patientId,
       insuranceProvider: "MassHealth",
-      appointmentId: appointmentId!,
+      appointmentId: appointmentIdToUse!,
       claimFiles: claimFilesMeta,
     });
 
@@ -769,6 +796,14 @@ export function ClaimForm({
                     >
                       Adult Recall Direct 4BW2PA
                     </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        applyComboAndThenMH("adultRecallDirectPano")
+                      }
+                    >
+                      Adult Recall Direct Pano
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -890,11 +925,12 @@ export function ClaimForm({
                       }
                     />
                     <Input
-                      placeholder="eg. 'B', 'D', 'F', 'I', 'L', 'M', 'O'"
+                      placeholder="eg. B,D,F,I,L,M,O (comma-separated)"
                       value={line.toothSurface}
-                      onChange={(e) =>
-                        updateServiceLine(i, "toothSurface", e.target.value)
-                      }
+                      onChange={(e) => {
+                        const typed = normalizeToothSurface(e.target.value);
+                        updateServiceLine(i, "toothSurface", typed);
+                      }}
                     />
                     <Input
                       type="number"
@@ -1023,17 +1059,17 @@ export function ClaimForm({
               <div className="flex justify-between">
                 <Button
                   className="w-32"
-                  variant="warning"
+                  variant="secondary"
                   onClick={() => handleMHSubmit()}
                 >
                   MH
                 </Button>
-                <Button className="w-32" variant="warning">
+                <Button className="w-32" variant="secondary">
                   MH PreAuth
                 </Button>
                 <Button
                   className="w-32"
-                  variant="warning"
+                  variant="secondary"
                   onClick={handleAddService}
                 >
                   Add Service
