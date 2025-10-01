@@ -10,7 +10,6 @@ import {
 import { ClaimForm } from "@/components/claims/claim-form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { parse } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
@@ -19,7 +18,6 @@ import {
   clearTaskStatus,
 } from "@/redux/slices/seleniumClaimSubmitTaskSlice";
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
-import { formatLocalDate } from "@/utils/dateUtils";
 import ClaimsRecentTable, {
   QK_CLAIMS_BASE,
 } from "@/components/claims/claims-recent-table";
@@ -27,27 +25,26 @@ import ClaimsOfPatientModal from "@/components/claims/claims-of-patient-table";
 import {
   Claim,
   InsertAppointment,
-  InsertPatient,
   UpdateAppointment,
   UpdatePatient,
 } from "@repo/db/types";
 import ClaimDocumentsUploadMultiple from "@/components/claims/claim-document-upload-modal";
 
 export default function ClaimsPage() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClaimFormOpen, setIsClaimFormOpen] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(
     null
   );
+  // for redirect from appointment page directly, then passing to claimform
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<
+    number | null
+  >(null);
   const dispatch = useAppDispatch();
   const { status, message, show } = useAppSelector(
     (state) => state.seleniumClaimSubmitTask
   );
   const { toast } = useToast();
   const { user } = useAuth();
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
 
   // Update patient mutation
   const updatePatientMutation = useMutation({
@@ -151,8 +148,13 @@ export default function ClaimsPage() {
     return { newPatient: params.get("newPatient") };
   }, [location]);
 
-  const handleNewClaim = (patientId: number) => {
+  const handleNewClaim = (patientId: number, appointmentId?: number) => {
     setSelectedPatientId(patientId);
+
+    // case: when redirect happerns from appointment page.
+    if (appointmentId) {
+      setSelectedAppointmentId(appointmentId);
+    }
     setIsClaimFormOpen(true);
   };
 
@@ -186,7 +188,7 @@ export default function ClaimsPage() {
       try {
         const res = await apiRequest(
           "GET",
-          `/api/appointments/${appointmentId}/patient`
+          `/api/appointments/${appointmentId}`
         );
         if (!res.ok) {
           let body: any = null;
@@ -195,21 +197,22 @@ export default function ClaimsPage() {
           } catch {}
           if (!cancelled) {
             toast({
-              title: "Failed to load patient",
+              title: "Failed to load appointment",
               description:
                 body?.message ??
                 body?.error ??
-                `Could not fetch patient for appointment ${appointmentId}.`,
+                `Could not fetch appointment ${appointmentId}.`,
               variant: "destructive",
             });
           }
           return;
         }
 
-        const data = await res.json();
-        const patient = data?.patient ?? data;
-        if (!cancelled && patient && patient.id) {
-          handleNewClaim(patient.id);
+        const appointment = await res.json();
+        const patientId = appointment?.patientId;
+
+        if (!cancelled && patientId) {
+          handleNewClaim(patientId, appointmentId);
           clearUrlParams(["appointmentId"]);
         }
       } catch (err: any) {
@@ -404,6 +407,7 @@ export default function ClaimsPage() {
   // 6. close claim
   const closeClaim = () => {
     setSelectedPatientId(null);
+    setSelectedAppointmentId(null);
     setIsClaimFormOpen(false);
 
     clearUrlParams(["newPatient", "appointmentId"]);
@@ -458,6 +462,7 @@ export default function ClaimsPage() {
       {isClaimFormOpen && selectedPatientId !== null && (
         <ClaimForm
           patientId={selectedPatientId}
+          appointmentId={selectedAppointmentId ?? undefined}
           onClose={closeClaim}
           onSubmit={handleClaimSubmit}
           onHandleAppointmentSubmit={handleAppointmentSubmit}

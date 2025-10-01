@@ -73,6 +73,7 @@ interface ClaimFormData {
 
 interface ClaimFormProps {
   patientId: number;
+  appointmentId?: number;
   onSubmit: (data: ClaimFormData) => Promise<Claim>;
   onHandleAppointmentSubmit: (
     appointmentData: InsertAppointment | UpdateAppointment
@@ -84,6 +85,7 @@ interface ClaimFormProps {
 
 export function ClaimForm({
   patientId,
+  appointmentId,
   onHandleAppointmentSubmit,
   onHandleUpdatePatient,
   onHandleForMHSelenium,
@@ -146,6 +148,82 @@ export function ClaimForm({
   const [openProcedureDateIndex, setOpenProcedureDateIndex] = useState<
     number | null
   >(null);
+
+  //incase when appointmentId is given - directly from appoinmentpage - claimpage - to here.
+  // then, update the service date as per the appointment date.
+  useEffect(() => {
+    if (!appointmentId) return;
+    if (!Number.isFinite(appointmentId) || appointmentId <= 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await apiRequest(
+          "GET",
+          `/api/appointments/${appointmentId}`
+        );
+        if (!res.ok) {
+          let body: any = null;
+          try {
+            body = await res.json();
+          } catch {}
+          if (!cancelled) {
+            toast({
+              title: "Failed to load appointment",
+              description:
+                body?.message ??
+                body?.error ??
+                `Could not fetch appointment ${appointmentId}.`,
+              variant: "destructive",
+            });
+          }
+          return;
+        }
+
+        const appointment = await res.json();
+        // appointment.date is expected to be either "YYYY-MM-DD" or an ISO string.
+        const rawDate = appointment?.date ?? appointment?.day ?? "";
+        if (!rawDate) return;
+
+        // Use your parseLocalDate to create a local-midnight Date (avoid TZ shifts)
+        let dateVal: Date;
+        try {
+          dateVal = parseLocalDate(String(rawDate));
+        } catch (e) {
+          // Fallback - try constructing Date and then normalize
+          const maybe = new Date(rawDate);
+          if (isNaN(maybe.getTime())) {
+            console.error("Could not parse appointment date:", rawDate);
+            return;
+          }
+          dateVal = new Date(
+            maybe.getFullYear(),
+            maybe.getMonth(),
+            maybe.getDate()
+          );
+        }
+
+        if (!cancelled) {
+          setServiceDateValue(dateVal);
+          setServiceDate(formatLocalDate(dateVal));
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error("Error fetching appointment:", err);
+          toast({
+            title: "Error",
+            description: err?.message ?? "Failed to fetch Appointment.",
+            variant: "destructive",
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appointmentId]);
 
   // Update service date when calendar date changes
   const onServiceDateChange = (date: Date | undefined) => {
