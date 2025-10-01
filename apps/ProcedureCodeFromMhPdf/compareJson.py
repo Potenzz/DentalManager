@@ -17,10 +17,10 @@ from typing import List, Dict, Any
 # =========================
 # CONFIG — EDIT THESE ONLY
 # =========================
-MAIN_PATH = "procedureCodesMain.json"  # your main JSON (with PriceLTEQ21/PriceGT21)
+MAIN_PATH = "procedureCodes_v2.json"  # your main JSON (with PriceLTEQ21/PriceGT21)
 OTHER_PATHS = [
-    "procedureCodesOld.json",       # one or more other JSON files to compare against the main
-    # "other2.json",
+    # "procedureCodesOld.json",       # one or more other JSON files to compare against the main
+    "output.json",
 ]
 OUT_PATH = "not_in_main.json"  # where to write the results
 # =========================

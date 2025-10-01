@@ -31,9 +31,9 @@ import fitz  # PyMuPDF
 # =========================
 # CONFIG — EDIT THESE ONLY
 # =========================
-PDF_PATH = "MH.pdf"   # path to your PDF
+PDF_PATH = "MHv2.pdf"   # path to your PDF
 PAGE_START = 1                # 1-based inclusive start page (e.g., 1)
-PAGE_END   = 12               # 1-based inclusive end page   (e.g., 5)
+PAGE_END   = 15             # 1-based inclusive end page   (e.g., 5)
 OUT_PATH = "output.json"      # single JSON file containing all parsed rows
 FIRST_PRICE_IS_LTE21 = True   # True => first price line is <=21; False => first price is >21
 PRINT_PAGE_TEXT = False       # set True to print raw text for each page
