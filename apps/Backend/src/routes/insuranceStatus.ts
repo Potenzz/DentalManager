@@ -10,6 +10,57 @@ import fsSync from "fs";
 
 const router = Router();
 
+/**
+ * Empty the folder containing `filePath`.
+ * - Uses only the filePath to locate the folder.
+ * - Deletes files and symlinks only (does not remove subfolders).
+ * - Has minimal safety checks to avoid catastrophic deletes.
+ */
+async function emptyFolderContainingFile(filePath: string) {
+  if (!filePath) return;
+
+  // Resolve to absolute path and get parent folder
+  const absFile = path.resolve(String(filePath));
+  const folder = path.dirname(absFile);
+
+  // Safety: refuse to operate on root (or extremely short paths)
+  const parsed = path.parse(folder);
+  if (!folder || folder === parsed.root) {
+    throw new Error(`Refusing to clean root or empty folder: ${folder}`);
+  }
+
+  // Optional light heuristic: require folder name to be non-empty and not a system root like "/tmp"
+  const base = path.basename(folder).toLowerCase();
+  if (base.length < 2) {
+    throw new Error(`Refusing to clean suspicious folder: ${folder}`);
+  }
+
+  // Read and remove files/symlinks only
+  try {
+    const names = await fs.readdir(folder);
+    for (const name of names) {
+      const full = path.join(folder, name);
+      try {
+        const st = await fs.lstat(full);
+        if (st.isFile() || st.isSymbolicLink()) {
+          await fs.unlink(full);
+          console.log(`[cleanup] removed file: ${full}`);
+        } else {
+          // If you truly know there will be no subfolders you can skip or log
+          console.log(`[cleanup] skipping non-file item: ${full}`);
+        }
+      } catch (innerErr) {
+        console.error(`[cleanup] failed to remove ${full}:`, innerErr);
+        // continue with other files
+      }
+    }
+    console.log(`[cleanup] emptied folder: ${folder}`);
+  } catch (err) {
+    console.error(`[cleanup] failed reading folder ${folder}:`, err);
+    throw err;
+  }
+}
+
 router.post(
   "/eligibility-check",
   async (req: Request, res: Response): Promise<any> => {
@@ -22,6 +73,8 @@ router.post(
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Unauthorized: user info missing" });
     }
+
+    let result: any = undefined;
 
     try {
       const insuranceEligibilityData = JSON.parse(req.body.data);
@@ -43,8 +96,7 @@ router.post(
         massdhpPassword: credentials.password,
       };
 
-      const result =
-        await forwardToSeleniumInsuranceEligibilityAgent(enrichedData);
+      result = await forwardToSeleniumInsuranceEligibilityAgent(enrichedData);
 
       let createdPdfFileId: number | null = null;
 
@@ -94,6 +146,11 @@ router.post(
             createdPdfFileId = Number(created.id);
           }
 
+          // safe-success path (after createdPdfFileId is set and DB committed)
+          if (result.pdf_path) {
+            await emptyFolderContainingFile(result.pdf_path);
+          }
+
           await fs.unlink(result.pdf_path);
 
           result.pdfUploadStatus = `PDF saved to group: ${group.title}`;
@@ -113,6 +170,19 @@ router.post(
       });
     } catch (err: any) {
       console.error(err);
+
+      try {
+        if (result && result.pdf_path) {
+          await emptyFolderContainingFile(result.pdf_path);
+        } else {
+          console.log(`[eligibility-check] no pdf_path available to cleanup`);
+        }
+      } catch (cleanupErr) {
+        console.error(
+          `[eligibility-check cleanup failed for ${result?.pdf_path}`,
+          cleanupErr
+        );
+      }
       return res.status(500).json({
         error: err.message || "Failed to forward to selenium agent",
       });

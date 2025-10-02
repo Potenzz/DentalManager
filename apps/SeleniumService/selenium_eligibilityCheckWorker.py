@@ -7,6 +7,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import os
+import shutil
+import stat
 
 class AutomationMassHealthEligibilityCheck:    
     def __init__(self, data):
@@ -120,7 +122,6 @@ class AutomationMassHealthEligibilityCheck:
 
     
     def step2(self):
-        wait = WebDriverWait(self.driver, 90)
         def wait_for_pdf_download(timeout=60):
             for _ in range(timeout):
                 files = [f for f in os.listdir(self.download_dir) if f.endswith(".pdf")]
@@ -128,6 +129,18 @@ class AutomationMassHealthEligibilityCheck:
                     return os.path.join(self.download_dir, files[0])
                 time.sleep(1)
             raise TimeoutError("PDF did not download in time")
+
+        def _unique_target_path():
+            """
+            Create a unique filename using memberId.
+            """
+            safe_member = "".join(c for c in str(self.memberId) if c.isalnum() or c in "-_.")
+            filename = f"eligibility_{safe_member}.pdf"
+            return os.path.join(self.download_dir, filename)
+
+        wait = WebDriverWait(self.driver, 90)
+        tmp_created_path = None
+
         try:
 
             eligibilityElement = wait.until(EC.presence_of_element_located((By.XPATH, 
@@ -140,16 +153,45 @@ class AutomationMassHealthEligibilityCheck:
 
             txReportElement.click()
 
-            pdf_path = wait_for_pdf_download()
-            print("PDF downloaded at:", pdf_path)
+            # wait for the PDF to fully appear
+            downloaded_path = wait_for_pdf_download()
+            # generate unique target path (include memberId)
+            target_path = self._unique_target_path()
+            # It's possible Chrome writes a file with a fixed name: copy/rename it to our target name.
+            shutil.copyfile(downloaded_path, target_path)
+            # ensure the copied file is writable / stable
+            os.chmod(target_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+
+            print("PDF downloaded at:", target_path)
 
             return {
                 "status": "success",
                 "eligibility": eligibilityText,
-                "pdf_path": pdf_path
+                "pdf_path": target_path
             }
         except Exception as e:
             print(f"ERROR: {str(e)}")
+
+            # Empty the download folder (remove files / symlinks only)
+            try:
+                dl = os.path.abspath(self.download_dir)
+                if os.path.isdir(dl):
+                    for name in os.listdir(dl):
+                        item = os.path.join(dl, name)
+                        try:
+                            if os.path.isfile(item) or os.path.islink(item):
+                                os.remove(item)
+                                print(f"[cleanup] removed: {item}")
+                        except Exception as rm_err:
+                            print(f"[cleanup] failed to remove {item}: {rm_err}")
+                    print(f"[cleanup] emptied download dir: {dl}")
+                else:
+                    print(f"[cleanup] download dir does not exist: {dl}")
+            except Exception as cleanup_exc:
+                print(f"[cleanup] unexpected error while cleaning downloads dir: {cleanup_exc}")
+
+
             return {
                 "status": "error",
                 "message": str(e),
