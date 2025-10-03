@@ -201,6 +201,8 @@ router.post(
       return res.status(401).json({ error: "Unauthorized: user info missing" });
     }
 
+    let result: any = undefined;
+
     async function imageToPdfBuffer(imagePath: string): Promise<Buffer> {
       return new Promise<Buffer>((resolve, reject) => {
         try {
@@ -249,8 +251,7 @@ router.post(
         massdhpPassword: credentials.password,
       };
 
-      const result =
-        await forwardToSeleniumInsuranceClaimStatusAgent(enrichedData);
+      result = await forwardToSeleniumInsuranceClaimStatusAgent(enrichedData);
 
       let createdPdfFileId: number | null = null;
 
@@ -329,21 +330,8 @@ router.post(
           }
 
           // Clean up temp files:
-          try {
-            // remove generated PDF file (if it was created during conversion)
-            if (
-              generatedPdfPath &&
-              fsSync.existsSync(generatedPdfPath) &&
-              generatedPdfPath !== result.pdf_path
-            ) {
-              await fs.unlink(generatedPdfPath);
-            }
-            // remove screenshot (if provided by Selenium) to avoid lingering temp files
-            if (result.ss_path && fsSync.existsSync(result.ss_path)) {
-              await fs.unlink(result.ss_path);
-            }
-          } catch (cleanupErr) {
-            console.warn("Cleanup error (non-fatal):", cleanupErr);
+          if (result.pdf_path) {
+            await emptyFolderContainingFile(result.pdf_path);
           }
 
           result.pdfUploadStatus = `PDF saved to group: ${group.title}`;
@@ -360,6 +348,18 @@ router.post(
       return;
     } catch (err: any) {
       console.error(err);
+      try {
+        if (result && result.pdf_path) {
+          await emptyFolderContainingFile(result.pdf_path);
+        } else {
+          console.log(`claim-status-check] no pdf_path available to cleanup`);
+        }
+      } catch (cleanupErr) {
+        console.error(
+          `[claim-status-check cleanup failed for ${result?.pdf_path}`,
+          cleanupErr
+        );
+      }
       return res.status(500).json({
         error: err.message || "Failed to forward to selenium agent",
       });

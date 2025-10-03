@@ -169,6 +169,23 @@ class AutomationMassHealthClaimStatusCheck:
 
         except Exception as e:
             print("ERROR in step2:", e)
+            # Empty the download folder (remove files / symlinks only)
+            try:
+                dl = os.path.abspath(self.download_dir)
+                if os.path.isdir(dl):
+                    for name in os.listdir(dl):
+                        item = os.path.join(dl, name)
+                        try:
+                            if os.path.isfile(item) or os.path.islink(item):
+                                os.remove(item)
+                                print(f"[cleanup] removed: {item}")
+                        except Exception as rm_err:
+                            print(f"[cleanup] failed to remove {item}: {rm_err}")
+                    print(f"[cleanup] emptied download dir: {dl}")
+                else:
+                    print(f"[cleanup] download dir does not exist: {dl}")
+            except Exception as cleanup_exc:
+                print(f"[cleanup] unexpected error while cleaning downloads dir: {cleanup_exc}")
             return {"status": "error", "message": str(e)}
 
         finally:
