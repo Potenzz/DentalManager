@@ -35,14 +35,36 @@ export function parseLocalDate(input: string | Date): Date {
 }
 
 /**
- * Format a JS Date object as a `yyyy-MM-dd` string (in local time).
- * Useful for saving date-only data without time component.
+ * Strictly format to "YYYY-MM-DD" without timezone shifts.
+ * - If input is already "YYYY-MM-DD", return it unchanged.
+ * - If input is a Date, use its local year/month/day directly (no TZ conversion).
+ * - If input is an ISO/timestamp string, first strip to "YYYY-MM-DD" safely.
  */
-export function formatLocalDate(date: Date): string {
-  const year = date.getFullYear(); // ← local time
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`; // e.g. "2025-07-15"
+export function formatLocalDate(input: string | Date): string {
+  if (!input) return "";
+
+  // Case 1: already "YYYY-MM-DD"
+  if (typeof input === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return input;
+  }
+
+  // Case 2: Date object (use its local fields directly)
+  if (input instanceof Date) {
+    if (isNaN(input.getTime())) return "";
+    const year = input.getFullYear();
+    const month = `${input.getMonth() + 1}`.padStart(2, "0");
+    const day = `${input.getDate()}`.padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  // Case 3: string with time/ISO — strip the "YYYY-MM-DD" part only
+  if (typeof input === "string") {
+    const parts = input.split("T");
+    const dateString = parts.length > 0 && parts[0] ? parts[0] : "";
+    return dateString;
+  }
+
+  return "";
 }
 
 /**

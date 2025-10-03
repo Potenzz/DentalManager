@@ -360,7 +360,7 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
                   <FormItem>
                     <FormLabel>Insurance ID</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value || ""} />
+                      <Input {...field} value={String(field.value) || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
