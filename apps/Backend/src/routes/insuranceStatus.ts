@@ -280,7 +280,7 @@ router.post(
           }
 
           // Clean up temp files:
-          if (result.pdf_path) {
+          if (result.ss_path) {
             await emptyFolderContainingFile(result.ss_path);
           }
 
