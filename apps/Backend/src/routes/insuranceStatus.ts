@@ -280,8 +280,21 @@ router.post(
           }
 
           // Clean up temp files:
-          if (result.ss_path) {
-            await emptyFolderContainingFile(result.ss_path);
+          // call cleaner on best known path and log
+          const cleanupPath =
+            result?.ss_path || generatedPdfPath || result?.pdf_path;
+          console.log(
+            "[claim-status-check] calling emptyFolderContainingFile for:",
+            cleanupPath
+          );
+          if (cleanupPath) {
+            try {
+              await emptyFolderContainingFile(cleanupPath);
+            } catch (cleanupErr) {
+              console.error("[claim-status-check] cleanup error:", cleanupErr);
+            }
+          } else {
+            console.log("[claim-status-check] no cleanup path available");
           }
 
           result.pdfUploadStatus = `PDF saved to group: ${group.title}`;
