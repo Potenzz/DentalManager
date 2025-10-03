@@ -156,7 +156,7 @@ class AutomationMassHealthEligibilityCheck:
             # wait for the PDF to fully appear
             downloaded_path = wait_for_pdf_download()
             # generate unique target path (include memberId)
-            target_path = self._unique_target_path()
+            target_path = _unique_target_path()
             # It's possible Chrome writes a file with a fixed name: copy/rename it to our target name.
             shutil.copyfile(downloaded_path, target_path)
             # ensure the copied file is writable / stable
