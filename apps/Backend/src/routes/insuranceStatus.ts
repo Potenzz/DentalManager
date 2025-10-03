@@ -331,7 +331,7 @@ router.post(
 
           // Clean up temp files:
           if (result.pdf_path) {
-            await emptyFolderContainingFile(result.pdf_path);
+            await emptyFolderContainingFile(result.ss_path);
           }
 
           result.pdfUploadStatus = `PDF saved to group: ${group.title}`;
@@ -349,14 +349,14 @@ router.post(
     } catch (err: any) {
       console.error(err);
       try {
-        if (result && result.pdf_path) {
-          await emptyFolderContainingFile(result.pdf_path);
+        if (result && result.ss_path) {
+          await emptyFolderContainingFile(result.ss_path);
         } else {
           console.log(`claim-status-check] no pdf_path available to cleanup`);
         }
       } catch (cleanupErr) {
         console.error(
-          `[claim-status-check cleanup failed for ${result?.pdf_path}`,
+          `[claim-status-check cleanup failed for ${result?.ss_path}`,
           cleanupErr
         );
       }
