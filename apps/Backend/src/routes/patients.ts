@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
 import { insertPatientSchema, updatePatientSchema } from "@repo/db/types";
+import { normalizeInsuranceId } from "../utils/helpers";
 
 const router = Router();
 
@@ -160,6 +161,18 @@ router.get(
 // Create a new patient
 router.post("/", async (req: Request, res: Response): Promise<any> => {
   try {
+    const body: any = { ...req.body, userId: req.user!.id };
+
+    // Normalize insuranceId early and return clear error if invalid
+    try {
+      const normalized = normalizeInsuranceId(body.insuranceId);
+      body.insuranceId = normalized;
+    } catch (err: any) {
+      return res.status(400).json({
+        message: "Invalid insuranceId",
+        details: err?.message ?? "Invalid insuranceId format",
+      });
+    }
     // Validate request body
     const patientData = insertPatientSchema.parse({
       ...req.body,
@@ -169,7 +182,7 @@ router.post("/", async (req: Request, res: Response): Promise<any> => {
     // Check for duplicate insuranceId if it's provided
     if (patientData.insuranceId) {
       const existingPatient = await storage.getPatientByInsuranceId(
-        patientData.insuranceId
+        patientData.insuranceId as string
       );
 
       if (existingPatient) {
@@ -201,6 +214,18 @@ router.put(
     try {
       const patientIdParam = req.params.id;
 
+      // Normalize incoming insuranceId (if present)
+      try {
+        if (req.body.insuranceId !== undefined) {
+          req.body.insuranceId = normalizeInsuranceId(req.body.insuranceId);
+        }
+      } catch (err: any) {
+        return res.status(400).json({
+          message: "Invalid insuranceId",
+          details: err?.message ?? "Invalid insuranceId format",
+        });
+      }
+
       // Ensure that patientIdParam exists and is a valid number
       if (!patientIdParam) {
         return res.status(400).json({ message: "Patient ID is required" });
@@ -223,7 +248,7 @@ router.put(
         patientData.insuranceId !== existingPatient.insuranceId
       ) {
         const duplicatePatient = await storage.getPatientByInsuranceId(
-          patientData.insuranceId
+          patientData.insuranceId as string
         );
         if (duplicatePatient && duplicatePatient.id !== patientId) {
           return res.status(409).json({

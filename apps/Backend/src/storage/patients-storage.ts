@@ -87,7 +87,7 @@ export const patientsStorage: IStorage = {
     try {
       return await db.patient.update({
         where: { id },
-        data: updateData,
+        data: updateData as Patient,
       });
     } catch (err) {
       throw new Error(`Patient with ID ${id} not found`);
