@@ -7,59 +7,9 @@ import path from "path";
 import PDFDocument from "pdfkit";
 import { forwardToSeleniumInsuranceClaimStatusAgent } from "../services/seleniumInsuranceClaimStatusClient";
 import fsSync from "fs";
+import { emptyFolderContainingFile } from "../utils/emptyTempFolder";
 
 const router = Router();
-
-/**
- * Empty the folder containing `filePath`.
- * - Uses only the filePath to locate the folder.
- * - Deletes files and symlinks only (does not remove subfolders).
- * - Has minimal safety checks to avoid catastrophic deletes.
- */
-async function emptyFolderContainingFile(filePath: string) {
-  if (!filePath) return;
-
-  // Resolve to absolute path and get parent folder
-  const absFile = path.resolve(String(filePath));
-  const folder = path.dirname(absFile);
-
-  // Safety: refuse to operate on root (or extremely short paths)
-  const parsed = path.parse(folder);
-  if (!folder || folder === parsed.root) {
-    throw new Error(`Refusing to clean root or empty folder: ${folder}`);
-  }
-
-  // Optional light heuristic: require folder name to be non-empty and not a system root like "/tmp"
-  const base = path.basename(folder).toLowerCase();
-  if (base.length < 2) {
-    throw new Error(`Refusing to clean suspicious folder: ${folder}`);
-  }
-
-  // Read and remove files/symlinks only
-  try {
-    const names = await fs.readdir(folder);
-    for (const name of names) {
-      const full = path.join(folder, name);
-      try {
-        const st = await fs.lstat(full);
-        if (st.isFile() || st.isSymbolicLink()) {
-          await fs.unlink(full);
-          console.log(`[cleanup] removed file: ${full}`);
-        } else {
-          // If you truly know there will be no subfolders you can skip or log
-          console.log(`[cleanup] skipping non-file item: ${full}`);
-        }
-      } catch (innerErr) {
-        console.error(`[cleanup] failed to remove ${full}:`, innerErr);
-        // continue with other files
-      }
-    }
-    console.log(`[cleanup] emptied folder: ${folder}`);
-  } catch (err) {
-    console.error(`[cleanup] failed reading folder ${folder}:`, err);
-    throw err;
-  }
-}
 
 router.post(
   "/eligibility-check",
