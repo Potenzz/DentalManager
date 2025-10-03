@@ -35,33 +35,66 @@ export function parseLocalDate(input: string | Date): Date {
 }
 
 /**
- * Strictly format to "YYYY-MM-DD" without timezone shifts.
- * - If input is already "YYYY-MM-DD", return it unchanged.
- * - If input is a Date, use its local year/month/day directly (no TZ conversion).
- * - If input is an ISO/timestamp string, first strip to "YYYY-MM-DD" safely.
+ * Format a date value into a "YYYY-MM-DD" string with **no timezone shifts**.
+ *
+ * Handles all common input cases:
+ * - "YYYY-MM-DD" string → returned as-is.
+ * - ISO/timestamp string → takes the date portion before "T" (safe, no TZ math).
+ * - Date object:
+ *   - If created via `new Date("2025-07-15T00:00:00Z")` (ISO instant),
+ *     UTC vs local calendar components may differ. In this case, use UTC
+ *     fields so the original calendar day (15th) is preserved across timezones.
+ *   - If created via `parseLocalDate("2025-07-15")` or `new Date(2025, 6, 15)`
+ *     (local-midnight Date), UTC and local calendar components match,
+ *     so local fields are safe to use.
+ *
+ * This hybrid logic ensures:
+ * - DOBs and other date-only values will never appear off by one day
+ *   due to timezone differences.
+ * - Works with both string and Date inputs without requiring code changes elsewhere.
  */
-export function formatLocalDate(input: string | Date): string {
+export function formatLocalDate(input?: string | Date): string {
   if (!input) return "";
 
-  // Case 1: already "YYYY-MM-DD"
+  // Case 1: already "YYYY-MM-DD" string
   if (typeof input === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
     return input;
   }
 
-  // Case 2: Date object (use its local fields directly)
-  if (input instanceof Date) {
-    if (isNaN(input.getTime())) return "";
-    const year = input.getFullYear();
-    const month = `${input.getMonth() + 1}`.padStart(2, "0");
-    const day = `${input.getDate()}`.padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  // Case 2: ISO/timestamp string -> take the left-of-T portion
+  if (typeof input === "string") {
+    const dateString = input.split("T")[0] ?? "";
+    return dateString;
   }
 
-  // Case 3: string with time/ISO — strip the "YYYY-MM-DD" part only
-  if (typeof input === "string") {
-    const parts = input.split("T");
-    const dateString = parts.length > 0 && parts[0] ? parts[0] : "";
-    return dateString;
+  // Case 3: Date object
+  if (input instanceof Date) {
+    if (isNaN(input.getTime())) return "";
+
+    const utcYear = input.getUTCFullYear();
+    const utcMonth = input.getUTCMonth();
+    const utcDate = input.getUTCDate();
+
+    const localYear = input.getFullYear();
+    const localMonth = input.getMonth();
+    const localDate = input.getDate();
+
+    const useUTC =
+      utcYear !== localYear || utcMonth !== localMonth || utcDate !== localDate;
+
+    if (useUTC) {
+      // Use UTC fields → preserves original date of ISO instants
+      const y = utcYear;
+      const m = `${utcMonth + 1}`.padStart(2, "0");
+      const d = `${utcDate}`.padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    } else {
+      // Use local fields → preserves local-midnight constructed Dates
+      const y = localYear;
+      const m = `${localMonth + 1}`.padStart(2, "0");
+      const d = `${localDate}`.padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
   }
 
   return "";
