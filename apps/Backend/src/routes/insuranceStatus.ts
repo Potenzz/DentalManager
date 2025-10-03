@@ -151,8 +151,6 @@ router.post(
             await emptyFolderContainingFile(result.pdf_path);
           }
 
-          await fs.unlink(result.pdf_path);
-
           result.pdfUploadStatus = `PDF saved to group: ${group.title}`;
         } else {
           result.pdfUploadStatus =
