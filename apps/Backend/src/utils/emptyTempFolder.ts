@@ -1,30 +1,25 @@
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
-import * as os from "os";
+import os from "os";
 
 /**
- * Recursively delete files & symlinks under the parent folder of `filePath`.
- * Will remove subfolders only if they become empty.
+ * Remove EVERYTHING under the folder that contains `filePath`.
+ * - Does NOT remove the folder itself (only its children).
+ * - Uses fs.rm recursive/force when available, otherwise falls back to manual recursion.
+ * - Logs actions and errors.
  *
- * Safety checks:
- *  - Refuses to operate on root or extremely short folders.
- *  - Refuses to operate on the user's home directory.
- *
- * Throws on critical safety failure; otherwise logs and continues on per-file errors.
+ * Safety: refuses to operate on root or user's home, or suspicious very-short basenames.
  */
-export async function emptyFolderContainingFile(
-  filePath: string | null | undefined
-): Promise<void> {
+export async function emptyFolderContainingFile(filePath: string | null | undefined): Promise<void> {
   if (!filePath) return;
 
   const absFile = path.resolve(String(filePath));
   const folder = path.dirname(absFile);
 
-  // Basic sanity / safety checks
+  // Basic safety checks
   if (!folder) {
-    throw new Error(
-      `Refusing to clean: resolved folder is empty for filePath=${filePath}`
-    );
+    throw new Error(`Refusing to clean: resolved folder empty for filePath=${filePath}`);
   }
 
   const parsed = path.parse(folder);
@@ -32,98 +27,112 @@ export async function emptyFolderContainingFile(
     throw new Error(`Refusing to clean root folder: ${folder}`);
   }
 
-  // Don't allow cleaning the user's home directory
   const home = os.homedir();
   if (home && path.resolve(home) === path.resolve(folder)) {
     throw new Error(`Refusing to clean user's home directory: ${folder}`);
   }
 
-  // Heuristic: require folder basename length >= 2 (prevents cleaning very short names like '/a')
   const base = path.basename(folder).toLowerCase();
   if (!base || base.length < 2) {
     throw new Error(`Refusing to clean suspicious folder: ${folder}`);
   }
 
-  // Now recursively walk and remove files & symlinks. Remove directories if empty after processing.
-  async function removeContentsRecursively(dir: string): Promise<boolean> {
-    // returns true if directory is empty (and therefore safe-to-delete by caller)
-    let entries;
-    try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
-    } catch (err) {
-      console.error(`[cleanup] failed to read directory ${dir}:`, err);
-      // If we can't read, don't attempt to delete it
-      return false;
-    }
+  console.log(`[cleanup] Cleaning contents of folder: ${folder}`);
 
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      try {
-        if (entry.isFile() || entry.isSymbolicLink()) {
-          await fs.unlink(full);
-          console.log(`[cleanup] removed file/symlink: ${full}`);
-        } else if (entry.isDirectory()) {
-          // Recurse into subdirectory
-          const subEmpty = await removeContentsRecursively(full);
-          if (subEmpty) {
-            // remove the now-empty directory
-            try {
-              await fs.rmdir(full);
-              console.log(`[cleanup] removed empty directory: ${full}`);
-            } catch (rmDirErr) {
-              // Could fail due to permissions/race; log and continue
-              console.error(
-                `[cleanup] failed to remove directory ${full}:`,
-                rmDirErr
-              );
-            }
-          } else {
-            // directory not empty (or had read error) — we leave it
-            console.log(
-              `[cleanup] left directory (not empty or read error): ${full}`
-            );
-          }
-        } else {
-          // Other types (socket, FIFO, etc.) — try unlink as fallback
-          try {
-            await fs.unlink(full);
-            console.log(`[cleanup] removed special entry: ${full}`);
-          } catch (unlinkErr) {
-            console.error(
-              `[cleanup] failed to remove special entry ${full}:`,
-              unlinkErr
-            );
-          }
+  // Helper: manual recursive delete fallback if fs.rm isn't available
+  async function recursiveRemoveFallback(p: string): Promise<void> {
+    try {
+      const st = await fs.lstat(p);
+      if (st.isDirectory()) {
+        const children = await fs.readdir(p);
+        for (const child of children) {
+          await recursiveRemoveFallback(path.join(p, child));
         }
-      } catch (entryErr) {
-        console.error(`[cleanup] error handling ${full}:`, entryErr);
-        // continue with other entries
+        // try remove dir
+        try {
+          await fs.rmdir(p);
+        } catch (err) {
+          // directory might not be empty due to race; log and continue
+          console.error(`[cleanup] rmdir failed for ${p}:`, err);
+        }
+      } else {
+        // file or symlink or other -> unlink
+        try {
+          await fs.unlink(p);
+        } catch (err) {
+          // permission or other error; rethrow to let upper logic handle or log
+          throw err;
+        }
       }
-    }
-
-    // After processing entries, check if directory is now empty
-    try {
-      const after = await fs.readdir(dir);
-      return after.length === 0;
-    } catch (readAfterErr) {
-      console.error(
-        `[cleanup] failed to re-read directory ${dir}:`,
-        readAfterErr
-      );
-      return false;
+    } catch (err: any) {
+      if (err.code === "ENOENT") {
+        // already gone
+        return;
+      }
+      throw err;
     }
   }
 
-  // Start recursive cleaning at the folder (we do NOT delete the top folder itself,
-  // only its contents; if you want the folder removed too, you can call fs.rmdir after)
+  // Read initial contents (for logging)
+  let initialEntries: string[] = [];
   try {
-    await removeContentsRecursively(folder);
-    console.log(`[cleanup] finished cleaning contents of folder: ${folder}`);
+    initialEntries = await fs.readdir(folder);
+    console.log(`[cleanup] before: ${initialEntries.length} entries:`, initialEntries);
   } catch (err) {
-    console.error(
-      `[cleanup] unexpected error while cleaning folder ${folder}:`,
-      err
-    );
+    console.error(`[cleanup] failed to read folder ${folder}:`, err);
     throw err;
   }
+
+  // Remove each top-level entry under the folder
+  for (const name of initialEntries) {
+    const full = path.join(folder, name);
+    try {
+      if (typeof (fs as any).rm === "function") {
+        // Node supports fs.rm with recursive + force
+        await (fs as any).rm(full, { recursive: true, force: true });
+        console.log(`[cleanup] removed (rm): ${full}`);
+      } else {
+        // fallback
+        await recursiveRemoveFallback(full);
+        console.log(`[cleanup] removed (fallback): ${full}`);
+      }
+    } catch (err: any) {
+      console.error(`[cleanup] initial remove failed for ${full}:`, err);
+
+      // try to fix permissions and retry once
+      try {
+        // only attempt chmod if entry still exists
+        if (fsSync.existsSync(full)) {
+          try {
+            fsSync.chmodSync(full, 0o666);
+            if (typeof (fs as any).rm === "function") {
+              await (fs as any).rm(full, { recursive: true, force: true });
+            } else {
+              await recursiveRemoveFallback(full);
+            }
+            console.log(`[cleanup] removed after chmod: ${full}`);
+            continue;
+          } catch (retryErr) {
+            console.error(`[cleanup] remove after chmod failed for ${full}:`, retryErr);
+          }
+        } else {
+          console.log(`[cleanup] ${full} no longer exists.`);
+        }
+      } catch (permErr) {
+        console.error(`[cleanup] chmod/retry failed for ${full}:`, permErr);
+      }
+
+      // continue with other files even if this one failed
+    }
+  }
+
+  // Final status read
+  try {
+    const final = await fs.readdir(folder);
+    console.log(`[cleanup] after: ${final.length} entries remaining:`, final);
+  } catch (err) {
+    console.error(`[cleanup] failed to read folder after cleanup ${folder}:`, err);
+  }
+
+  console.log(`[cleanup] finished cleaning contents of folder: ${folder}`);
 }
