@@ -26,10 +26,9 @@ export default function DatabaseManagementPage() {
     },
   });
 
-  // helper: safely extract filename from fetch Response headers
-  function getFileNameFromResponse(res: Response): string {
+  // Helper: parse Content-Disposition filename if present
+  function filenameFromDisposition(res: Response): string | null {
     const disposition = res.headers.get("Content-Disposition") || "";
-    // filename*=UTF-8''encoded%20name.zip
     const starMatch = disposition.match(/filename\*\s*=\s*([^;]+)/i);
     if (starMatch && starMatch[1]) {
       let val = starMatch[1]
@@ -42,23 +41,37 @@ export default function DatabaseManagementPage() {
         return val;
       }
     }
-
-    // filename="name"  OR  filename=name
     const fileNameRegex = /filename\s*=\s*"([^"]+)"|filename\s*=\s*([^;]+)/i;
     const normalMatch = disposition.match(fileNameRegex);
     if (normalMatch) {
-      // normalMatch[1] corresponds to the quoted capture, normalMatch[2] to unquoted
       const candidate = (normalMatch[1] ?? normalMatch[2] ?? "").trim();
       if (candidate) return candidate.replace(/['"]/g, "");
     }
+    return null;
+  }
 
-    // fallback by content-type
-    const ct = (res.headers.get("Content-Type") || "").toLowerCase();
-    const iso = new Date().toISOString().replace(/[:.]/g, "-");
-    if (ct.includes("zip")) return `dental_backup_${iso}.zip`;
-    if (ct.includes("gzip") || ct.includes("x-gzip"))
-      return `dental_backup_${iso}.tar.gz`;
-    return `dental_backup_${iso}.dump`;
+  // Detect file type by reading first bytes (magic numbers)
+  // Returns 'zip' | 'gzip' | 'unknown'
+  async function detectBlobType(b: Blob): Promise<"zip" | "gzip" | "unknown"> {
+    try {
+      const header = await b.slice(0, 8).arrayBuffer();
+      const bytes = new Uint8Array(header);
+      // ZIP: 50 4B 03 04
+      if (
+        bytes[0] === 0x50 &&
+        bytes[1] === 0x4b &&
+        (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07)
+      ) {
+        return "zip";
+      }
+      // GZIP: 1F 8B
+      if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+        return "gzip";
+      }
+      return "unknown";
+    } catch (e) {
+      return "unknown";
+    }
   }
 
   // ----- Backup mutation -----
@@ -75,11 +88,39 @@ export default function DatabaseManagementPage() {
         throw new Error((errorBody as any)?.error || "Backup failed");
       }
 
-      // get filename from Content-Disposition or fallback
-      const fileName = getFileNameFromResponse(res);
-
       // Convert response to blob (file)
       const blob = await res.blob();
+
+      // 1) prefer Content-Disposition filename if available
+      let fileName = filenameFromDisposition(res);
+
+      // 2) try to guess from Content-Type if disposition not given
+      if (!fileName) {
+        const ct = (res.headers.get("Content-Type") || "").toLowerCase();
+        const iso = new Date().toISOString().replace(/[:.]/g, "-");
+        if (ct.includes("zip")) fileName = `dental_backup_${iso}.zip`;
+        else if (
+          ct.includes("gzip") ||
+          ct.includes("x-gzip") ||
+          ct.includes("tar")
+        )
+          fileName = `dental_backup_${iso}.tar.gz`;
+        else fileName = `dental_backup_${iso}.dump`;
+      }
+
+      // 3) sanity-check blob contents and correct extension if needed
+      const detected = await detectBlobType(blob);
+      if (detected === "zip" && !fileName.toLowerCase().endsWith(".zip")) {
+        // replace extension with .zip
+        fileName = fileName.replace(/(\.tar\.gz|\.tgz|\.gz|\.dump)?$/i, ".zip");
+      } else if (
+        detected === "gzip" &&
+        !/(\.tar\.gz|\.tgz|\.gz)$/i.test(fileName)
+      ) {
+        // prefer .tar.gz for gzipped tar
+        fileName = fileName.replace(/(\.zip|\.dump)?$/i, ".tar.gz");
+      }
+
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
