@@ -19,14 +19,40 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const fileName = `dental_backup_${Date.now()}.dump`;
-    const tmpFile = path.join(os.tmpdir(), fileName);
+    // create a unique tmp directory for directory-format dump
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dental_backup_")); // MUST
+
+    // choose archive extension per platform
+    const isWin = process.platform === "win32";
+    const archiveName = isWin
+      ? `dental_backup_${Date.now()}.zip`
+      : `dental_backup_${Date.now()}.tar.gz`;
+    const archivePath = path.join(os.tmpdir(), archiveName);
+
+    // ensure archivePath is not inside tmpDir (very important)
+    if (archivePath.startsWith(tmpDir) || tmpDir.startsWith(archivePath)) {
+      // place archive in parent tmp to be safe
+      const safeDir = path.join(os.tmpdir(), "dental_backups");
+      try {
+        fs.mkdirSync(safeDir, { recursive: true, mode: 0o700 });
+      } catch {}
+      // recompute archivePath
+      const safeArchivePath = path.join(safeDir, archiveName);
+      // overwrite archivePath with safe location
+      // (note: might require permission to write to safeDir)
+      (global as any).__archivePathOverride = safeArchivePath;
+    }
+
+    const finalArchivePath =
+      (global as any).__archivePathOverride || archivePath;
 
     // Spawn pg_dump
     const pgDump = spawn(
       "pg_dump",
       [
-        "-Fc", // custom format
+        "-Fd", // DIRECTORY format (required for parallel dump)
+        "-j",
+        "4", // number of parallel jobs — MUST be >0 for parallelism
         "--no-acl",
         "--no-owner",
         "-h",
@@ -35,7 +61,7 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
         process.env.DB_USER || "postgres",
         process.env.DB_NAME || "dental_db",
         "-f",
-        tmpFile, // write directly to temp file
+        tmpDir, // write parallely
       ],
       {
         env: {
@@ -50,22 +76,105 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
       errorMessage += chunk.toString();
     });
 
+    // handle spawn error immediately
+    pgDump.on("error", (err) => {
+      try {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      } catch {}
+      console.error("Failed to start pg_dump:", err);
+      return res
+        .status(500)
+        .json({ error: "Failed to run pg_dump", details: err.message });
+    });
+
+    // when pg_dump ends
     pgDump.on("close", (code) => {
-      if (code === 0) {
-        // ✅ Send only if dump succeeded
+      if (code !== 0) {
+        // cleanup tmpDir
+        try {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        } catch {}
+        console.error("pg_dump failed:", errorMessage || `exit ${code}`);
+        return res.status(500).json({
+          error: "Backup failed",
+          details: errorMessage || `pg_dump exited with ${code}`,
+        });
+      }
+
+      // SUCCESS: create a single tar.gz archive of the dump directory (so we can stream one file)
+      let archiver;
+      let archStderr = "";
+
+      if (isWin) {
+        // Use PowerShell Compress-Archive on Windows (creates .zip)
+        // Use -Force to overwrite archive if it exists
+        // Protect paths by wrapping in double quotes
+        const psCmd = `Compress-Archive -Path "${tmpDir}\\*" -DestinationPath "${finalArchivePath}" -Force`;
+        archiver = spawn("powershell.exe", ["-NoProfile", "-Command", psCmd], {
+          env: process.env,
+        });
+      } else {
+        // POSIX: use tar to create gzipped tarball
+        archiver = spawn("tar", ["-czf", finalArchivePath, "-C", tmpDir, "."]);
+      }
+
+      archiver.stderr.on("data", (chunk) => {
+        archStderr += chunk.toString();
+      });
+
+      archiver.on("error", (err) => {
+        try {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        } catch {}
+        console.error("Failed to start archiver:", err);
+        return res
+          .status(500)
+          .json({ error: "Failed to archive backup", details: err.message });
+      });
+
+      archiver.on("close", (archCode) => {
+        // remove tmpDir now that archive attempt finished
+        try {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        } catch (e) {}
+
+        if (archCode !== 0) {
+          console.error(
+            "Archiver exited with",
+            archCode,
+            "stderr:",
+            archStderr
+          );
+          try {
+            fs.unlinkSync(finalArchivePath);
+          } catch (e) {}
+          return res.status(500).json({
+            error: "Failed to create backup archive",
+            details: archStderr || `archiver exited with code ${archCode}`,
+          });
+        }
+
+        // Stream the archive to the client
         res.setHeader(
           "Content-Disposition",
-          `attachment; filename=${fileName}`
+          `attachment; filename=${path.basename(finalArchivePath)}`
         );
-        res.setHeader("Content-Type", "application/octet-stream");
+        res.setHeader(
+          "Content-Type",
+          isWin ? "application/zip" : "application/gzip"
+        );
 
-        const fileStream = fs.createReadStream(tmpFile);
+        const fileStream = fs.createReadStream(finalArchivePath);
         fileStream.pipe(res);
 
-        fileStream.on("close", async () => {
-          fs.unlink(tmpFile, () => {}); // cleanup temp file
+        // when the response finishes (success)
+        res.once("finish", async () => {
+          // cleanup archive
+          try {
+            fs.unlinkSync(finalArchivePath);
+          } catch (_) {}
 
-          // ✅ Then, in background, update DB
+          // update metadata (fire-and-forget, but we await to log failures)
           try {
             await storage.createBackup(userId);
             await storage.deleteNotificationsByType(userId, "BACKUP");
@@ -73,31 +182,31 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
             console.error("Backup saved but metadata update failed:", err);
           }
         });
-      } else {
-        console.error("pg_dump failed:", errorMessage);
-        fs.unlink(tmpFile, () => {}); // cleanup
-        res.status(500).json({
-          error: "Backup failed",
-          details: errorMessage || `pg_dump exited with code ${code}`,
-        });
-      }
-    });
 
-    pgDump.on("error", (err) => {
-      console.error("Failed to start pg_dump:", err);
-      fs.unlink(tmpFile, () => {});
-      res.status(500).json({
-        error: "Failed to run pg_dump",
-        details: err.message,
-      });
-    });
+        // if client disconnects or error in streaming
+        res.once("close", () => {
+          // ensure archive removed
+          try {
+            fs.unlinkSync(finalArchivePath);
+          } catch (_) {}
+        });
+
+        fileStream.on("error", (err) => {
+          console.error("Error streaming archive:", err);
+          try {
+            fs.unlinkSync(finalArchivePath);
+          } catch (_) {}
+          if (!res.headersSent)
+            res.status(500).json({ error: "Error streaming backup" });
+        });
+      }); // archiver.on close
+    }); // pgDump.on close
   } catch (err: any) {
     console.error("Unexpected error:", err);
     if (!res.headersSent) {
-      res.status(500).json({
-        message: "Internal server error",
-        details: String(err),
-      });
+      res
+        .status(500)
+        .json({ message: "Internal server error", details: String(err) });
     }
   }
 });

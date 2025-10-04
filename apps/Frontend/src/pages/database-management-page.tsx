@@ -26,6 +26,41 @@ export default function DatabaseManagementPage() {
     },
   });
 
+  // helper: safely extract filename from fetch Response headers
+  function getFileNameFromResponse(res: Response): string {
+    const disposition = res.headers.get("Content-Disposition") || "";
+    // filename*=UTF-8''encoded%20name.zip
+    const starMatch = disposition.match(/filename\*\s*=\s*([^;]+)/i);
+    if (starMatch && starMatch[1]) {
+      let val = starMatch[1]
+        .trim()
+        .replace(/^UTF-8''/i, "")
+        .replace(/['"]/g, "");
+      try {
+        return decodeURIComponent(val);
+      } catch {
+        return val;
+      }
+    }
+
+    // filename="name"  OR  filename=name
+    const fileNameRegex = /filename\s*=\s*"([^"]+)"|filename\s*=\s*([^;]+)/i;
+    const normalMatch = disposition.match(fileNameRegex);
+    if (normalMatch) {
+      // normalMatch[1] corresponds to the quoted capture, normalMatch[2] to unquoted
+      const candidate = (normalMatch[1] ?? normalMatch[2] ?? "").trim();
+      if (candidate) return candidate.replace(/['"]/g, "");
+    }
+
+    // fallback by content-type
+    const ct = (res.headers.get("Content-Type") || "").toLowerCase();
+    const iso = new Date().toISOString().replace(/[:.]/g, "-");
+    if (ct.includes("zip")) return `dental_backup_${iso}.zip`;
+    if (ct.includes("gzip") || ct.includes("x-gzip"))
+      return `dental_backup_${iso}.tar.gz`;
+    return `dental_backup_${iso}.dump`;
+  }
+
   // ----- Backup mutation -----
   const backupMutation = useMutation({
     mutationFn: async () => {
@@ -40,15 +75,14 @@ export default function DatabaseManagementPage() {
         throw new Error((errorBody as any)?.error || "Backup failed");
       }
 
+      // get filename from Content-Disposition or fallback
+      const fileName = getFileNameFromResponse(res);
+
       // Convert response to blob (file)
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const disposition = res.headers.get("Content-Disposition");
-      const fileName =
-        disposition?.split("filename=")[1]?.replace(/"/g, "") ||
-        `dental_backup_${new Date().toISOString()}.dump`;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
