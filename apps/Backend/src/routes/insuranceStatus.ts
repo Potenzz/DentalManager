@@ -104,7 +104,7 @@ router.post(
 
     let seleniumResult: any = undefined;
     let createdPdfFileId: number | null = null;
-    let outputResult: any = undefined;
+    let outputResult: any = {};
     const extracted: any = {};
 
     try {
