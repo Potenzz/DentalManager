@@ -256,11 +256,11 @@ export default function InsuranceStatusPage() {
   // Handle insurance provider eligibility button clicks
   const handleMHEligibilityButton = async () => {
     // Form Fields check
-    if (!memberId || !dateOfBirth || !firstName) {
+    if (!memberId || !dateOfBirth) {
       toast({
         title: "Missing Fields",
         description:
-          "Please fill in all the required fields: Member ID, Date of Birth, First Name.",
+          "Please fill in all the required fields: Member ID, Date of Birth.",
         variant: "destructive",
       });
       return;
@@ -268,12 +268,7 @@ export default function InsuranceStatusPage() {
 
     setIsCheckingEligibilityStatus(true);
 
-    // Adding patient if same patient exists then it will skip.
     try {
-      if (!selectedPatient) {
-        await handleAddPatient();
-      }
-
       await handleEligibilityCheckSelenium();
 
       await queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });

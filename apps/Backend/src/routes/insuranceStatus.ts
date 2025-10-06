@@ -8,9 +8,87 @@ import PDFDocument from "pdfkit";
 import { forwardToSeleniumInsuranceClaimStatusAgent } from "../services/seleniumInsuranceClaimStatusClient";
 import fsSync from "fs";
 import { emptyFolderContainingFile } from "../utils/emptyTempFolder";
+import forwardToPatientDataExtractorService from "../services/patientDataExtractorService";
+import { InsertPatient } from "../../../../packages/db/types/patient-types";
 
 const router = Router();
 
+/** Utility: naive name splitter */
+function splitName(fullName?: string | null) {
+  if (!fullName) return { firstName: "", lastName: "" };
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts.shift() ?? "";
+  const lastName = parts.join(" ") ?? "";
+  return { firstName, lastName };
+}
+
+/**
+ * Ensure patient exists for given insuranceId.
+ * If exists -> update first/last name when different.
+ * If not -> create using provided fields.
+ * Returns the patient object (the version read from DB after potential create/update).
+ */
+async function createOrUpdatePatientByInsuranceId(options: {
+  insuranceId: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  dob?: string | Date | null;
+  userId: number;
+}) {
+  const { insuranceId, firstName, lastName, dob, userId } = options;
+  if (!insuranceId) throw new Error("Missing insuranceId");
+
+  let patient = await storage.getPatientByInsuranceId(insuranceId);
+
+  // Normalize incoming names
+  const incomingFirst = firstName!.trim();
+  const incomingLast = lastName!.trim();
+
+  if (patient && patient.id) {
+    // update only if different
+    const updates: any = {};
+    if (
+      incomingFirst &&
+      String(patient.firstName ?? "").trim() !== incomingFirst
+    ) {
+      updates.firstName = incomingFirst;
+    }
+    if (
+      incomingLast &&
+      String(patient.lastName ?? "").trim() !== incomingLast
+    ) {
+      updates.lastName = incomingLast;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await storage.updatePatient(patient.id, updates);
+    }
+    return;
+  } else {
+    // If patient doesn't exist -> create
+    const createPayload: InsertPatient = {
+      firstName: incomingFirst,
+      lastName: incomingLast,
+      dateOfBirth: dob,
+      gender: "",
+      phone: "",
+      userId,
+      status: "inactive",
+      insuranceId,
+    };
+
+    await storage.createPatient(createPayload);
+  }
+}
+
+/**
+ * /eligibility-check
+ * - run selenium
+ * - if pdf created -> call extractor -> get name
+ * - create or update patient (by memberId)
+ * - attach PDF to patient (create pdf group/file)
+ * - return { patient, pdfFileId, extractedName ... }
+ */
 router.post(
   "/eligibility-check",
   async (req: Request, res: Response): Promise<any> => {
@@ -24,7 +102,10 @@ router.post(
       return res.status(401).json({ error: "Unauthorized: user info missing" });
     }
 
+    let seleniumResult: any = undefined;
+    let createdPdfFileId: number | null = null;
     let result: any = undefined;
+    const extracted: any = {};
 
     try {
       const insuranceEligibilityData = JSON.parse(req.body.data);
@@ -46,11 +127,73 @@ router.post(
         massdhpPassword: credentials.password,
       };
 
-      result = await forwardToSeleniumInsuranceEligibilityAgent(enrichedData);
+      // 1) Run selenium agent
+      try {
+        seleniumResult =
+          await forwardToSeleniumInsuranceEligibilityAgent(enrichedData);
+      } catch (seleniumErr: any) {
+        return res.status(502).json({
+          error: "Selenium service failed",
+          detail: seleniumErr?.message ?? String(seleniumErr),
+        });
+      }
 
-      let createdPdfFileId: number | null = null;
+      // 2) If selenium produced a pdf path, extract name
+      if (
+        seleniumResult?.pdf_path &&
+        seleniumResult.pdf_path.endsWith(".pdf")
+      ) {
+        try {
+          const pdfPath = seleniumResult.pdf_path;
+          const pdfBuffer = await fs.readFile(pdfPath);
 
-      // ✅ Step 1: Check result and update patient status
+          const extraction = await forwardToPatientDataExtractorService({
+            buffer: pdfBuffer,
+            originalname: path.basename(pdfPath),
+            mimetype: "application/pdf",
+          } as any);
+
+          if (extraction.name) {
+            const parts = splitName(extraction.name);
+            extracted.firstName = parts.firstName;
+            extracted.lastName = parts.lastName;
+          }
+        } catch (extractErr: any) {
+          return res.status(502).json({
+            error: "Patient data extraction failed",
+            detail: extractErr?.message ?? String(extractErr),
+          });
+        }
+      }
+
+      // Step-3) Create or update patient name using extracted info (prefer extractor -> request)
+      const insuranceId = String(
+        insuranceEligibilityData.memberId ?? ""
+      ).trim();
+      if (!insuranceId) {
+        return res.status(400).json({ error: "Missing memberId" });
+      }
+
+      // prefer extractor names, else use request-sent names, else null
+      const preferFirst = extracted.firstName;
+      const preferLast = extracted.lastName;
+
+      try {
+        await createOrUpdatePatientByInsuranceId({
+          insuranceId,
+          firstName: preferFirst,
+          lastName: preferLast,
+          dob: insuranceEligibilityData.dateOfBirth,
+          userId: req.user.id,
+        });
+      } catch (patientOpErr: any) {
+        return res.status(500).json({
+          error: "Failed to create/update patient",
+          detail: patientOpErr?.message ?? String(patientOpErr),
+        });
+      }
+
+      // ✅ Step 4: Check result and update patient status
       const patient = await storage.getPatientByInsuranceId(
         insuranceEligibilityData.memberId
       );
@@ -60,7 +203,7 @@ router.post(
         await storage.updatePatient(patient.id, { status: newStatus });
         result.patientUpdateStatus = `Patient status updated to ${newStatus}`;
 
-        // ✅ Step 2: Handle PDF Upload
+        // ✅ Step 5: Handle PDF Upload
         if (result.pdf_path && result.pdf_path.endsWith(".pdf")) {
           const pdfBuffer = await fs.readFile(result.pdf_path);
 
@@ -72,7 +215,7 @@ router.post(
             groupTitleKey
           );
 
-          // Step 2b: Create group if it doesn’t exist
+          // Step 5b: Create group if it doesn’t exist
           if (!group) {
             group = await storage.createPdfGroup(
               patient.id,
