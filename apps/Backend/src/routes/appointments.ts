@@ -188,8 +188,11 @@ router.post(
 
       // 2. Attempt to find the next available slot
       let [hour, minute] = originalStartTime.split(":").map(Number);
-
       const pad = (n: number) => n.toString().padStart(2, "0");
+
+      // Step by 15 minutes to support quarter-hour starts, but keep appointment duration 30 mins
+      const STEP_MINUTES = 15;
+      const APPT_DURATION_MINUTES = 30;
 
       while (`${pad(hour)}:${pad(minute)}` <= MAX_END_TIME) {
         const currentStartTime = `${pad(hour)}:${pad(minute)}`;
@@ -211,7 +214,7 @@ router.post(
         );
 
         if (!staffConflict) {
-          const endMinute = minute + 30;
+          const endMinute = minute + APPT_DURATION_MINUTES;
           let endHour = hour + Math.floor(endMinute / 60);
           let realEndMinute = endMinute % 60;
 
@@ -255,11 +258,11 @@ router.post(
           return res.status(201).json(responseData);
         }
 
-        // Move to next 30-min slot
-        minute += 30;
+        // Move to next STEP_MINUTES slot
+        minute += STEP_MINUTES;
         if (minute >= 60) {
-          hour += 1;
-          minute = 0;
+          hour += Math.floor(minute / 60);
+          minute = minute % 60;
         }
       }
 

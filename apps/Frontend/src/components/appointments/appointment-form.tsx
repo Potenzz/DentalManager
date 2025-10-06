@@ -34,7 +34,7 @@ import {
   UpdateAppointment,
 } from "@repo/db/types";
 import { DateInputField } from "@/components/ui/dateInputField";
-import { parseLocalDate } from "@/utils/dateUtils";
+import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import {
   PatientSearch,
   SearchCriteria,
@@ -106,10 +106,7 @@ export function AppointmentForm({
         userId: user?.id,
         patientId: appointment.patientId,
         title: appointment.title,
-        date:
-          typeof appointment.date === "string"
-            ? parseLocalDate(appointment.date)
-            : appointment.date,
+        date: parseLocalDate(appointment.date),
         startTime: appointment.startTime || "09:00", // Default "09:00"
         endTime: appointment.endTime || "09:30", // Default "09:30"
         type: appointment.type,
@@ -125,11 +122,8 @@ export function AppointmentForm({
           userId: user?.id,
           patientId: Number(parsedStoredData.patientId),
           date: parsedStoredData.date
-            ? typeof parsedStoredData.date === "string"
-              ? parseLocalDate(parsedStoredData.date)
-              : new Date(parsedStoredData.date) // in case it’s a stringified date or timestamp
-            : new Date(),
-
+            ? parseLocalDate(parsedStoredData.date)
+            : parseLocalDate(new Date()),
           title: parsedStoredData.title || "",
           startTime: parsedStoredData.startTime,
           endTime: parsedStoredData.endTime,
@@ -260,11 +254,7 @@ export function AppointmentForm({
     if (parsedStoredData.staff)
       form.setValue("staffId", parsedStoredData.staff);
     if (parsedStoredData.date) {
-      const parsedDate =
-        typeof parsedStoredData.date === "string"
-          ? parseLocalDate(parsedStoredData.date)
-          : new Date(parsedStoredData.date);
-      form.setValue("date", parsedDate);
+      form.setValue("date", parseLocalDate(parsedStoredData.date));
     }
 
     // ---- patient prefill: check main cache, else fetch once ----
@@ -388,7 +378,7 @@ export function AppointmentForm({
         : `Appointment with ${selectedStaff?.name}`;
     }
 
-    const formattedDate = data.date.toLocaleDateString("en-CA");
+    const formattedDate = formatLocalDate(data.date);
 
     onSubmit({
       ...data,
@@ -575,11 +565,7 @@ export function AppointmentForm({
             )}
           />
 
-          <DateInputField
-            control={form.control}
-            name="date"
-            label="Date"
-          />
+          <DateInputField control={form.control} name="date" label="Date" />
 
           <div className="grid grid-cols-2 gap-4">
             <FormField

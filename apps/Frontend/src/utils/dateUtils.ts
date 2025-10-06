@@ -1,6 +1,15 @@
 /**
+ * Use parseLocalDate when you need a Date object at local midnight 
+ * (for calendars, date pickers, Date math in the browser).
+ * 
+ * 
  * Parse a date string in yyyy-MM-dd format (assumed local) into a JS Date object.
  * No timezone conversion is applied. Returns a Date at midnight local time.
+ * 
+ * * Accepts:
+ * - "YYYY-MM-DD"
+ * - ISO/timestamp string (will take left-of-'T' date portion)
+ * - Date object (will return a new Date set to that local calendar day at midnight)
  */
 
 export function parseLocalDate(input: string | Date): Date {
@@ -35,6 +44,10 @@ export function parseLocalDate(input: string | Date): Date {
 }
 
 /**
+ * Use formatLocalDate when you need a date-only string "YYYY-MM-DD" (for displaying stable date values in UI lists, 
+ * sending to APIs, storing in sessionStorage/DB where date-only is required).
+ * 
+ * 
  * Format a date value into a "YYYY-MM-DD" string with **no timezone shifts**.
  *
  * Handles all common input cases:
@@ -71,78 +84,16 @@ export function formatLocalDate(input?: string | Date): string {
   if (input instanceof Date) {
     if (isNaN(input.getTime())) return "";
 
-    const utcYear = input.getUTCFullYear();
-    const utcMonth = input.getUTCMonth();
-    const utcDate = input.getUTCDate();
-
-    const localYear = input.getFullYear();
-    const localMonth = input.getMonth();
-    const localDate = input.getDate();
-
-    const useUTC =
-      utcYear !== localYear || utcMonth !== localMonth || utcDate !== localDate;
-
-    if (useUTC) {
-      // Use UTC fields → preserves original date of ISO instants
-      const y = utcYear;
-      const m = `${utcMonth + 1}`.padStart(2, "0");
-      const d = `${utcDate}`.padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    } else {
-      // Use local fields → preserves local-midnight constructed Dates
-      const y = localYear;
-      const m = `${localMonth + 1}`.padStart(2, "0");
-      const d = `${localDate}`.padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    }
+    // ALWAYS use the local calendar fields for Date objects.
+    // This avoids day-flips when a Date was constructed from an ISO instant
+    // and the browser's timezone would otherwise show a different calendar day.
+    const y = input.getFullYear();
+    const m = `${input.getMonth() + 1}`.padStart(2, "0");
+    const d = `${input.getDate()}`.padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
 
   return "";
-}
-
-/**
- * Get a Date object representing midnight UTC for a given local date.
- * Useful for comparing or storing dates consistently across timezones.
- */
-export function toUTCDate(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-  );
-}
-
-// ---------- formatUTCDateStringToLocal ----------
-/**
- * If `dateStr` is:
- * - date-only "YYYY-MM-DD" -> returns it unchanged
- * - ISO instant/string -> returns the LOCAL calendar date "YYYY-MM-DD" of that instant
- */
-export function formatUTCDateStringToLocal(dateStr: string): string {
-  if (!dateStr) return "";
-  if (isDateOnlyString(dateStr)) return dateStr;
-
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) {
-    // fallback: strip time part and treat as local date
-    try {
-      const maybe = parseLocalDate(dateStr);
-      return formatLocalDate(maybe);
-    } catch {
-      return "";
-    }
-  }
-  return formatLocalDate(d); // uses local fields of the instant
-}
-
-/**
- * Frontend-only normalizer.
- * - Returns "YYYY-MM-DD" string representing the calendar date the user expects.
- * - This avoids producing ISO instants that confuse frontend display.
- *
- * Use this for UI display or for sending date-only values to backend if backend accepts date-only.
- */
-export function normalizeToISOString(date: Date | string): string {
-  const parsed = parseLocalDate(date); // returns local-midnight-based Date
-  return formatLocalDate(parsed); // "YYYY-MM-DD"
 }
 
 // ---------- helpers ----------
@@ -167,22 +118,28 @@ function isDateOnlyString(s: string): boolean {
 
 // ---------- formatDateToHumanReadable ----------
 /**
- * Frontend-safe: never lets timezone shift the displayed calendar day.
- * - "YYYY-MM-DD" strings are shown exactly.
- * - Date objects are shown using their calendar fields (getFullYear/getMonth/getDate).
- * - ISO/timestamp strings are parsed and shown using UTC date component so they do not flip on client TZ.
+ * Frontend-safe human readable formatter.
+ *
+ * Rules:
+ * - If input is a date-only string "YYYY-MM-DD", format it directly (no TZ math).
+ * - If input is a Date object, use its local calendar fields (getFullYear/getMonth/getDate).
+ * - If input is any other string (ISO/timestamp), DO NOT call new Date(isoString) directly
+ *   for display. Instead, use parseLocalDate(dateInput) to extract the local calendar day
+ *   (strip time portion) and render that. This prevents off-by-one day drift.
+ *
+ * Output example: "Oct 7, 2025"
  */
 export function formatDateToHumanReadable(dateInput?: string | Date): string {
   if (!dateInput) return "N/A";
 
-  // date-only string -> show as-is
+  // date-only string -> show as-is using MONTH_SHORT
   if (typeof dateInput === "string" && isDateOnlyString(dateInput)) {
     const [y, m, d] = dateInput.split("-");
     if (!y || !m || !d) return "Invalid Date";
     return `${MONTH_SHORT[parseInt(m, 10) - 1]} ${d}, ${y}`;
   }
 
-  // Handle Date object
+  // Date object -> use local calendar fields
   if (dateInput instanceof Date) {
     if (isNaN(dateInput.getTime())) return "Invalid Date";
     const dd = String(dateInput.getDate());
@@ -191,18 +148,26 @@ export function formatDateToHumanReadable(dateInput?: string | Date): string {
     return `${mm} ${dd}, ${yy}`;
   }
 
-  // Handle ISO/timestamp string (UTC-based to avoid shifting)
-  const parsed = new Date(dateInput);
-  if (isNaN(parsed.getTime())) {
-    console.error("Invalid date input provided:", dateInput);
-    return "Invalid Date";
+  // Other string (likely ISO/timestamp) -> normalize via parseLocalDate
+  // This preserves the calendar day the user expects (no timezone drift).
+  if (typeof dateInput === "string") {
+    try {
+      const localDate = parseLocalDate(dateInput);
+      const dd = String(localDate.getDate());
+      const mm = MONTH_SHORT[localDate.getMonth()];
+      const yy = localDate.getFullYear();
+      return `${mm} ${dd}, ${yy}`;
+    } catch (err) {
+      console.error("Invalid date input provided:", dateInput, err);
+      return "Invalid Date";
+    }
   }
-  const dd = String(parsed.getUTCDate());
-  const mm = MONTH_SHORT[parsed.getUTCMonth()];
-  const yy = parsed.getUTCFullYear();
-  return `${mm} ${dd}, ${yy}`;
+
+  return "Invalid Date";
 }
 
+
+// ---------------- OCR Date helper --------------------------
 /**
  * Convert any OCR numeric-ish value into a number.
  * Handles string | number | null | undefined gracefully.

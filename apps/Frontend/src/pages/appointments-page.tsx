@@ -5,6 +5,7 @@ import {
   parseLocalDate,
   formatLocalDate,
   formatLocalTime,
+  formatDateToHumanReadable,
 } from "@/utils/dateUtils";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
 import { Button } from "@/components/ui/button";
@@ -162,14 +163,19 @@ export default function AppointmentsPage() {
     color: colors[index % colors.length] || "bg-gray-400",
   }));
 
-  // Generate time slots from 8:00 AM to 6:00 PM in 30-minute increments
+  // Generate time slots from 8:00 AM to 6:00 PM in 15-minute increments
   const timeSlots: TimeSlot[] = [];
   for (let hour = 8; hour <= 18; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      const timeStr = `${pad(hour)}:${pad(minute)}`;
+
+      // Only allow start times up to 18:00 (last start for 30-min appointment)
+      if (timeStr > "18:00") continue;
+
       const hour12 = hour > 12 ? hour - 12 : hour;
       const period = hour >= 12 ? "PM" : "AM";
-      const timeStr = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-      const displayTime = `${hour12}:${minute.toString().padStart(2, "0")} ${period}`;
+      const displayTime = `${hour12}:${pad(minute)} ${period}`;
       timeSlots.push({ time: timeStr, displayTime });
     }
   }
@@ -399,7 +405,7 @@ export default function AppointmentsPage() {
       patientName,
       staffId,
       status: apt.status ?? null,
-      date: formatLocalDate(parseLocalDate(apt.date)),
+      date: formatLocalDate(apt.date),
       startTime: normalizedStart,
       endTime: normalizedEnd,
     } as ScheduledAppointment;
@@ -827,7 +833,7 @@ export default function AppointmentsPage() {
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {selectedDate
-                          ? selectedDate.toLocaleDateString()
+                          ? formatDateToHumanReadable(selectedDate)
                           : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
