@@ -199,12 +199,16 @@ router.post(
       );
 
       if (patient && patient.id !== undefined) {
-        const newStatus = seleniumResult.eligibility === "Y" ? "active" : "inactive";
+        const newStatus =
+          seleniumResult.eligibility === "Y" ? "active" : "inactive";
         await storage.updatePatient(patient.id, { status: newStatus });
         outputResult.patientUpdateStatus = `Patient status updated to ${newStatus}`;
 
         // ✅ Step 5: Handle PDF Upload
-        if (seleniumResult.pdf_path && seleniumResult.pdf_path.endsWith(".pdf")) {
+        if (
+          seleniumResult.pdf_path &&
+          seleniumResult.pdf_path.endsWith(".pdf")
+        ) {
           const pdfBuffer = await fs.readFile(seleniumResult.pdf_path);
 
           const groupTitle = "Eligibility Status";
@@ -239,11 +243,6 @@ router.post(
             createdPdfFileId = Number(created.id);
           }
 
-          // safe-success path (after createdPdfFileId is set and DB committed)
-          if (seleniumResult.pdf_path) {
-            await emptyFolderContainingFile(seleniumResult.pdf_path);
-          }
-
           outputResult.pdfUploadStatus = `PDF saved to group: ${group.title}`;
         } else {
           outputResult.pdfUploadStatus =
@@ -261,7 +260,10 @@ router.post(
       });
     } catch (err: any) {
       console.error(err);
-
+      return res.status(500).json({
+        error: err.message || "Failed to forward to selenium agent",
+      });
+    } finally {
       try {
         if (seleniumResult && seleniumResult.pdf_path) {
           await emptyFolderContainingFile(seleniumResult.pdf_path);
@@ -274,9 +276,6 @@ router.post(
           cleanupErr
         );
       }
-      return res.status(500).json({
-        error: err.message || "Failed to forward to selenium agent",
-      });
     }
   }
 );
@@ -422,24 +421,6 @@ router.post(
             createdPdfFileId = Number(created.id);
           }
 
-          // Clean up temp files:
-          // call cleaner on best known path and log
-          const cleanupPath =
-            result?.ss_path || generatedPdfPath || result?.pdf_path;
-          console.log(
-            "[claim-status-check] calling emptyFolderContainingFile for:",
-            cleanupPath
-          );
-          if (cleanupPath) {
-            try {
-              await emptyFolderContainingFile(cleanupPath);
-            } catch (cleanupErr) {
-              console.error("[claim-status-check] cleanup error:", cleanupErr);
-            }
-          } else {
-            console.log("[claim-status-check] no cleanup path available");
-          }
-
           result.pdfUploadStatus = `PDF saved to group: ${group.title}`;
         }
       } else {
@@ -454,6 +435,10 @@ router.post(
       return;
     } catch (err: any) {
       console.error(err);
+      return res.status(500).json({
+        error: err.message || "Failed to forward to selenium agent",
+      });
+    } finally {
       try {
         if (result && result.ss_path) {
           await emptyFolderContainingFile(result.ss_path);
@@ -466,9 +451,6 @@ router.post(
           cleanupErr
         );
       }
-      return res.status(500).json({
-        error: err.message || "Failed to forward to selenium agent",
-      });
     }
   }
 );
