@@ -152,6 +152,8 @@ export default function InsuranceStatusPage() {
         variant: "default",
       });
 
+      setSelectedPatient(null);
+      
       // If server returned pdfFileId: open preview modal
       if (result.pdfFileId) {
         setPreviewPdfId(Number(result.pdfFileId));
@@ -214,6 +216,8 @@ export default function InsuranceStatusPage() {
           "Your Claim Status is fetched and updated, Kindly search through the patient.",
         variant: "default",
       });
+
+      setSelectedPatient(null);
 
       // If server returned pdfFileId: open preview modal
       if (result.pdfFileId) {
