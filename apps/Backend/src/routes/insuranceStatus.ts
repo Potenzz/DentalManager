@@ -104,7 +104,7 @@ router.post(
 
     let seleniumResult: any = undefined;
     let createdPdfFileId: number | null = null;
-    let result: any = undefined;
+    let outputResult: any = undefined;
     const extracted: any = {};
 
     try {
@@ -199,13 +199,13 @@ router.post(
       );
 
       if (patient && patient.id !== undefined) {
-        const newStatus = result.eligibility === "Y" ? "active" : "inactive";
+        const newStatus = seleniumResult.eligibility === "Y" ? "active" : "inactive";
         await storage.updatePatient(patient.id, { status: newStatus });
-        result.patientUpdateStatus = `Patient status updated to ${newStatus}`;
+        outputResult.patientUpdateStatus = `Patient status updated to ${newStatus}`;
 
         // ✅ Step 5: Handle PDF Upload
-        if (result.pdf_path && result.pdf_path.endsWith(".pdf")) {
-          const pdfBuffer = await fs.readFile(result.pdf_path);
+        if (seleniumResult.pdf_path && seleniumResult.pdf_path.endsWith(".pdf")) {
+          const pdfBuffer = await fs.readFile(seleniumResult.pdf_path);
 
           const groupTitle = "Eligibility Status";
           const groupTitleKey = "ELIGIBILITY_STATUS";
@@ -230,7 +230,7 @@ router.post(
 
           const created = await storage.createPdfFile(
             group.id,
-            path.basename(result.pdf_path),
+            path.basename(seleniumResult.pdf_path),
             pdfBuffer
           );
 
@@ -240,37 +240,37 @@ router.post(
           }
 
           // safe-success path (after createdPdfFileId is set and DB committed)
-          if (result.pdf_path) {
-            await emptyFolderContainingFile(result.pdf_path);
+          if (seleniumResult.pdf_path) {
+            await emptyFolderContainingFile(seleniumResult.pdf_path);
           }
 
-          result.pdfUploadStatus = `PDF saved to group: ${group.title}`;
+          outputResult.pdfUploadStatus = `PDF saved to group: ${group.title}`;
         } else {
-          result.pdfUploadStatus =
+          outputResult.pdfUploadStatus =
             "No valid PDF path provided by Selenium, Couldn't upload pdf to server.";
         }
       } else {
-        result.patientUpdateStatus =
+        outputResult.patientUpdateStatus =
           "Patient not found or missing ID; no update performed";
       }
 
       res.json({
-        patientUpdateStatus: result.patientUpdateStatus,
-        pdfUploadStatus: result.pdfUploadStatus,
+        patientUpdateStatus: outputResult.patientUpdateStatus,
+        pdfUploadStatus: outputResult.pdfUploadStatus,
         pdfFileId: createdPdfFileId,
       });
     } catch (err: any) {
       console.error(err);
 
       try {
-        if (result && result.pdf_path) {
-          await emptyFolderContainingFile(result.pdf_path);
+        if (seleniumResult && seleniumResult.pdf_path) {
+          await emptyFolderContainingFile(seleniumResult.pdf_path);
         } else {
           console.log(`[eligibility-check] no pdf_path available to cleanup`);
         }
       } catch (cleanupErr) {
         console.error(
-          `[eligibility-check cleanup failed for ${result?.pdf_path}`,
+          `[eligibility-check cleanup failed for ${seleniumResult?.pdf_path}`,
           cleanupErr
         );
       }
