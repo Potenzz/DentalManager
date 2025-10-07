@@ -4,8 +4,8 @@ import {
   OcrRow,
   Payment,
   PaymentMethod,
-  paymentMethodOptions,
   PaymentStatus,
+  ClaimStatus,
 } from "@repo/db/types";
 import { storage } from "../storage";
 import { prisma } from "@repo/db/client";
@@ -69,7 +69,7 @@ export async function applyTransactions(
   userId: number
 ): Promise<Payment> {
   return prisma.$transaction(async (tx) => {
-    // 1. Insert service line transactions + recalculate each service line
+    // 1. Insert service line transactions + recalculate each serviceLines
     for (const txn of serviceLineTransactions) {
       await tx.serviceLineTransaction.create({
         data: {
@@ -85,7 +85,7 @@ export async function applyTransactions(
         },
       });
 
-      // Recalculate service line totals
+      // Recalculate Claim - serviceLines model totals and updates along with Claim-serviceLine status
       const aggLine = await tx.serviceLineTransaction.aggregate({
         _sum: { paidAmount: true, adjustedAmount: true },
         where: { serviceLineId: txn.serviceLineId },
@@ -118,7 +118,7 @@ export async function applyTransactions(
       });
     }
 
-    // 2. Recalc payment totals
+    // 2. Recalc payment model totals based on serviceLineTransactions, and update PaymentStatus.
     const aggPayment = await tx.serviceLineTransaction.aggregate({
       _sum: { paidAmount: true, adjustedAmount: true },
       where: { paymentId },
@@ -138,10 +138,26 @@ export async function applyTransactions(
     else if (totalPaid.gt(0)) status = "PARTIALLY_PAID";
     else status = "PENDING";
 
-    return tx.payment.update({
+    const updatedPayment = await tx.payment.update({
       where: { id: paymentId },
       data: { totalPaid, totalAdjusted, totalDue, status, updatedById: userId },
     });
+
+    // 3. Update Claim Model Status based on serviceLineTransaction and Payment values.(as they hold the same values
+    // as per, ServiceLine.totalPaid and totalAdjusted and Claim.totalBilled) Hence not fetching unneccessary.
+    const claimId = updatedPayment.claimId ?? null;
+    if (claimId) {
+      let newClaimStatus: ClaimStatus;
+      if (totalDue.lte(0) && totalPaid.gt(0)) newClaimStatus = "APPROVED";
+      else newClaimStatus = "PENDING";
+
+      await tx.claim.update({
+        where: { id: claimId },
+        data: { status: newClaimStatus },
+      });
+    }
+
+    return updatedPayment;
   });
 }
 
