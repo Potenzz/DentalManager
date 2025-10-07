@@ -131,6 +131,38 @@ router.get(
   }
 );
 
+// GET /api/patients/:id/financials?limit=50&offset=0
+router.get(
+  "/:id/financials",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const patientIdParam = req.params.id;
+      if (!patientIdParam)
+        return res.status(400).json({ message: "Patient ID required" });
+
+      const patientId = parseInt(patientIdParam, 10);
+      if (isNaN(patientId))
+        return res.status(400).json({ message: "Invalid patient ID" });
+
+      const limit = Math.min(1000, Number(req.query.limit ?? 50)); // cap maximums
+      const offset = Math.max(0, Number(req.query.offset ?? 0));
+
+      const { rows, totalCount } = await storage.getPatientFinancialRows(
+        patientId,
+        limit,
+        offset
+      );
+
+      return res.json({ rows, totalCount, limit, offset });
+    } catch (err) {
+      console.error("Failed to fetch financial rows:", err);
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch financial rows" });
+    }
+  }
+);
+
 // Get a single patient by ID
 router.get(
   "/:id",

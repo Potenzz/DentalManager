@@ -55,3 +55,18 @@ export const updatePatientSchema = (
   });
 
 export type UpdatePatient = z.infer<typeof updatePatientSchema>;
+
+export type FinancialRow = {
+  type: "CLAIM" | "PAYMENT";
+  id: number;
+  date: string | null;
+  createdAt: string | null;
+  status: string | null;
+  total_billed: number;
+  total_paid: number;
+  total_adjusted: number;
+  total_due: number;
+  patient_name: string | null;
+  service_lines: any[];
+  payments: any[];
+};

@@ -37,7 +37,6 @@ export default function PatientsPage() {
   const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(
     undefined
   );
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const addPatientModalRef = useRef<AddPatientModalRef | null>(null);
 
   // File upload states
@@ -81,79 +80,12 @@ export default function PatientsPage() {
     },
   });
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
   const handleAddPatient = (patient: InsertPatient) => {
     if (user) {
       addPatientMutation.mutate({
         ...patient,
         userId: user.id,
       });
-    }
-  };
-
-  // helper: ensure patient exists (returns patient object)
-  const ensurePatientExists = async (data: {
-    name: string;
-    memberId: string;
-    dob: string;
-  }) => {
-    try {
-      // 1) try to find by insurance id
-      const findRes = await apiRequest(
-        "GET",
-        `/api/patients/by-insurance-id?insuranceId=${encodeURIComponent(
-          data.memberId
-        )}`
-      );
-      if (findRes.ok) {
-        const found = await findRes.json();
-        if (found && found.id) return found;
-      } else {
-        // If API returns a non-ok with body, try to parse a possible 404-with-JSON
-        try {
-          const body = await findRes.json();
-          if (body && body.id) return body;
-        } catch {
-          // ignore
-        }
-      }
-
-      // 2) not found -> create patient
-      const [firstName, ...rest] = (data.name || "").trim().split(" ");
-      const lastName = rest.join(" ") || "";
-      const parsedDob = parse(data.dob, "M/d/yyyy", new Date()); // robust for "4/17/1964", "12/1/1975", etc.
-
-      // convert dob to whatever format your API expects. Here we keep as received.
-      const newPatient: InsertPatient = {
-        firstName: firstName || "",
-        lastName: lastName || "",
-        dateOfBirth: formatLocalDate(parsedDob),
-        gender: "",
-        phone: "",
-        userId: user?.id ?? 1,
-        status: "active",
-        insuranceId: data.memberId || "",
-      };
-
-      const createRes = await apiRequest("POST", "/api/patients/", newPatient);
-      if (!createRes.ok) {
-        // surface error
-        let body: any = null;
-        try {
-          body = await createRes.json();
-        } catch {}
-        throw new Error(
-          body?.message ||
-            `Failed to create patient (status ${createRes.status})`
-        );
-      }
-      const created = await createRes.json();
-      return created;
-    } catch (err) {
-      throw err;
     }
   };
 
@@ -498,6 +430,7 @@ export default function PatientsPage() {
               allowDelete={true}
               allowEdit={true}
               allowView={true}
+              allowFinancial={true}
             />
           </CardContent>
         </Card>

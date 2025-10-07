@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/pagination";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import LoadingScreen from "../ui/LoadingScreen";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -30,14 +30,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AddPatientModal } from "./add-patient-modal";
-import { DeleteConfirmationDialog } from "../ui/deleteDialog";
+import { DeleteConfirmationDialog } from "@/components/ui/deleteDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { PatientSearch, SearchCriteria } from "./patient-search";
 import { useDebounce } from "use-debounce";
 import { cn } from "@/lib/utils";
-import { Checkbox } from "../ui/checkbox";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
 import { Patient, UpdatePatient } from "@repo/db/types";
+import { PatientFinancialsModal } from "./patient-financial-modal";
 
 interface PatientApiResponse {
   patients: Patient[];
@@ -50,6 +51,7 @@ interface PatientTableProps {
   allowDelete?: boolean;
   allowCheckbox?: boolean;
   allowNewClaim?: boolean;
+  allowFinancial?: boolean;
   onNewClaim?: (patientId: number) => void;
   onSelectPatient?: (patient: Patient | null) => void;
   onPageChange?: (page: number) => void;
@@ -68,6 +70,7 @@ export function PatientTable({
   allowDelete,
   allowCheckbox,
   allowNewClaim,
+  allowFinancial,
   onNewClaim,
   onSelectPatient,
   onPageChange,
@@ -76,12 +79,15 @@ export function PatientTable({
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
-  const [isViewPatientOpen, setIsViewPatientOpen] = useState(false);
-  const [isDeletePatientOpen, setIsDeletePatientOpen] = useState(false);
   const [currentPatient, setCurrentPatient] = useState<Patient | undefined>(
     undefined
   );
+
+  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
+  const [isViewPatientOpen, setIsViewPatientOpen] = useState(false);
+  const [isDeletePatientOpen, setIsDeletePatientOpen] = useState(false);
+  const [isFinancialsOpen, setIsFinancialsOpen] = useState(false);
+  const [modalPatientId, setModalPatientId] = useState<number | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const patientsPerPage = 5;
@@ -457,8 +463,23 @@ export function PatientTable({
                           aria-label="Delete Staff"
                           variant="ghost"
                           size="icon"
+                          title="Delete Patient"
                         >
                           <Delete />
+                        </Button>
+                      )}
+                      {allowFinancial && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setModalPatientId(Number(patient.id));
+                            setIsFinancialsOpen(true);
+                          }}
+                          className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"
+                          title="View financials"
+                        >
+                          <FileCheck className="h-5 w-5" />
                         </Button>
                       )}
                       {allowEdit && (
@@ -469,6 +490,7 @@ export function PatientTable({
                             handleEditPatient(patient);
                           }}
                           className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                          title="Edit Patient"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -479,7 +501,7 @@ export function PatientTable({
                           size="icon"
                           onClick={() => onNewClaim?.(Number(patient.id))}
                           className="text-green-600 hover:text-green-800 hover:bg-green-50"
-                          aria-label="New Claim"
+                          title="New Claim"
                         >
                           <FileCheck className="h-5 w-5" />
                         </Button>
@@ -492,6 +514,7 @@ export function PatientTable({
                             handleViewPatient(patient);
                           }}
                           className="text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                          title="View Patient Info"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -671,6 +694,16 @@ export function PatientTable({
         onSubmit={handleUpdatePatient}
         isLoading={isLoading}
         patient={currentPatient}
+      />
+
+      {/* Financial Modal */}
+      <PatientFinancialsModal
+        patientId={modalPatientId}
+        open={isFinancialsOpen}
+        onOpenChange={(v) => {
+          setIsFinancialsOpen(v);
+          if (!v) setModalPatientId(null);
+        }}
       />
 
       <DeleteConfirmationDialog
