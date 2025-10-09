@@ -28,21 +28,7 @@ import LoadingScreen from "../ui/LoadingScreen";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { FinancialRow } from "@repo/db/types";
-
-function getPageNumbers(current: number, total: number): (number | "...")[] {
-  const delta = 2;
-  const range: (number | "...")[] = [];
-  const left = Math.max(2, current - delta);
-  const right = Math.min(total - 1, current + delta);
-
-  range.push(1);
-  if (left > 2) range.push("...");
-  for (let i = left; i <= right; i++) range.push(i);
-  if (right < total - 1) range.push("...");
-  if (total > 1) range.push(total);
-
-  return range;
-}
+import { getPageNumbers } from "@/utils/pageNumberGenerator";
 
 export function PatientFinancialsModal({
   patientId,
@@ -111,21 +97,26 @@ export function PatientFinancialsModal({
   }
 
   function gotoRow(r: FinancialRow) {
-    // If there's an explicit linked payment id, navigate to that payment
+    const openInNewTab = (url: string) => {
+      if (typeof window !== "undefined") {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        // fallback for non-browser env (shouldn't happen in the client)
+        navigate(url);
+      }
+    };
+
+    const makePaymentUrl = (id: number) => `/payments?paymentId=${id}`;
+
     if (r.linked_payment_id) {
-      navigate(`/payments?paymentId=${r.linked_payment_id}`);
-      onOpenChange(false);
+      openInNewTab(makePaymentUrl(r.linked_payment_id));
       return;
     }
 
-    // If this is a PAYMENT row but somehow has no linked id, fallback to its id
     if (r.type === "PAYMENT") {
-      navigate(`/payments?paymentId=${r.id}`);
-      onOpenChange(false);
+      openInNewTab(makePaymentUrl(r.id));
       return;
     }
-
-    onOpenChange(false);
   }
 
   const currentPage = Math.floor(offset / limit) + 1;
