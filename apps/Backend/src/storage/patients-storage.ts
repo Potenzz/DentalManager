@@ -160,15 +160,15 @@ export const getPatientFinancialRowsFn = async (
   offset = 0
 ): Promise<{ rows: FinancialRow[]; totalCount: number }> => {
   try {
-    // counts
-    const [[{ count_claims }], [{ count_payments_without_claim }]] =
+    // Count claims and orphan payments
+    const [[{ count_claims }], [{ count_orphan_payments }]] =
       (await Promise.all([
         db.$queryRaw`SELECT COUNT(1) AS count_claims FROM "Claim" c WHERE c."patientId" = ${patientId}`,
-        db.$queryRaw`SELECT COUNT(1) AS count_payments_without_claim FROM "Payment" p WHERE p."patientId" = ${patientId} AND p."claimId" IS NULL`,
+        db.$queryRaw`SELECT COUNT(1) AS count_orphan_payments FROM "Payment" p WHERE p."patientId" = ${patientId} AND p."claimId" IS NULL`,
       ])) as any;
 
     const totalCount =
-      Number(count_claims ?? 0) + Number(count_payments_without_claim ?? 0);
+      Number(count_claims ?? 0) + Number(count_orphan_payments ?? 0);
 
     const rawRows = (await db.$queryRaw`
       WITH claim_rows AS (
@@ -185,6 +185,12 @@ export const getPatientFinancialRowsFn = async (
           (
             SELECT (pat."firstName" || ' ' || pat."lastName") FROM "Patient" pat WHERE pat.id = c."patientId" LIMIT 1
           ) AS patient_name,
+
+          -- linked_payment_id (NULL if none). Schema has unique Payment.claimId so LIMIT 1 is safe.
+          (
+            SELECT p2.id FROM "Payment" p2 WHERE p2."claimId" = c.id LIMIT 1
+          ) AS linked_payment_id,
+
           (
             SELECT coalesce(json_agg(
               json_build_object(
@@ -201,29 +207,13 @@ export const getPatientFinancialRowsFn = async (
               )
             ), '[]'::json)
             FROM "ServiceLine" sl2 WHERE sl2."claimId" = c.id
-          ) AS service_lines,
-          (
-            SELECT coalesce(json_agg(
-              json_build_object(
-                'id', p2.id,
-                'totalBilled', p2."totalBilled",
-                'totalPaid', p2."totalPaid",
-                'totalAdjusted', p2."totalAdjusted",
-                'totalDue', p2."totalDue",
-                'status', p2.status::text,
-                'createdAt', p2."createdAt",
-                'icn', p2.icn,
-                'notes', p2.notes
-              )
-            ), '[]'::json)
-            FROM "Payment" p2 WHERE p2."claimId" = c.id
-          ) AS payments
+          ) AS service_lines
         FROM "Claim" c
         LEFT JOIN "ServiceLine" sl ON sl."claimId" = c.id
         WHERE c."patientId" = ${patientId}
         GROUP BY c.id
       ),
-      payment_rows AS (
+      orphan_payment_rows AS (
         SELECT
           'PAYMENT'::text AS type,
           p.id,
@@ -237,7 +227,10 @@ export const getPatientFinancialRowsFn = async (
           (
             SELECT (pat."firstName" || ' ' || pat."lastName") FROM "Patient" pat WHERE pat.id = p."patientId" LIMIT 1
           ) AS patient_name,
-          -- aggregate service lines that belong to this payment (if any)
+
+          -- this payment's id is the linked_payment_id
+          p.id AS linked_payment_id,
+
           (
             SELECT coalesce(json_agg(
               json_build_object(
@@ -254,28 +247,15 @@ export const getPatientFinancialRowsFn = async (
               )
             ), '[]'::json)
             FROM "ServiceLine" sl3 WHERE sl3."paymentId" = p.id
-          ) AS service_lines,
-          json_build_array(
-            json_build_object(
-              'id', p.id,
-              'totalBilled', p."totalBilled",
-              'totalPaid', p."totalPaid",
-              'totalAdjusted', p."totalAdjusted",
-              'totalDue', p."totalDue",
-              'status', p.status::text,
-              'createdAt', p."createdAt",
-              'icn', p.icn,
-              'notes', p.notes
-            )
-          ) AS payments
+          ) AS service_lines
         FROM "Payment" p
         WHERE p."patientId" = ${patientId} AND p."claimId" IS NULL
       )
-      SELECT type, id, date, created_at, status, total_billed, total_paid, total_adjusted, total_due, patient_name, service_lines, payments
+      SELECT type, id, date, created_at, status, total_billed, total_paid, total_adjusted, total_due, patient_name, linked_payment_id, service_lines
       FROM (
         SELECT * FROM claim_rows
         UNION ALL
-        SELECT * FROM payment_rows
+        SELECT * FROM orphan_payment_rows
       ) t
       ORDER BY t.created_at DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -294,7 +274,9 @@ export const getPatientFinancialRowsFn = async (
       total_due: Number(r.total_due ?? 0),
       patient_name: r.patient_name ?? null,
       service_lines: r.service_lines ?? [],
-      payments: r.payments ?? [],
+      linked_payment_id: r.linked_payment_id
+        ? Number(r.linked_payment_id)
+        : null,
     }));
 
     return { rows, totalCount };

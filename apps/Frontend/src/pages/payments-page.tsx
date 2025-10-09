@@ -18,9 +18,10 @@ import PaymentsRecentTable from "@/components/payments/payments-recent-table";
 import PaymentsOfPatientModal from "@/components/payments/payments-of-patient-table";
 import PaymentOCRBlock from "@/components/payments/payment-ocr-block";
 import { useLocation } from "wouter";
-import { Patient } from "@repo/db/types";
+import { Patient, PaymentWithExtras } from "@repo/db/types";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
+import PaymentEditModal from "@/components/payments/payment-edit-modal";
 
 export default function PaymentsPage() {
   const [paymentPeriod, setPaymentPeriod] = useState<string>("all-time");
@@ -31,6 +32,10 @@ export default function PaymentsPage() {
     useState<Patient | null>(null);
   const [openPatientModalFromAppointment, setOpenPatientModalFromAppointment] =
     useState(false);
+
+  // Payment edit modal state (opens directly when ?paymentId=)
+  const [paymentIdToEdit, setPaymentIdToEdit] = useState<number | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // small helper: remove query params silently
   const clearUrlParams = (params: string[]) => {
@@ -103,6 +108,20 @@ export default function PaymentsPage() {
     return () => {
       cancelled = true;
     };
+  }, [location]);
+
+  // NEW: detect paymentId query param -> open edit modal (modal will fetch by id)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentIdParam = params.get("paymentId");
+    if (!paymentIdParam) return;
+    const paymentId = Number(paymentIdParam);
+    if (!Number.isFinite(paymentId) || paymentId <= 0) return;
+
+    // Open modal with paymentId and clear params
+    setPaymentIdToEdit(paymentId);
+    setIsEditModalOpen(true);
+    clearUrlParams(["paymentId", "patientId"]);
   }, [location]);
 
   return (
@@ -214,6 +233,17 @@ export default function PaymentsPage() {
           setOpenPatientModalFromAppointment(false);
           setInitialPatientForModal(null);
         }}
+      />
+
+      {/* Payment Edit Modal — modal will fetch payment by id and handle its own save/update */}
+      <PaymentEditModal
+        isOpen={isEditModalOpen}
+        onOpenChange={(v) => setIsEditModalOpen(v)}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setPaymentIdToEdit(null);
+        }}
+        paymentId={paymentIdToEdit}
       />
     </div>
   );

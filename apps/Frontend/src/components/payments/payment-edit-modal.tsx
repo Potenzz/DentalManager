@@ -11,7 +11,7 @@ import {
   formatLocalDate,
   parseLocalDate,
 } from "@/utils/dateUtils";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   PaymentStatus,
   paymentStatusOptions,
@@ -31,34 +31,59 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { X } from "lucide-react";
 import { DateInput } from "@/components/ui/dateInput";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
 
 type PaymentEditModalProps = {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onClose: () => void;
-  onEditServiceLine: (payload: NewTransactionPayload) => void;
+
+  // Keeping callbacks optional — if provided parent handlers will be used
+  onEditServiceLine?: (payload: NewTransactionPayload) => void;
   isUpdatingServiceLine?: boolean;
-  onUpdateStatus: (paymentId: number, status: PaymentStatus) => void;
+
+  onUpdateStatus?: (paymentId: number, status: PaymentStatus) => void;
   isUpdatingStatus?: boolean;
-  payment: PaymentWithExtras | null;
+
+  // Either pass a full payment object OR a paymentId (or both)
+  payment?: PaymentWithExtras | null;
+  paymentId?: number | null;
 };
 
 export default function PaymentEditModal({
   isOpen,
   onOpenChange,
   onClose,
-  payment,
   onEditServiceLine,
-  isUpdatingServiceLine,
+  isUpdatingServiceLine: propUpdatingServiceLine,
   onUpdateStatus,
-  isUpdatingStatus,
+  isUpdatingStatus: propUpdatingStatus,
+  payment: paymentProp,
+  paymentId: paymentIdProp,
 }: PaymentEditModalProps) {
-  if (!payment) return null;
-
-  const [expandedLineId, setExpandedLineId] = useState<number | null>(null);
-  const [paymentStatus, setPaymentStatus] = React.useState<PaymentStatus>(
-    payment.status
+  // Local payment state: prefer prop but fetch if paymentId is provided
+  const [payment, setPayment] = useState<PaymentWithExtras | null>(
+    paymentProp ?? null
   );
+  const [loadingPayment, setLoadingPayment] = useState(false);
+
+  // Local update states (used if parent didn't provide flags)
+  const [localUpdatingServiceLine, setLocalUpdatingServiceLine] =
+    useState(false);
+  const [localUpdatingStatus, setLocalUpdatingStatus] = useState(false);
+
+  // derived flags - prefer parent's flags if provided
+  const isUpdatingServiceLine =
+    propUpdatingServiceLine ?? localUpdatingServiceLine;
+  const isUpdatingStatus = propUpdatingStatus ?? localUpdatingStatus;
+
+  // UI state (kept from your original)
+  const [expandedLineId, setExpandedLineId] = useState<number | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(
+    (paymentProp ?? null)?.status ?? ("PENDING" as PaymentStatus)
+  );
+
   const [formState, setFormState] = useState(() => {
     return {
       serviceLineId: 0,
@@ -72,10 +97,191 @@ export default function PaymentEditModal({
     };
   });
 
-  const serviceLines =
-    payment.claim?.serviceLines ?? payment.serviceLines ?? [];
+  // Sync when parent passes a payment object or paymentId changes
+  useEffect(() => {
+    // if parent gave a full payment object, use it immediately
+    if (paymentProp) {
+      setPayment(paymentProp);
+      setPaymentStatus(paymentProp.status);
+    }
+  }, [paymentProp]);
 
-  const handleEditServiceLine = (lineId: number) => {
+  // Fetch payment when modal opens and we only have paymentId (or payment prop not supplied)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // if payment prop is already available, no need to fetch
+    if (paymentProp) return;
+
+    const id = paymentIdProp ?? payment?.id;
+    if (!id) return;
+
+    let cancelled = false;
+    (async () => {
+      setLoadingPayment(true);
+      try {
+        const res = await apiRequest("GET", `/api/payments/${id}`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(body?.message ?? `Failed to fetch payment ${id}`);
+        }
+        const data = await res.json();
+        if (!cancelled) {
+          setPayment(data as PaymentWithExtras);
+          setPaymentStatus((data as PaymentWithExtras).status);
+        }
+      } catch (err: any) {
+        console.error("Failed to fetch payment:", err);
+        toast({
+          title: "Error",
+          description: err?.message ?? "Failed to load payment.",
+          variant: "destructive",
+        });
+      } finally {
+        if (!cancelled) setLoadingPayment(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, paymentIdProp]);
+
+  // convenience: get service lines from claim or payment
+  const serviceLines =
+    payment?.claim?.serviceLines ?? payment?.serviceLines ?? [];
+
+  // small helper to refresh current payment (used after internal writes)
+  async function refetchPayment(id?: number) {
+    const pid = id ?? payment?.id ?? paymentIdProp;
+    if (!pid) return;
+    setLoadingPayment(true);
+    try {
+      const res = await apiRequest("GET", `/api/payments/${pid}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message ?? `Failed to fetch payment ${pid}`);
+      }
+      const data = await res.json();
+      setPayment(data as PaymentWithExtras);
+      setPaymentStatus((data as PaymentWithExtras).status);
+    } catch (err: any) {
+      console.error("Failed to refetch payment:", err);
+      toast({
+        title: "Error",
+        description: err?.message ?? "Failed to refresh payment.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPayment(false);
+    }
+  }
+
+  // Internal save (fallback) — used only when parent didn't provide onEditServiceLine
+  const internalUpdatePaymentMutation = useMutation({
+    mutationFn: async (data: NewTransactionPayload) => {
+      const response = await apiRequest(
+        "PUT",
+        `/api/payments/${data.paymentId}`,
+        {
+          data: data,
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update Payment");
+      }
+      return response.json();
+    },
+    onSuccess: async (updated, { paymentId }) => {
+      toast({
+        title: "Success",
+        description: "Payment updated successfully!",
+      });
+
+      await refetchPayment(paymentId);
+    },
+
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Update failed: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const internalUpdatePaymentStatusMutation = useMutation({
+    mutationFn: async ({
+      paymentId,
+      status,
+    }: {
+      paymentId: number;
+      status: PaymentStatus;
+    }) => {
+      const response = await apiRequest(
+        "PATCH",
+        `/api/payments/${paymentId}/status`,
+        {
+          data: { status },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update payment status");
+      }
+
+      return response.json();
+    },
+
+    onSuccess: async (updated, { paymentId }) => {
+      toast({
+        title: "Success",
+        description: "Payment Status updated successfully!",
+      });
+
+      // Fetch updated payment and set into local state
+      await refetchPayment(paymentId);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Status update failed: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Keep your existing handlers but route to either parent callback or internal functions
+  const handleEditServiceLine = async (payload: NewTransactionPayload) => {
+    if (onEditServiceLine) {
+      await onEditServiceLine(payload);
+    } else {
+      // fallback to internal API call
+      setLocalUpdatingServiceLine(true);
+      await internalUpdatePaymentMutation.mutateAsync(payload);
+      setLocalUpdatingServiceLine(false);
+    }
+  };
+
+  const handleUpdateStatus = async (
+    paymentId: number,
+    status: PaymentStatus
+  ) => {
+    if (onUpdateStatus) {
+      await onUpdateStatus(paymentId, status);
+    } else {
+      setLocalUpdatingStatus(true);
+      await internalUpdatePaymentStatusMutation.mutateAsync({
+        paymentId,
+        status,
+      });
+      setLocalUpdatingStatus(false);
+    }
+  };
+
+  const handleEditServiceLineClick = (lineId: number) => {
     if (expandedLineId === lineId) {
       // Closing current line
       setExpandedLineId(null);
@@ -109,6 +315,14 @@ export default function PaymentEditModal({
   };
 
   const handleSavePayment = async () => {
+    if (!payment) {
+      toast({
+        title: "Error",
+        description: "Payment not loaded.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!formState.serviceLineId) {
       toast({
         title: "Error",
@@ -178,7 +392,7 @@ export default function PaymentEditModal({
     };
 
     try {
-      await onEditServiceLine(payload);
+      await handleEditServiceLine(payload);
       toast({
         title: "Success",
         description: "Payment Transaction added successfully.",
@@ -224,7 +438,7 @@ export default function PaymentEditModal({
     };
 
     try {
-      await onEditServiceLine(payload);
+      await handleEditServiceLine(payload);
       toast({
         title: "Success",
         description: `Full due amount ($${dueAmount.toFixed(
@@ -240,6 +454,18 @@ export default function PaymentEditModal({
       });
     }
   };
+
+  if (!payment) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <div className="p-8 text-center">
+            {loadingPayment ? "Loading…" : "No payment selected"}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -352,7 +578,7 @@ export default function PaymentEditModal({
                   size="sm"
                   disabled={isUpdatingStatus}
                   onClick={() =>
-                    payment && onUpdateStatus(payment.id, paymentStatus)
+                    payment && handleUpdateStatus(payment.id, paymentStatus)
                   }
                 >
                   {isUpdatingStatus ? "Updating..." : "Update Status"}
@@ -432,7 +658,7 @@ export default function PaymentEditModal({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEditServiceLine(line.id)}
+                          onClick={() => handleEditServiceLineClick(line.id)}
                         >
                           {isExpanded ? "Cancel" : "Pay Partially"}
                         </Button>

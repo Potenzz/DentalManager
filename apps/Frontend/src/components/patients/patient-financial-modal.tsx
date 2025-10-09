@@ -111,8 +111,20 @@ export function PatientFinancialsModal({
   }
 
   function gotoRow(r: FinancialRow) {
-    if (r.type === "CLAIM") navigate(`/claims/${r.id}`);
-    else navigate(`/payments/${r.id}`);
+    // If there's an explicit linked payment id, navigate to that payment
+    if (r.linked_payment_id) {
+      navigate(`/payments?paymentId=${r.linked_payment_id}`);
+      onOpenChange(false);
+      return;
+    }
+
+    // If this is a PAYMENT row but somehow has no linked id, fallback to its id
+    if (r.type === "PAYMENT") {
+      navigate(`/payments?paymentId=${r.id}`);
+      onOpenChange(false);
+      return;
+    }
+
     onOpenChange(false);
   }
 
@@ -125,8 +137,14 @@ export function PatientFinancialsModal({
     setOffset((page - 1) * limit);
   }
 
-  const startItem = useMemo(() => Math.min(offset + 1, totalCount || 0), [offset, totalCount]);
-  const endItem = useMemo(() => Math.min(offset + limit, totalCount || 0), [offset, limit, totalCount]);
+  const startItem = useMemo(
+    () => Math.min(offset + 1, totalCount || 0),
+    [offset, totalCount]
+  );
+  const endItem = useMemo(
+    () => Math.min(offset + limit, totalCount || 0),
+    [offset, limit, totalCount]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -139,7 +157,11 @@ export function PatientFinancialsModal({
                 {patientName ? (
                   <>
                     <span className="font-medium">{patientName}</span>{" "}
-                    {patientPID && <span className="text-muted-foreground">• PID-{String(patientPID).padStart(4, "0")}</span>}
+                    {patientPID && (
+                      <span className="text-muted-foreground">
+                        • PID-{String(patientPID).padStart(4, "0")}
+                      </span>
+                    )}
                   </>
                 ) : (
                   "Claims, payments and balances for this patient."
@@ -148,7 +170,11 @@ export function PatientFinancialsModal({
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+              >
                 Close
               </Button>
             </div>
@@ -181,7 +207,10 @@ export function PatientFinancialsModal({
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell
+                        colSpan={8}
+                        className="text-center py-8 text-muted-foreground"
+                      >
                         No records found.
                       </TableCell>
                     </TableRow>
@@ -194,9 +223,10 @@ export function PatientFinancialsModal({
 
                       const procedureCodes =
                         (r.service_lines || [])
-                          .map((sl: any) => sl.procedureCode ?? sl.procedureCode)
+                          .map((sl: any) => sl.procedureCode)
                           .filter(Boolean)
-                          .join(", ") || (r.payments?.length ? "No Codes Given" : "-");
+                          .join(", ") ||
+                        (r.linked_payment_id ? "No Codes Given" : "-");
 
                       return (
                         <TableRow
@@ -204,13 +234,29 @@ export function PatientFinancialsModal({
                           className="cursor-pointer hover:bg-gray-50"
                           onClick={() => gotoRow(r)}
                         >
-                          <TableCell className="font-medium">{r.type}</TableCell>
-                          <TableCell>{r.date ? new Date(r.date).toLocaleDateString() : "-"}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{procedureCodes}</TableCell>
-                          <TableCell className="text-right">{billed.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{paid.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{adjusted.toFixed(2)}</TableCell>
-                          <TableCell className={`text-right ${totalDue > 0 ? "text-red-600" : "text-green-600"}`}>
+                          <TableCell className="font-medium">
+                            {r.type}
+                          </TableCell>
+                          <TableCell>
+                            {r.date
+                              ? new Date(r.date).toLocaleDateString()
+                              : "-"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {procedureCodes}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {billed.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {paid.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {adjusted.toFixed(2)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right ${totalDue > 0 ? "text-red-600" : "text-green-600"}`}
+                          >
                             {totalDue.toFixed(2)}
                           </TableCell>
                           <TableCell>{r.status ?? "-"}</TableCell>
@@ -243,7 +289,9 @@ export function PatientFinancialsModal({
               </div>
 
               <div className="text-sm text-muted-foreground">
-                Showing <span className="font-medium">{startItem}</span>–<span className="font-medium">{endItem}</span> of <span className="font-medium">{totalCount}</span>
+                Showing <span className="font-medium">{startItem}</span>–
+                <span className="font-medium">{endItem}</span> of{" "}
+                <span className="font-medium">{totalCount}</span>
               </div>
             </div>
 
@@ -257,7 +305,11 @@ export function PatientFinancialsModal({
                         e.preventDefault();
                         if (currentPage > 1) setPage(currentPage - 1);
                       }}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                      className={
+                        currentPage === 1
+                          ? "pointer-events-none opacity-50"
+                          : ""
+                      }
                     />
                   </PaginationItem>
 
@@ -287,7 +339,11 @@ export function PatientFinancialsModal({
                         e.preventDefault();
                         if (currentPage < totalPages) setPage(currentPage + 1);
                       }}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                      className={
+                        currentPage === totalPages
+                          ? "pointer-events-none opacity-50"
+                          : ""
+                      }
                     />
                   </PaginationItem>
                 </PaginationContent>

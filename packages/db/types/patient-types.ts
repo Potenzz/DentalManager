@@ -68,5 +68,5 @@ export type FinancialRow = {
   total_due: number;
   patient_name: string | null;
   service_lines: any[];
-  payments: any[];
+  linked_payment_id?: number | null;
 };
