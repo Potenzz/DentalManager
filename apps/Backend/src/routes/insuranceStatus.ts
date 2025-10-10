@@ -9,7 +9,10 @@ import { forwardToSeleniumInsuranceClaimStatusAgent } from "../services/selenium
 import fsSync from "fs";
 import { emptyFolderContainingFile } from "../utils/emptyTempFolder";
 import forwardToPatientDataExtractorService from "../services/patientDataExtractorService";
-import { InsertPatient } from "../../../../packages/db/types/patient-types";
+import {
+  InsertPatient,
+  insertPatientSchema,
+} from "../../../../packages/db/types/patient-types";
 
 const router = Router();
 
@@ -65,11 +68,11 @@ async function createOrUpdatePatientByInsuranceId(options: {
     }
     return;
   } else {
-    // If patient doesn't exist -> create
-    const createPayload: InsertPatient = {
+    // inside createOrUpdatePatientByInsuranceId, when creating:
+    const createPayload: any = {
       firstName: incomingFirst,
       lastName: incomingLast,
-      dateOfBirth: dob,
+      dateOfBirth: dob, // raw from caller (string | Date | null)
       gender: "",
       phone: "",
       userId,
@@ -77,7 +80,22 @@ async function createOrUpdatePatientByInsuranceId(options: {
       insuranceId,
     };
 
-    await storage.createPatient(createPayload);
+    let patientData: InsertPatient;
+    try {
+      patientData = insertPatientSchema.parse(createPayload);
+    } catch (err) {
+      // handle malformed dob or other validation errors conservatively
+      console.warn(
+        "Failed to validate patient payload in insurance flow:",
+        err
+      );
+      // either rethrow or drop invalid fields — here we drop dob and proceed
+      const safePayload = { ...createPayload };
+      delete (safePayload as any).dateOfBirth;
+      patientData = insertPatientSchema.parse(safePayload);
+    }
+
+    await storage.createPatient(patientData);
   }
 }
 
