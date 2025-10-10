@@ -2,7 +2,6 @@ import { useState, useRef, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { PatientTable } from "@/components/patients/patient-table";
 import { AddPatientModal } from "@/components/patients/add-patient-modal";
-import { FileUploadZone } from "@/components/file-upload/file-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw, FilePlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +20,10 @@ import { InsertPatient, Patient } from "@repo/db/types";
 import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 import { parse } from "date-fns";
 import { formatLocalDate } from "@/utils/dateUtils";
+import {
+  MultipleFileUploadZone,
+  MultipleFileUploadZoneHandle,
+} from "@/components/file-upload/multiple-file-upload-zone";
 
 // Type for the ref to access modal methods
 type AddPatientModalRef = {
@@ -40,9 +43,13 @@ export default function PatientsPage() {
   const addPatientModalRef = useRef<AddPatientModalRef | null>(null);
 
   // File upload states
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const uploadRef = useRef<MultipleFileUploadZoneHandle | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+
+  // extraction state (single boolean for whole process)
   const [isExtracting, setIsExtracting] = useState(false);
+
   const { mutate: extractPdf } = useExtractPdfData();
   const [location, navigate] = useLocation();
 
@@ -91,18 +98,19 @@ export default function PatientsPage() {
 
   const isLoading = addPatientMutation.isPending;
 
-  // File upload handling
-  const handleFileUpload = (file: File) => {
-    setIsUploading(true);
-    setUploadedFile(file);
-
-    toast({
-      title: "File Selected",
-      description: `${file.name} is ready for processing.`,
-      variant: "default",
-    });
-
-    setIsUploading(false);
+  // Hook up file-change coming from MultipleFileUploadZone
+  const handleFilesChange = (files: File[]) => {
+    // ensure we only keep PDFs (defensive)
+    const pdfs = files.filter((f) => f.type === "application/pdf");
+    if (pdfs.length !== files.length) {
+      toast({
+        title: "Non-PDF ignored",
+        description:
+          "Only PDF files are accepted — other file types were ignored.",
+        variant: "destructive",
+      });
+    }
+    setUploadedFiles(pdfs);
   };
 
   /**
@@ -113,9 +121,9 @@ export default function PatientsPage() {
    * - shows toasts for errors,
    * - returns Patient on success or null on error.
    */
-  const extractAndEnsurePatient =
-    useCallback(async (): Promise<Patient | null> => {
-      if (!uploadedFile) {
+  const extractAndEnsurePatientForFile = useCallback(
+    async (file: File): Promise<Patient | null> => {
+      if (!file) {
         toast({
           title: "Error",
           description: "Please upload a PDF",
@@ -130,7 +138,7 @@ export default function PatientsPage() {
         const data: { name: string; memberId: string; dob: string } =
           await new Promise((resolve, reject) => {
             try {
-              extractPdf(uploadedFile, {
+              extractPdf(file, {
                 onSuccess: (d) => resolve(d as any),
                 onError: (err: any) => reject(err),
               });
@@ -300,23 +308,61 @@ export default function PatientsPage() {
       } finally {
         setIsExtracting(false);
       }
-    }, [uploadedFile, extractPdf]);
+    },
+    [extractPdf]
+  );
 
-  // handlers are now minimal and don't repeat error/toast logic
+  // These two operate only when exactly one file selected
   const handleExtractAndClaim = async () => {
-    const patient = await extractAndEnsurePatient();
-    if (!patient) return; // error already shown in helper
+    if (uploadedFiles.length !== 1) return;
+    const patient = await extractAndEnsurePatientForFile(uploadedFiles[0]!);
+    if (!patient) return;
     navigate(`/claims?newPatient=${patient.id}`);
   };
 
   const handleExtractAndAppointment = async () => {
-    const patient = await extractAndEnsurePatient();
+    if (uploadedFiles.length !== 1) return;
+    const patient = await extractAndEnsurePatientForFile(uploadedFiles[0]!);
     if (!patient) return;
     navigate(`/appointments?newPatient=${patient.id}`);
   };
 
+  // Batch: iterate files one-by-one and call extractAndEnsurePatientForFile
   const handleExtractAndSave = async () => {
-    await extractAndEnsurePatient();
+    if (uploadedFiles.length === 0) {
+      toast({
+        title: "No files",
+        description: "Please upload one or more PDF files first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExtracting(true);
+    // iterate serially so server isn't hit all at once and order is predictable
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i]!;
+      toast({
+        title: `Processing file ${i + 1} of ${uploadedFiles.length}`,
+        description: file.name,
+        variant: "default",
+      });
+
+      // await each file
+      /* eslint-disable no-await-in-loop */
+      await extractAndEnsurePatientForFile(file);
+      /* eslint-enable no-await-in-loop */
+    }
+    setIsExtracting(false);
+
+    // optionally clear files after a successful batch run:
+    setUploadedFiles([]);
+    if (uploadRef.current) uploadRef.current.reset?.();
+    toast({
+      title: "Batch complete",
+      description: `Processed ${uploadedFiles.length} file(s).`,
+      variant: "default",
+    });
   };
 
   return (
@@ -354,16 +400,19 @@ export default function PatientsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FileUploadZone
-                onFileUpload={handleFileUpload}
+              <MultipleFileUploadZone
+                ref={uploadRef}
+                onFilesChange={handleFilesChange}
                 isUploading={isUploading}
                 acceptedFileTypes="application/pdf"
+                maxFiles={20}
+                maxFileSizeMB={20}
               />
 
               <div className="flex flex-col-2 gap-2 mt-4">
                 <Button
                   className="w-full h-12 gap-2"
-                  disabled={!uploadedFile || isExtracting}
+                  disabled={uploadedFiles.length === 0 || isExtracting}
                   onClick={handleExtractAndSave}
                 >
                   {isExtracting ? (
@@ -380,7 +429,7 @@ export default function PatientsPage() {
                 </Button>
                 <Button
                   className="w-full h-12 gap-2"
-                  disabled={!uploadedFile || isExtracting}
+                  disabled={uploadedFiles.length !== 1 || isExtracting}
                   onClick={handleExtractAndAppointment}
                 >
                   {isExtracting ? (
@@ -397,7 +446,7 @@ export default function PatientsPage() {
                 </Button>
                 <Button
                   className="w-full h-12 gap-2"
-                  disabled={!uploadedFile || isExtracting}
+                  disabled={uploadedFiles.length !== 1 || isExtracting}
                   onClick={handleExtractAndClaim}
                 >
                   {isExtracting ? (
