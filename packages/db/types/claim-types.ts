@@ -5,6 +5,7 @@ import {
 import { z } from "zod";
 import { Decimal } from "decimal.js";
 import { Staff } from "@repo/db/types";
+import { makeEnumOptions } from "../utils";
 
 export const insertClaimSchema = (
   ClaimUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>
@@ -36,6 +37,14 @@ export const ExtendedClaimSchema = (
 
 export type Claim = z.infer<typeof ClaimUncheckedCreateInputObjectSchema>;
 export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
+export const claimStatusOptions =
+  makeEnumOptions<
+    typeof ClaimStatusSchema extends z.ZodTypeAny
+      ? z.infer<typeof ClaimStatusSchema>
+      : string
+  >(ClaimStatusSchema);
+export type ClaimStatusOptions =
+  (typeof claimStatusOptions)[keyof typeof claimStatusOptions];
 
 export type ClaimFileMeta = {
   id?: number;

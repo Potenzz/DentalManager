@@ -1,5 +1,6 @@
 import {
   Claim,
+  ClaimStatus,
   ClaimWithServiceLines,
   InsertClaim,
   UpdateClaim,
@@ -13,13 +14,13 @@ export interface IStorage {
     limit: number,
     offset: number
   ): Promise<ClaimWithServiceLines[]>;
-
   getTotalClaimCountByPatient(patientId: number): Promise<number>;
   getClaimsByAppointmentId(appointmentId: number): Promise<Claim[]>;
   getRecentClaims(limit: number, offset: number): Promise<Claim[]>;
   getTotalClaimCount(): Promise<number>;
   createClaim(claim: InsertClaim): Promise<Claim>;
   updateClaim(id: number, updates: UpdateClaim): Promise<Claim>;
+  updateClaimStatus(id: number, status: ClaimStatus): Promise<Claim>;
   deleteClaim(id: number): Promise<void>;
 }
 
@@ -86,6 +87,18 @@ export const claimsStorage: IStorage = {
     } catch (err) {
       throw new Error(`Claim with ID ${id} not found`);
     }
+  },
+
+  async updateClaimStatus(id: number, status: ClaimStatus): Promise<Claim> {
+    const existing = await db.claim.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error("Claim not found");
+    }
+
+    return db.claim.update({
+      where: { id },
+      data: { status },
+    });
   },
 
   async deleteClaim(id: number): Promise<void> {

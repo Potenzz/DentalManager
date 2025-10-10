@@ -132,6 +132,7 @@ enum ClaimStatus {
   APPROVED
   CANCELLED
   REVIEW
+  VOID
 }
 
 model ServiceLine {

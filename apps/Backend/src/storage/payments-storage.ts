@@ -11,6 +11,11 @@ export interface IStorage {
   getPayment(id: number): Promise<Payment | undefined>;
   createPayment(data: InsertPayment): Promise<Payment>;
   updatePayment(id: number, updates: UpdatePayment): Promise<Payment>;
+  updatePaymentStatus(
+    id: number,
+    updates: UpdatePayment,
+    updatedById?: number
+  ): Promise<Payment>;
   deletePayment(id: number, userId: number): Promise<void>;
   getPaymentById(id: number): Promise<PaymentWithExtras | null>;
   getRecentPaymentsByPatientId(
@@ -48,6 +53,25 @@ export const paymentsStorage: IStorage = {
     return db.payment.update({
       where: { id },
       data: updates,
+    });
+  },
+
+  async updatePaymentStatus(
+    id: number,
+    updates: UpdatePayment,
+    updatedById?: number
+  ): Promise<Payment> {
+    const existing = await db.payment.findFirst({ where: { id } });
+    if (!existing) {
+      throw new Error("Payment not found");
+    }
+
+    const data: any = { ...updates };
+    if (typeof updatedById === "number") data.updatedById = updatedById;
+
+    return db.payment.update({
+      where: { id },
+      data,
     });
   },
 

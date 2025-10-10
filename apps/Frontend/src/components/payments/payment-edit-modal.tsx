@@ -14,11 +14,12 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   PaymentStatus,
-  paymentStatusOptions,
   PaymentMethod,
   paymentMethodOptions,
   PaymentWithExtras,
   NewTransactionPayload,
+  paymentStatusArray,
+  paymentMethodArray,
 } from "@repo/db/types";
 import {
   Select,
@@ -90,7 +91,7 @@ export default function PaymentEditModal({
       transactionId: "",
       paidAmount: 0,
       adjustedAmount: 0,
-      method: paymentMethodOptions[1] as PaymentMethod,
+      method: paymentMethodOptions.CHECK as PaymentMethod,
       receivedDate: formatLocalDate(new Date()),
       payerName: "",
       notes: "",
@@ -298,7 +299,7 @@ export default function PaymentEditModal({
       transactionId: "",
       paidAmount: Number(line.totalDue) > 0 ? Number(line.totalDue) : 0,
       adjustedAmount: 0,
-      method: paymentMethodOptions[1] as PaymentMethod,
+      method: paymentMethodOptions.CHECK as PaymentMethod,
       receivedDate: formatLocalDate(new Date()),
       payerName: "",
       notes: "",
@@ -431,7 +432,7 @@ export default function PaymentEditModal({
           serviceLineId: line.id,
           paidAmount: dueAmount,
           adjustedAmount: 0,
-          method: paymentMethodOptions[1] as PaymentMethod, // Maybe make dynamic later
+          method: paymentMethodOptions.CHECK as PaymentMethod, // Maybe make dynamic later
           receivedDate: new Date(),
         },
       ],
@@ -565,7 +566,7 @@ export default function PaymentEditModal({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {paymentStatusOptions.map((status) => (
+                      {paymentStatusArray.map((status) => (
                         <SelectItem key={status} value={status}>
                           {status}
                         </SelectItem>
@@ -727,7 +728,7 @@ export default function PaymentEditModal({
                                 <SelectValue placeholder="Select a payment method" />
                               </SelectTrigger>
                               <SelectContent>
-                                {paymentMethodOptions.map((methodOption) => (
+                                {paymentMethodArray.map((methodOption) => (
                                   <SelectItem
                                     key={methodOption}
                                     value={methodOption}

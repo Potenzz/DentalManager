@@ -6,6 +6,7 @@ import {
 } from "@repo/db/usedSchemas";
 import { Prisma } from "@repo/db/generated/prisma";
 import { z } from "zod";
+import { makeEnumOptions } from "../utils";
 
 // ========== BASIC TYPES ==========
 
@@ -31,8 +32,29 @@ export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 
 // ✅ Runtime arrays (used in code logic / map / select options)
-export const paymentStatusOptions = PaymentStatusSchema.options;
-export const paymentMethodOptions = PaymentMethodSchema.options;
+export const paymentStatusOptions =
+  makeEnumOptions<
+    typeof PaymentStatusSchema extends z.ZodTypeAny
+      ? z.infer<typeof PaymentStatusSchema>
+      : string
+  >(PaymentStatusSchema);
+export type PaymentStatusOptions =
+  (typeof paymentStatusOptions)[keyof typeof paymentStatusOptions];
+export const paymentStatusArray = Object.values(
+  paymentStatusOptions
+) as PaymentStatusOptions[];
+
+export const paymentMethodOptions =
+  makeEnumOptions<
+    typeof PaymentMethodSchema extends z.ZodTypeAny
+      ? z.infer<typeof PaymentMethodSchema>
+      : string
+  >(PaymentMethodSchema);
+export type PaymentMethodOptions =
+  (typeof paymentMethodOptions)[keyof typeof paymentMethodOptions];
+export const paymentMethodArray = Object.values(
+  paymentMethodOptions
+) as PaymentMethodOptions[];
 
 // ========== INPUT TYPES ==========
 

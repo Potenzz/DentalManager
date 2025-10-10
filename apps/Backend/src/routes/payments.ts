@@ -8,6 +8,9 @@ import {
   NewTransactionPayload,
   newTransactionPayloadSchema,
   paymentMethodOptions,
+  PaymentStatus,
+  paymentStatusOptions,
+  claimStatusOptions,
 } from "@repo/db/types";
 import { prisma } from "@repo/db/client";
 import { PaymentStatusSchema } from "@repo/db/types";
@@ -283,7 +286,7 @@ router.put(
           serviceLineId: line.id,
           paidAmount: line.totalDue.toNumber(),
           adjustedAmount: 0,
-          method: paymentMethodOptions[1],
+          method: paymentMethodOptions.CHECK,
           receivedDate: new Date(),
           notes: "Full claim payment",
         }));
@@ -338,7 +341,7 @@ router.put(
           serviceLineId: line.id,
           paidAmount: line.totalPaid.negated().toNumber(), // negative to undo
           adjustedAmount: line.totalAdjusted.negated().toNumber(),
-          method: paymentMethodOptions[4],
+          method: paymentMethodOptions.OTHER,
           receivedDate: new Date(),
           notes: "Reverted full claim",
         }));
@@ -374,18 +377,51 @@ router.patch(
 
       const paymentId = parseIntOrError(req.params.id, "Payment ID");
 
-      const status = PaymentStatusSchema.parse(req.body.data.status);
+      // Parse & coerce to PaymentStatus enum
+      const rawStatus = PaymentStatusSchema.parse(req.body.data.status);
+      if (
+        !Object.values(paymentStatusOptions).includes(
+          rawStatus as PaymentStatus
+        )
+      ) {
+        return res.status(400).json({ message: "Invalid payment status" });
+      }
+      const status = rawStatus as PaymentStatus;
 
-      const updatedPayment = await prisma.payment.update({
-        where: { id: paymentId },
-        data: { status, updatedById: userId },
-      });
+      // Load existing payment
+      const existingPayment = await storage.getPayment(paymentId);
+      if (!existingPayment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
 
-      res.json(updatedPayment);
+      // If changing to VOID and linked to a claim -> update both atomically
+      if (status === paymentStatusOptions.VOID && existingPayment.claimId) {
+        const [updatedPayment, updatedClaim] = await prisma.$transaction([
+          prisma.payment.update({
+            where: { id: paymentId },
+            data: { status, updatedById: userId },
+          }),
+          prisma.claim.update({
+            where: { id: existingPayment.claimId },
+            data: { status: claimStatusOptions.VOID },
+          }),
+        ]);
+
+        return res.json(updatedPayment);
+      }
+
+      // Otherwise just update payment (use storage helper)
+      const updatedPayment = await storage.updatePaymentStatus(
+        paymentId,
+        { status } as any,
+        userId
+      );
+
+      return res.json(updatedPayment);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to update payment status";
-      res.status(500).json({ message });
+      return res.status(500).json({ message });
     }
   }
 );
