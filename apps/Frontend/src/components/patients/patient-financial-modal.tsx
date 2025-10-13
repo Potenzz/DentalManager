@@ -181,6 +181,7 @@ export function PatientFinancialsModal({
                     <TableHead className="w-24">Type</TableHead>
                     <TableHead className="w-36">Date</TableHead>
                     <TableHead>Procedures Codes</TableHead>
+                    <TableHead className="w-28">Tooth Number</TableHead>
                     <TableHead className="text-right w-28">Billed</TableHead>
                     <TableHead className="text-right w-28">Paid</TableHead>
                     <TableHead className="text-right w-28">Adjusted</TableHead>
@@ -192,14 +193,14 @@ export function PatientFinancialsModal({
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-12">
+                      <TableCell colSpan={9} className="text-center py-12">
                         <LoadingScreen />
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={9}
                         className="text-center py-8 text-muted-foreground"
                       >
                         No records found.
@@ -212,12 +213,26 @@ export function PatientFinancialsModal({
                       const adjusted = Number(r.total_adjusted ?? 0);
                       const totalDue = Number(r.total_due ?? 0);
 
+                      const serviceLines = r.service_lines || [];
+
                       const procedureCodes =
-                        (r.service_lines || [])
-                          .map((sl: any) => sl.procedureCode)
-                          .filter(Boolean)
-                          .join(", ") ||
-                        (r.linked_payment_id ? "No Codes Given" : "-");
+                        serviceLines.length > 0
+                          ? serviceLines
+                              .map((sl: any) => sl.procedureCode)
+                              .filter(Boolean)
+                              .join(", ")
+                          : r.linked_payment_id
+                            ? "No Codes Given"
+                            : "-";
+
+                      const toothNumbers =
+                        serviceLines.length > 0
+                          ? serviceLines
+                              .map((sl: any) =>
+                                sl.toothNumber ? String(sl.toothNumber) : "-"
+                              )
+                              .join(", ")
+                          : "-";
 
                       return (
                         <TableRow
@@ -235,6 +250,9 @@ export function PatientFinancialsModal({
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {procedureCodes}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {toothNumbers}
                           </TableCell>
                           <TableCell className="text-right">
                             {billed.toFixed(2)}
