@@ -567,7 +567,7 @@ export function ClaimForm({
       form,
       comboId,
       patient?.dateOfBirth ?? "",
-      { replaceAll: true, lineDate: form.serviceDate }
+      { replaceAll: false, lineDate: form.serviceDate }
     );
 
     setForm(nextForm);
@@ -763,47 +763,110 @@ export function ClaimForm({
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="mb-3 text-sm font-semibold opacity-70">
-                    Direct Claim Submittion Buttons
+                <div className="space-y-6">
+                  {/* Section Title */}
+                  <div className="text-sm font-semibold text-muted-foreground">
+                    Direct Claim Submission Buttons
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    <Button
-                      variant="secondary"
-                      onClick={() => applyComboAndThenMH("childRecallDirect")}
-                    >
-                      Child Recall Direct
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => applyComboAndThenMH("adultRecallDirect")}
-                    >
-                      Adult Recall Direct
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        applyComboAndThenMH("adultRecallDirect4bw")
-                      }
-                    >
-                      Adult Recall Direct 4BW
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        applyComboAndThenMH("adultRecallDirect4bw2pa")
-                      }
-                    >
-                      Adult Recall Direct 4BW2PA
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        applyComboAndThenMH("adultRecallDirectPano")
-                      }
-                    >
-                      Adult Recall Direct Pano
-                    </Button>
+
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {/* CHILD RECALL GROUP */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium opacity-80">
+                        Child Recall
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          "childRecallDirect",
+                          "childRecallDirect2BW",
+                          "childRecallDirect4BW",
+                          "childRecallDirect2PA2BW",
+                          "childRecallDirect2PA4BW",
+                          "childRecallDirectPANO2PA2BW",
+                        ].map((comboId) => {
+                          const b = PROCEDURE_COMBOS[comboId];
+                          if (!b) return null;
+                          const codesWithTooth = b.codes.map((code, idx) => {
+                            const tooth = b.toothNumbers?.[idx];
+                            return tooth ? `${code} (tooth ${tooth})` : code;
+                          });
+                          const tooltipText = codesWithTooth.join(", ");
+                          const labelMap: Record<string, string> = {
+                            childRecallDirect: "Direct",
+                            childRecallDirect2BW: "Direct 2BW",
+                            childRecallDirect4BW: "Direct 4BW",
+                            childRecallDirect2PA2BW: "Direct 2PA 2BW",
+                            childRecallDirect2PA4BW: "Direct 2PA 4BW",
+                            childRecallDirectPANO2PA2BW: "Direct PANO 2PA 2BW",
+                          };
+                          return (
+                            <Tooltip key={b.id}>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => applyComboAndThenMH(b.id)}
+                                  aria-label={`${b.label} — codes: ${tooltipText}`}
+                                >
+                                  {labelMap[comboId] ?? b.label}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                <div className="text-sm max-w-xs break-words">
+                                  {tooltipText}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* ADULT RECALL GROUP */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium opacity-80">
+                        Adult Recall
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          "adultRecallDirect",
+                          "adultRecallDirect4bw",
+                          "adultRecallDirect4bw2pa",
+                          "adultRecallDirectPano",
+                        ].map((comboId) => {
+                          const b = PROCEDURE_COMBOS[comboId];
+                          if (!b) return null;
+                          const codesWithTooth = b.codes.map((code, idx) => {
+                            const tooth = b.toothNumbers?.[idx];
+                            return tooth ? `${code} (tooth ${tooth})` : code;
+                          });
+                          const tooltipText = codesWithTooth.join(", ");
+                          const labelMap: Record<string, string> = {
+                            adultRecallDirect: "Direct",
+                            adultRecallDirect4bw: "Direct 4BW",
+                            adultRecallDirect4bw2pa: "Direct 4BW2PA",
+                            adultRecallDirectPano: "Direct Pano",
+                          };
+                          return (
+                            <Tooltip key={b.id}>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => applyComboAndThenMH(b.id)}
+                                  aria-label={`${b.label} — codes: ${tooltipText}`}
+                                >
+                                  {labelMap[comboId] ?? b.label}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                <div className="text-sm max-w-xs break-words">
+                                  {tooltipText}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -995,30 +1058,48 @@ export function ClaimForm({
                         if (!b) {
                           return;
                         }
+                        // Build a human readable string for the tooltip
+                        const codesWithTooth = b.codes.map((code, idx) => {
+                          const tooth = b.toothNumbers?.[idx];
+                          return tooth ? `${code} (tooth ${tooth})` : code;
+                        });
+                        const tooltipText = codesWithTooth.join(", ");
+
                         return (
-                          <Button
-                            key={b.id}
-                            variant="secondary"
-                            onClick={() =>
-                              setForm((prev) => {
-                                const next = applyComboToForm(
-                                  prev,
-                                  b.id as any,
-                                  patient?.dateOfBirth ?? "",
-                                  {
-                                    replaceAll: true,
-                                    lineDate: prev.serviceDate,
-                                  }
-                                );
+                          <Tooltip key={b.id}>
+                            <TooltipTrigger asChild>
+                              <Button
+                                key={b.id}
+                                variant="secondary"
+                                onClick={() =>
+                                  setForm((prev) => {
+                                    const next = applyComboToForm(
+                                      prev,
+                                      b.id as any,
+                                      patient?.dateOfBirth ?? "",
+                                      {
+                                        replaceAll: false,
+                                        lineDate: prev.serviceDate,
+                                      }
+                                    );
 
-                                setTimeout(() => scrollToLine(0), 0);
+                                    setTimeout(() => scrollToLine(0), 0);
 
-                                return next;
-                              })
-                            }
-                          >
-                            {b.label}
-                          </Button>
+                                    return next;
+                                  })
+                                }
+                                aria-label={`${b.label} — codes: ${tooltipText}`}
+                              >
+                                {b.label}
+                              </Button>
+                            </TooltipTrigger>
+
+                            <TooltipContent side="top" align="center">
+                              <div className="text-sm max-w-xs break-words">
+                                {tooltipText}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         );
                       })}
                     </div>

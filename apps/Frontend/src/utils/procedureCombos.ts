@@ -17,6 +17,33 @@ export const PROCEDURE_COMBOS: Record<
     label: "Child Recall Direct(no x-ray)",
     codes: ["D0120", "D1120", "D1208"],
   },
+  childRecallDirect2BW: {
+    id: "childRecallDirect2BW",
+    label: "Child Recall Direct 2BW",
+    codes: ["D0120", "D1120", "D1208", "D0272"],
+  },
+  childRecallDirect4BW: {
+    id: "childRecallDirect4BW",
+    label: "Child Recall Direct 4BW",
+    codes: ["D0120", "D1120", "D1208", "D0274"],
+  },
+  childRecallDirect2PA2BW: {
+    id: "childRecallDirect2PA2BW",
+    label: "Child Recall Direct 2PA 2BW",
+    codes: ["D0120", "D1120", "D1208", "D0220", "D0230", "D0272"],
+    toothNumbers: [null, null, null, "9", "24", null], // only these two need values
+  },
+  childRecallDirect2PA4BW: {
+    id: "childRecallDirect2PA4BW",
+    label: "Child Recall Direct 2PA 4BW",
+    codes: ["D0120", "D1120", "D1208", "D0220", "D0230", "D0274"],
+    toothNumbers: [null, null, null, "9", "24", null], // only these two need values
+  },
+  childRecallDirectPANO2PA2BW: {
+    id: "childRecallDirectPANO2PA2BW",
+    label: "Child Recall Direct PANO 2PA 2BW",
+    codes: ["D0120", "D1120", "D1208", "D0330"],
+  },
   adultRecall: {
     id: "adultRecall",
     label: "Adult Recall",
