@@ -9,3 +9,4 @@ export * from "./user-types";
 export * from "./databaseBackup-types";
 export * from "./notifications-types";
 export * from "./cloudStorage-types";
+export * from "./payments-reports-types";

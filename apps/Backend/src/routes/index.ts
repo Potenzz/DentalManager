@@ -13,6 +13,7 @@ import databaseManagementRoutes from "./database-management";
 import notificationsRoutes from "./notifications";
 import paymentOcrRoutes from "./paymentOcrExtraction";
 import cloudStorageRoutes from "./cloud-storage";
+import paymentsReportsRoutes from "./payments-reports";
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use("/database-management", databaseManagementRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/payment-ocr", paymentOcrRoutes);
 router.use("/cloud-storage", cloudStorageRoutes);
+router.use("/payments-reports", paymentsReportsRoutes);
 
 export default router;

@@ -11,6 +11,7 @@ import { paymentsStorage } from './payments-storage';
 import { databaseBackupStorage } from './database-backup-storage';
 import { notificationsStorage } from './notifications-storage';
 import { cloudStorageStorage } from './cloudStorage-storage';
+import { paymentsReportsStorage } from './payments-reports-storage';
 
 
 
@@ -26,6 +27,7 @@ export const storage = {
   ...databaseBackupStorage,
   ...notificationsStorage,
   ...cloudStorageStorage,
+  ...paymentsReportsStorage,
 
 };
 
