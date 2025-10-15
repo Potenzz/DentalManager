@@ -829,6 +829,7 @@ export function ClaimForm({
                       <div className="flex flex-wrap gap-2">
                         {[
                           "adultRecallDirect",
+                          "adultRecallDirect2bw",
                           "adultRecallDirect4bw",
                           "adultRecallDirect4bw2pa",
                           "adultRecallDirectPano",
@@ -842,6 +843,7 @@ export function ClaimForm({
                           const tooltipText = codesWithTooth.join(", ");
                           const labelMap: Record<string, string> = {
                             adultRecallDirect: "Direct",
+                            adultRecallDirect2bw: "Direct 2BW",
                             adultRecallDirect4bw: "Direct 4BW",
                             adultRecallDirect4bw2pa: "Direct 4BW2PA",
                             adultRecallDirectPano: "Direct Pano",

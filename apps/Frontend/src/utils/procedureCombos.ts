@@ -55,6 +55,11 @@ export const PROCEDURE_COMBOS: Record<
     label: "Adult Recall Direct(no x-ray)",
     codes: ["D0120", "D1110"],
   },
+  adultRecallDirect2bw: {
+    id: "adultRecallDirect2bw",
+    label: "Adult Recall Direct - 2bw (no x-ray)",
+    codes: ["D0120", "D1110", "D0272"],
+  },
   adultRecallDirect4bw: {
     id: "adultRecallDirect4bw",
     label: "Adult Recall Direct - 4bw (no x-ray)",
