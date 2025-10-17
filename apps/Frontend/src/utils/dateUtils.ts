@@ -1,11 +1,11 @@
 /**
- * Use parseLocalDate when you need a Date object at local midnight 
+ * Use parseLocalDate when you need a Date object at local midnight
  * (for calendars, date pickers, Date math in the browser).
- * 
- * 
+ *
+ *
  * Parse a date string in yyyy-MM-dd format (assumed local) into a JS Date object.
  * No timezone conversion is applied. Returns a Date at midnight local time.
- * 
+ *
  * * Accepts:
  * - "YYYY-MM-DD"
  * - ISO/timestamp string (will take left-of-'T' date portion)
@@ -44,10 +44,10 @@ export function parseLocalDate(input: string | Date): Date {
 }
 
 /**
- * Use formatLocalDate when you need a date-only string "YYYY-MM-DD" (for displaying stable date values in UI lists, 
+ * Use formatLocalDate when you need a date-only string "YYYY-MM-DD" (for displaying stable date values in UI lists,
  * sending to APIs, storing in sessionStorage/DB where date-only is required).
- * 
- * 
+ *
+ *
  * Format a date value into a "YYYY-MM-DD" string with **no timezone shifts**.
  *
  * Handles all common input cases:
@@ -84,13 +84,23 @@ export function formatLocalDate(input?: string | Date): string {
   if (input instanceof Date) {
     if (isNaN(input.getTime())) return "";
 
-    // ALWAYS use the local calendar fields for Date objects.
-    // This avoids day-flips when a Date was constructed from an ISO instant
-    // and the browser's timezone would otherwise show a different calendar day.
-    const y = input.getFullYear();
-    const m = `${input.getMonth() + 1}`.padStart(2, "0");
-    const d = `${input.getDate()}`.padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    // HYBRID LOGIC:
+    // - If this Date was likely created from an ISO instant at UTC midnight
+    //   (e.g. "2025-10-15T00:00:00Z"), then getUTCHours() === 0 but getHours()
+    //   will be non-zero in most non-UTC timezones. In that case use UTC date
+    //   parts to preserve the original calendar day.
+    // - Otherwise use the local calendar fields (safe for local-midnight Dates).
+    const utcHours = input.getUTCHours();
+    const localHours = input.getHours();
+    const useUTC = utcHours === 0 && localHours !== 0;
+
+    const year = useUTC ? input.getUTCFullYear() : input.getFullYear();
+    const month = useUTC ? input.getUTCMonth() + 1 : input.getMonth() + 1;
+    const day = useUTC ? input.getUTCDate() : input.getDate();
+
+    const m = `${month}`.padStart(2, "0");
+    const d = `${day}`.padStart(2, "0");
+    return `${year}-${m}-${d}`;
   }
 
   return "";
@@ -165,7 +175,6 @@ export function formatDateToHumanReadable(dateInput?: string | Date): string {
 
   return "Invalid Date";
 }
-
 
 // ---------------- OCR Date helper --------------------------
 /**
