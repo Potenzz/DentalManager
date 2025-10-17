@@ -47,6 +47,8 @@ import {
   getDescriptionForCode,
 } from "@/utils/procedureCombosMapping";
 import { COMBO_CATEGORIES, PROCEDURE_COMBOS } from "@/utils/procedureCombos";
+import { DateInputField } from "../ui/dateInputField";
+import { DateInput } from "../ui/dateInput";
 
 interface ClaimFileMeta {
   filename: string;
@@ -251,22 +253,86 @@ export function ClaimForm({
   }, [serviceDate]);
 
   // Determine patient date of birth format - required as date extracted from pdfs has different format.
-  const formatDOB = (dob: string | Date | undefined) => {
+  // Replace previous implementation with this type-safe normalizer.
+  // Always returns canonical YYYY-MM-DD or "" if it cannot parse.
+  function normalizeToIsoDateString(dob: string | Date | undefined): string {
     if (!dob) return "";
 
-    const normalized = formatLocalDate(parseLocalDate(dob));
-
-    // If it's already MM/DD/YYYY, leave it alone
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) return normalized;
-
-    // If it's yyyy-MM-dd, swap order to MM/DD/YYYY
-    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-      const [year, month, day] = normalized.split("-");
-      return `${month}/${day}/${year}`;
+    // Date object -> canonicalize
+    if (dob instanceof Date) {
+      if (isNaN(dob.getTime())) return "";
+      return formatLocalDate(dob);
     }
 
-    return normalized;
-  };
+    const raw = String(dob).trim();
+    if (!raw) return "";
+
+    // 1) If already date-only ISO (yyyy-mm-dd)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      try {
+        parseLocalDate(raw); // validate
+        return raw;
+      } catch {
+        return "";
+      }
+    }
+
+    // 2) Try parseLocalDate for ISO-like inputs (will throw if not suitable)
+    try {
+      const parsed = parseLocalDate(raw);
+      return formatLocalDate(parsed);
+    } catch {
+      // continue to other fallbacks
+    }
+
+    // 3) MM/DD/YYYY or M/D/YYYY -> convert to ISO
+    const m1 = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m1) {
+      const mm = m1[1] ?? "";
+      const dd = m1[2] ?? "";
+      const yyyy = m1[3] ?? "";
+      if (mm && dd && yyyy) {
+        const iso = `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+        try {
+          parseLocalDate(iso);
+          return iso;
+        } catch {
+          return "";
+        }
+      }
+    }
+
+    // 4) OCR-ish short form: MMDDYY (exactly 6 digits) -> guess century
+    const m2 = raw.match(/^(\d{6})$/);
+    if (m2) {
+      const s = m2[1];
+      if (s && s.length === 6) {
+        const mm = s.slice(0, 2);
+        const dd = s.slice(2, 4);
+        const yy = s.slice(4, 6);
+        const year = Number(yy) < 50 ? 2000 + Number(yy) : 1900 + Number(yy);
+        const iso = `${year}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+        try {
+          parseLocalDate(iso);
+          return iso;
+        } catch {
+          return "";
+        }
+      }
+    }
+
+    // 5) Last resort: naive Date parse -> normalize to local calendar fields
+    try {
+      const maybe = new Date(raw);
+      if (!isNaN(maybe.getTime())) {
+        return formatLocalDate(maybe);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return "";
+  }
 
   // MAIN FORM INITIAL STATE
   const [form, setForm] = useState<ClaimFormData & { uploadedFiles: File[] }>({
@@ -276,7 +342,7 @@ export function ClaimForm({
     staffId: Number(staff?.id),
     patientName: `${patient?.firstName} ${patient?.lastName}`.trim(),
     memberId: patient?.insuranceId ?? "",
-    dateOfBirth: formatDOB(patient?.dateOfBirth),
+    dateOfBirth: normalizeToIsoDateString(patient?.dateOfBirth),
     remarks: "",
     serviceDate: serviceDate,
     insuranceProvider: "",
@@ -304,7 +370,7 @@ export function ClaimForm({
         ...prev,
         patientId: Number(patient.id),
         patientName: fullName,
-        dateOfBirth: formatDOB(patient.dateOfBirth),
+        dateOfBirth: normalizeToIsoDateString(patient.dateOfBirth),
         memberId: patient.insuranceId || "",
       }));
     }
@@ -406,6 +472,20 @@ export function ClaimForm({
       return;
     }
 
+    // require at least one procedure code before proceeding
+    const filteredServiceLines = (f.serviceLines || []).filter(
+      (line) => (line.procedureCode ?? "").trim() !== ""
+    );
+    if (filteredServiceLines.length === 0) {
+      toast({
+        title: "No procedure codes",
+        description:
+          "Please add at least one procedure code before submitting the claim.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // 1. Create or update appointment
     let appointmentIdToUse = appointmentId;
 
@@ -443,9 +523,6 @@ export function ClaimForm({
 
     // 3. Create Claim(if not)
     // Filter out empty service lines (empty procedureCode)
-    const filteredServiceLines = f.serviceLines.filter(
-      (line) => line.procedureCode.trim() !== ""
-    );
     const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = f;
 
     // build claimFiles metadata from uploadedFiles (only filename + mimeType)
@@ -498,6 +575,20 @@ export function ClaimForm({
       return;
     }
 
+    // require at least one procedure code before proceeding
+    const filteredServiceLines = (form.serviceLines || []).filter(
+      (line) => (line.procedureCode ?? "").trim() !== ""
+    );
+    if (filteredServiceLines.length === 0) {
+      toast({
+        title: "No procedure codes",
+        description:
+          "Please add at least one procedure code before submitting the claim.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // 1. Create or update appointment
     let appointmentIdToUse = appointmentId;
 
@@ -535,9 +626,6 @@ export function ClaimForm({
 
     // 3. Create Claim(if not)
     // Filter out empty service lines (empty procedureCode)
-    const filteredServiceLines = form.serviceLines.filter(
-      (line) => line.procedureCode.trim() !== ""
-    );
     const { uploadedFiles, insuranceSiteKey, ...formToCreateClaim } = form;
 
     // build claimFiles metadata from uploadedFiles (only filename + mimeType)
@@ -608,24 +696,24 @@ export function ClaimForm({
                 <Input
                   id="memberId"
                   value={form.memberId}
-                  onChange={(e) =>
-                    setForm({ ...form, memberId: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setForm({ ...form, memberId: e.target.value });
+                    updatePatientField("insuranceId", e.target.value);
+                  }}
                 />
               </div>
               <div>
                 <Label htmlFor="dateOfBirth">Date Of Birth</Label>
-                <Input
-                  id="dateOfBirth"
-                  value={form.dateOfBirth}
-                  onChange={(e) => {
-                    updatePatientField("dateOfBirth", e.target.value);
-                    setForm((prev) => ({
-                      ...prev,
-                      dateOfBirth: e.target.value,
-                    }));
+                <DateInput
+                  value={
+                    form.dateOfBirth ? parseLocalDate(form.dateOfBirth) : null
+                  }
+                  onChange={(date: Date | null) => {
+                    const formatted = date ? formatLocalDate(date) : "";
+                    setForm((prev) => ({ ...prev, dateOfBirth: formatted }));
+                    updatePatientField("dateOfBirth", formatted);
                   }}
-                  disabled={isLoading}
+                  disableFuture
                 />
               </div>
               <div>
@@ -782,7 +870,7 @@ export function ClaimForm({
                           "childRecallDirect4BW",
                           "childRecallDirect2PA2BW",
                           "childRecallDirect2PA4BW",
-                          "childRecallDirectPANO2PA2BW",
+                          "childRecallDirectPANO",
                         ].map((comboId) => {
                           const b = PROCEDURE_COMBOS[comboId];
                           if (!b) return null;
@@ -797,7 +885,7 @@ export function ClaimForm({
                             childRecallDirect4BW: "Direct 4BW",
                             childRecallDirect2PA2BW: "Direct 2PA 2BW",
                             childRecallDirect2PA4BW: "Direct 2PA 4BW",
-                            childRecallDirectPANO2PA2BW: "Direct PANO 2PA 2BW",
+                            childRecallDirectPANO: "Direct Pano",
                           };
                           return (
                             <Tooltip key={b.id}>
@@ -829,9 +917,10 @@ export function ClaimForm({
                       <div className="flex flex-wrap gap-2">
                         {[
                           "adultRecallDirect",
-                          "adultRecallDirect2bw",
-                          "adultRecallDirect4bw",
-                          "adultRecallDirect4bw2pa",
+                          "adultRecallDirect2BW",
+                          "adultRecallDirect4BW",
+                          "adultRecallDirect2PA2BW",
+                          "adultRecallDirect2PA4BW",
                           "adultRecallDirectPano",
                         ].map((comboId) => {
                           const b = PROCEDURE_COMBOS[comboId];
@@ -843,9 +932,10 @@ export function ClaimForm({
                           const tooltipText = codesWithTooth.join(", ");
                           const labelMap: Record<string, string> = {
                             adultRecallDirect: "Direct",
-                            adultRecallDirect2bw: "Direct 2BW",
-                            adultRecallDirect4bw: "Direct 4BW",
-                            adultRecallDirect4bw2pa: "Direct 4BW2PA",
+                            adultRecallDirect2BW: "Direct 2BW",
+                            adultRecallDirect4BW: "Direct 4BW",
+                            adultRecallDirect2PA2BW: "Direct 2PA 2BW",
+                            adultRecallDirect2PA4BW: "Direct 2PA 4BW",
                             adultRecallDirectPano: "Direct Pano",
                           };
                           return (

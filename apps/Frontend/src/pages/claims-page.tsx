@@ -29,6 +29,7 @@ import {
   UpdatePatient,
 } from "@repo/db/types";
 import ClaimDocumentsUploadMultiple from "@/components/claims/claim-document-upload-modal";
+import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 
 export default function ClaimsPage() {
   const [isClaimFormOpen, setIsClaimFormOpen] = useState(false);
@@ -64,6 +65,8 @@ export default function ClaimsPage() {
         description: "Patient updated successfully!",
         variant: "default",
       });
+      queryClient.invalidateQueries({ queryKey: QK_CLAIMS_BASE });
+      queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
     },
     onError: (error) => {
       toast({

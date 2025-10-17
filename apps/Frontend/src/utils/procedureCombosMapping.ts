@@ -107,17 +107,56 @@ const ageOnDate = (dob: DateInput, on: DateInput): number => {
 };
 
 /**
- * Price chooser that respects your age rules and IC/NC semantics.
- * - If <=21 → PriceLTEQ21 (if present and not IC/NC/blank) else Price.
- * - If >21  → PriceGT21   (if present and not IC/NC/blank) else Price.
- * - If chosen field is IC/NC/blank → 0 (leave empty).
+ * we can implement per-code age buckets without changing the JSON.
+ *
+ * Behavior:
+ * - Default: same as before: age <= 21 -> PriceLTEQ21, else PriceGT21
+ * - Fallback to Price if tiered field is blank/IC/NC
+ * - Special-cases D1110 and D1120 according to MH rules
  */
-export function pickPriceForRowByAge(row: CodeRow, age: number): Decimal {
+export function pickPriceForRowByAge(
+  row: CodeRow,
+  age: number,
+  normalizedCode?: string
+): Decimal {
+  // Special-case rules (add more codes here if needed)
+  if (normalizedCode) {
+    // D1110: only valid for age >=14 (14..21 => PriceLTEQ21, >21 => PriceGT21)
+    if (normalizedCode === "D1110") {
+      if (age < 14) {
+        // D1110 not applicable to children <14 (those belong to D1120)
+        return new Decimal(0);
+      }
+      if (age >= 14 && age <= 21) {
+        // use PriceLTEQ21 only if present
+        if (!isBlankPrice(row.PriceLTEQ21))
+          return toDecimalOrZero(row.PriceLTEQ21);
+        return new Decimal(0);
+      }
+      // age > 21
+      if (!isBlankPrice(row.PriceGT21)) return toDecimalOrZero(row.PriceGT21);
+      return new Decimal(0);
+    }
+
+    // D1120: child 0-13 => PriceLTEQ21, otherwise no price (NC)
+    if (normalizedCode === "D1120") {
+      if (age < 14) {
+        if (!isBlankPrice(row.PriceLTEQ21))
+          return toDecimalOrZero(row.PriceLTEQ21);
+        return new Decimal(0);
+      }
+      // age >= 14 => NC / no price
+      return new Decimal(0);
+    }
+  }
+
+  // Generic/default behavior (unchanged)
   if (age <= 21) {
     if (!isBlankPrice(row.PriceLTEQ21)) return toDecimalOrZero(row.PriceLTEQ21);
   } else {
     if (!isBlankPrice(row.PriceGT21)) return toDecimalOrZero(row.PriceGT21);
   }
+
   // Fallback to Price if tiered not available/blank
   if (!isBlankPrice(row.Price)) return toDecimalOrZero(row.Price);
   return new Decimal(0);
@@ -131,8 +170,9 @@ function getPriceForCodeWithAgeFromMap(
   code: string,
   age: number
 ): Decimal {
-  const row = map.get(normalizeCode(code));
-  return row ? pickPriceForRowByAge(row, age) : new Decimal(0);
+  const norm = normalizeCode(code);
+  const row = map.get(norm);
+  return row ? pickPriceForRowByAge(row, age, norm) : new Decimal(0);
 }
 
 // helper keeping lines empty,
@@ -251,10 +291,7 @@ export function applyComboToForm<T extends ClaimFormLike>(
       procedureCode: code,
       procedureDate: lineDate,
       oralCavityArea: original?.oralCavityArea ?? "",
-      toothNumber:
-      preset.toothNumbers?.[j] ??
-      original?.toothNumber ??
-      "", 
+      toothNumber: preset.toothNumbers?.[j] ?? original?.toothNumber ?? "",
       toothSurface: original?.toothSurface ?? "",
       totalBilled: price,
       totalAdjusted: new Decimal(0),

@@ -39,9 +39,9 @@ export const PROCEDURE_COMBOS: Record<
     codes: ["D0120", "D1120", "D1208", "D0220", "D0230", "D0274"],
     toothNumbers: [null, null, null, "9", "24", null], // only these two need values
   },
-  childRecallDirectPANO2PA2BW: {
-    id: "childRecallDirectPANO2PA2BW",
-    label: "Child Recall Direct PANO 2PA 2BW",
+  childRecallDirectPANO: {
+    id: "childRecallDirectPANO",
+    label: "Child Recall Direct PANO",
     codes: ["D0120", "D1120", "D1208", "D0330"],
   },
   adultRecall: {
@@ -55,25 +55,31 @@ export const PROCEDURE_COMBOS: Record<
     label: "Adult Recall Direct(no x-ray)",
     codes: ["D0120", "D1110"],
   },
-  adultRecallDirect2bw: {
-    id: "adultRecallDirect2bw",
+  adultRecallDirect2BW: {
+    id: "adultRecallDirect2BW",
     label: "Adult Recall Direct - 2bw (no x-ray)",
     codes: ["D0120", "D1110", "D0272"],
   },
-  adultRecallDirect4bw: {
-    id: "adultRecallDirect4bw",
+  adultRecallDirect4BW: {
+    id: "adultRecallDirect4BW",
     label: "Adult Recall Direct - 4bw (no x-ray)",
     codes: ["D0120", "D1110", "D0274"],
   },
-  adultRecallDirect4bw2pa: {
-    id: "adultRecallDirect4bw",
-    label: "Adult Recall Direct - 4bw (no x-ray)",
+  adultRecallDirect2PA2BW: {
+    id: "adultRecallDirect2PA2BW",
+    label: "Adult Recall Direct - 2PA 2BW",
+    codes: ["D0120", "D0220", "D0230", "D0272", "D1110"],
+    toothNumbers: [null, "9", "24", null, null], // only these two need values
+  },
+  adultRecallDirect2PA4BW: {
+    id: "adultRecallDirect2PA4BW",
+    label: "Adult Recall Direct - 2PA 4BW",
     codes: ["D0120", "D0220", "D0230", "D0274", "D1110"],
     toothNumbers: [null, "9", "24", null, null], // only these two need values
   },
   adultRecallDirectPano: {
     id: "adultRecallDirectPano",
-    label: "Adult Recall Direct - Pano",
+    label: "Adult Recall Direct - PANO",
     codes: ["D0120", "D1110", "D0330"],
   },
   newChildPatient: {
@@ -83,7 +89,7 @@ export const PROCEDURE_COMBOS: Record<
   },
   newAdultPatientPano: {
     id: "newAdultPatientPano",
-    label: "New Adult Patient (Pano)",
+    label: "New Adult Patient - PANO",
     codes: ["D0150", "D0330", "D1110"],
   },
   newAdultPatientFMX: {
