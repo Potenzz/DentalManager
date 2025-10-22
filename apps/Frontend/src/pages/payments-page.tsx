@@ -127,14 +127,18 @@ export default function PaymentsPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-800">Payments</h1>
-          <p className="text-gray-600">
-            Manage patient payments and outstanding balances
-          </p>
+      <div className="container mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
+            <p className="text-muted-foreground">
+              Manage patient payments and outstanding balances
+            </p>
+          </div>
         </div>
+      </div>
 
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-4 mb-6">
         <div className="mt-4 md:mt-0 flex items-center space-x-2">
           <Select
             defaultValue="all-time"
