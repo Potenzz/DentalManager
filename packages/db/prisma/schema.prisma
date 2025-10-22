@@ -243,6 +243,7 @@ model Payment {
 
   @@index([claimId])
   @@index([patientId])
+  @@index([createdAt])
 }
 
 model ServiceLineTransaction {
