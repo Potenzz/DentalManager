@@ -37,7 +37,7 @@ router.get("/summary", async (req: Request, res: Response): Promise<any> => {
  *  - from / to (optional ISO date strings) - filter payments by createdAt in the range (inclusive)
  */
 router.get(
-  "/patient-balances",
+  "/patients-with-balances",
   async (req: Request, res: Response): Promise<any> => {
     try {
       const limit = Math.max(
@@ -60,7 +60,12 @@ router.get(
         return res.status(400).json({ message: "Invalid 'to' date" });
       }
 
-      const data = await storage.getPatientBalances(limit, cursor, from, to);
+      const data = await storage.getPatientsWithBalances(
+        limit,
+        cursor,
+        from,
+        to
+      );
       // returns { balances, totalCount, nextCursor, hasMore }
       res.json(data);
     } catch (err: any) {
@@ -73,5 +78,71 @@ router.get(
     }
   }
 );
+
+/**
+ * GET /api/payments-reports/by-doctor
+ * Query params:
+ *  - staffId (required)
+ *  - limit (optional, default 25)
+ *  - cursor (optional)
+ *  - from/to (optional ISO date strings) - filter payments by createdAt in the range (inclusive)
+ */
+router.get("/by-doctor", async (req: Request, res: Response): Promise<any> => {
+  try {
+    const staffIdRaw = req.query.staffId;
+    if (!staffIdRaw) {
+      return res
+        .status(400)
+        .json({ message: "Missing required 'staffId' query parameter" });
+    }
+    const staffId = Number(staffIdRaw);
+    if (!Number.isFinite(staffId) || staffId <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Invalid 'staffId' query parameter" });
+    }
+
+    const limit = Math.max(
+      1,
+      Math.min(200, parseInt(String(req.query.limit || "25"), 10))
+    );
+
+    const cursor =
+      typeof req.query.cursor === "string" ? String(req.query.cursor) : null;
+
+    const from = req.query.from ? new Date(String(req.query.from)) : undefined;
+    const to = req.query.to ? new Date(String(req.query.to)) : undefined;
+
+    if (req.query.from && isNaN(from?.getTime() ?? NaN)) {
+      return res.status(400).json({ message: "Invalid 'from' date" });
+    }
+    if (req.query.to && isNaN(to?.getTime() ?? NaN)) {
+      return res.status(400).json({ message: "Invalid 'to' date" });
+    }
+
+    const data = await storage.getBalancesAndSummaryByDoctor(
+      staffId,
+      limit,
+      cursor,
+      from,
+      to
+    );
+    // data expected: { balances, totalCount, nextCursor, hasMore, summary }
+    res.json(data);
+  } catch (err: any) {
+    console.error(
+      "GET /api/payments-reports/by-doctor error:",
+      err?.message ?? err,
+      err?.stack
+    );
+    // If prisma errors, return 500 with message for debugging (strip sensitive info in prod)
+    res
+      .status(500)
+      .json({
+        message: "Failed to fetch doctor balances and summary",
+        detail: err?.message ?? String(err),
+      });
+  }
+});
 
 export default router;

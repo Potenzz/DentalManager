@@ -40,7 +40,7 @@ export default function PatientsWithBalanceReport({
       if (endDate) params.set("to", endDate);
       const res = await apiRequest(
         "GET",
-        `/api/payments-reports/patient-balances?${params.toString()}`
+        `/api/payments-reports/patients-with-balances?${params.toString()}`
       );
       if (!res.ok) {
         const body = await res

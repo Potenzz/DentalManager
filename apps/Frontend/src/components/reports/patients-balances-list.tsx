@@ -90,7 +90,7 @@ export default function PatientsBalancesList({
             </div>
           ) : (
             rows.map((r) => (
-              <div key={r.id} className="p-4 hover:bg-gray-50">
+              <div key={String(r.id)} className="p-4 hover:bg-gray-50">
                 <div className="flex justify-between items-center">
                   <div>
                     <h4 className="font-medium text-gray-900">{r.name}</h4>
@@ -98,7 +98,11 @@ export default function PatientsBalancesList({
                   </div>
 
                   <div className="text-right">
-                    <div className="text-lg font-semibold text-red-600">
+                    <div
+                      className={`text-lg font-semibold ${
+                        r.currentBalance > 0 ? "text-red-600" : "text-green-600"
+                      }`}
+                    >
                       {fmt(r.currentBalance)}
                     </div>
                     <div className="text-sm text-gray-500">
