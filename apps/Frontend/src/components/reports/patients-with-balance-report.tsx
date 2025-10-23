@@ -51,7 +51,6 @@ export default function PatientsWithBalanceReport({
       return res.json();
     },
     enabled: true,
-    staleTime: 30_000,
   });
 
   const balances = data?.balances ?? [];

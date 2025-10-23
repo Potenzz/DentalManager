@@ -11,34 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DoctorBalancesAndSummary } from "@repo/db/types";
 
 type StaffOption = { id: number; name: string };
-
-type BalanceRow = {
-  patientId: number;
-  firstName: string | null;
-  lastName: string | null;
-  totalCharges: number | string;
-  totalPaid: number | string;
-  totalAdjusted: number | string;
-  currentBalance: number | string;
-  lastPaymentDate: string | null;
-  lastAppointmentDate: string | null;
-  patientCreatedAt?: string | null;
-};
-
-type CollectionsResp = {
-  balances: BalanceRow[];
-  totalCount?: number;
-  nextCursor?: string | null;
-  hasMore?: boolean;
-  summary?: {
-    totalPatients?: number;
-    totalOutstanding?: number;
-    totalCollected?: number;
-    patientsWithBalance?: number;
-  };
-};
 
 function fmtCurrency(v: number) {
   return new Intl.NumberFormat("en-US", {
@@ -85,7 +60,7 @@ export default function CollectionsByDoctorReport({
     isError: isErrorRows,
     refetch,
     isFetching,
-  } = useQuery<CollectionsResp, Error>({
+  } = useQuery<DoctorBalancesAndSummary, Error>({
     queryKey: [
       "collections-by-doctor-rows",
       staffId,
@@ -115,7 +90,6 @@ export default function CollectionsByDoctorReport({
       return res.json();
     },
     enabled: Boolean(staffId), // only load when a doctor is selected
-    staleTime: 30_000,
   });
 
   const balances = collectionData?.balances ?? [];
@@ -152,7 +126,7 @@ export default function CollectionsByDoctorReport({
   // Map server rows to GenericRow
   const genericRows: GenericRow[] = balances.map((r) => {
     const totalCharges = Number(r.totalCharges ?? 0);
-    const totalPayments = Number(r.totalPaid ?? 0);
+    const totalPayments = Number(r.totalPayments ?? 0);
     const currentBalance = Number(r.currentBalance ?? 0);
     const name = `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || "Unknown";
 
@@ -169,7 +143,9 @@ export default function CollectionsByDoctorReport({
     <div>
       <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="text-sm text-gray-700 block mb-1">Doctor</label>
+          <label className="text-sm text-gray-700 block mb-1 ml-2">
+            Select Doctor
+          </label>
           <Select
             value={staffId || undefined}
             onValueChange={(v) => setStaffId(v)}

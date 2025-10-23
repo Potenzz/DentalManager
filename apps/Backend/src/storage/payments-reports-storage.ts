@@ -1,37 +1,9 @@
 import { prisma } from "@repo/db/client";
-
-export interface PatientBalanceRow {
-  patientId: number;
-  firstName: string | null;
-  lastName: string | null;
-  totalCharges: number;
-  totalPayments: number;
-  totalAdjusted: number;
-  currentBalance: number;
-  lastPaymentDate: string | null;
-  lastAppointmentDate: string | null;
-  patientCreatedAt?: string | null;
-}
-
-export interface GetPatientBalancesResult {
-  balances: PatientBalanceRow[];
-  totalCount: number;
-  nextCursor: string | null;
-  hasMore: boolean;
-}
-
-export interface DoctorBalancesAndSummary {
-  balances: PatientBalanceRow[];
-  totalCount: number;
-  nextCursor: string | null;
-  hasMore: boolean;
-  summary: {
-    totalPatients: number;
-    totalOutstanding: number;
-    totalCollected: number;
-    patientsWithBalance: number;
-  };
-}
+import {
+  DoctorBalancesAndSummary,
+  GetPatientBalancesResult,
+  PatientBalanceRow,
+} from "../../../../packages/db/types/payments-reports-types";
 
 export interface IPaymentsReportsStorage {
   // summary now returns an extra field patientsWithBalance
@@ -75,11 +47,21 @@ export interface IPaymentsReportsStorage {
   ): Promise<DoctorBalancesAndSummary>;
 }
 
-/** Helper: format Date -> SQL literal 'YYYY-MM-DDTHH:mm:ss.sssZ' or null */
-function fmtDateLiteral(d?: Date | null): string | null {
+/** Return ISO literal for inclusive start-of-day (UTC midnight) */
+function isoStartOfDayLiteral(d?: Date | null): string | null {
   if (!d) return null;
-  const iso = new Date(d).toISOString();
-  return `'${iso}'`;
+  const dt = new Date(d);
+  dt.setUTCHours(0, 0, 0, 0);
+  return `'${dt.toISOString()}'`;
+}
+
+/** Return ISO literal for exclusive next-day start (UTC midnight of the next day) */
+function isoStartOfNextDayLiteral(d?: Date | null): string | null {
+  if (!d) return null;
+  const dt = new Date(d);
+  dt.setUTCHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return `'${dt.toISOString()}'`;
 }
 
 /** Cursor helpers — base64(JSON) */
@@ -129,8 +111,10 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
     try {
       const hasFrom = from !== undefined && from !== null;
       const hasTo = to !== undefined && to !== null;
-      const fromLit = fmtDateLiteral(from);
-      const toLit = fmtDateLiteral(to);
+
+      // Use inclusive start-of-day for 'from' and exclusive start-of-next-day for 'to'
+      const fromStart = isoStartOfDayLiteral(from); // 'YYYY-MM-DDT00:00:00.000Z'
+      const toNextStart = isoStartOfNextDayLiteral(to); // 'YYYY-MM-DDT00:00:00.000Z' of next day
 
       // totalPatients: distinct patients who had payments in the date range
       let patientsCountSql = "";
@@ -139,7 +123,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
           SELECT COUNT(*)::int AS cnt FROM (
             SELECT pay."patientId" AS patient_id
             FROM "Payment" pay
-            WHERE pay."createdAt" >= ${fromLit} AND pay."createdAt" <= ${toLit}
+            WHERE pay."createdAt" >= ${fromStart} AND pay."createdAt" <= ${toNextStart}
             GROUP BY pay."patientId"
           ) t
         `;
@@ -148,7 +132,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
           SELECT COUNT(*)::int AS cnt FROM (
             SELECT pay."patientId" AS patient_id
             FROM "Payment" pay
-            WHERE pay."createdAt" >= ${fromLit}
+            WHERE pay."createdAt" >= ${fromStart}
             GROUP BY pay."patientId"
           ) t
         `;
@@ -157,7 +141,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
           SELECT COUNT(*)::int AS cnt FROM (
             SELECT pay."patientId" AS patient_id
             FROM "Payment" pay
-            WHERE pay."createdAt" <= ${toLit}
+            WHERE pay."createdAt" <= ${toNextStart}
             GROUP BY pay."patientId"
           ) t
         `;
@@ -182,7 +166,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
                    SUM(pay."totalPaid")::numeric(14,2) AS total_paid,
                    SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted
             FROM "Payment" pay
-            WHERE pay."createdAt" >= ${fromLit} AND pay."createdAt" <= ${toLit}
+            WHERE pay."createdAt" >= ${fromStart} AND pay."createdAt" <= ${toNextStart}
             GROUP BY pay."patientId"
           ) pm
         `;
@@ -197,7 +181,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
                    SUM(pay."totalPaid")::numeric(14,2) AS total_paid,
                    SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted
             FROM "Payment" pay
-            WHERE pay."createdAt" >= ${fromLit}
+            WHERE pay."createdAt" >= ${fromStart}
             GROUP BY pay."patientId"
           ) pm
         `;
@@ -212,7 +196,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
                    SUM(pay."totalPaid")::numeric(14,2) AS total_paid,
                    SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted
             FROM "Payment" pay
-            WHERE pay."createdAt" <= ${toLit}
+            WHERE pay."createdAt" <= ${toNextStart}
             GROUP BY pay."patientId"
           ) pm
         `;
@@ -239,11 +223,11 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
       // totalCollected: sum(totalPaid) in the range
       let collSql = "";
       if (hasFrom && hasTo) {
-        collSql = `SELECT COALESCE(SUM("totalPaid"),0)::numeric(14,2) AS collected FROM "Payment" WHERE "createdAt" >= ${fromLit} AND "createdAt" <= ${toLit}`;
+        collSql = `SELECT COALESCE(SUM("totalPaid"),0)::numeric(14,2) AS collected FROM "Payment" WHERE "createdAt" >= ${fromStart} AND "createdAt" <= ${toNextStart}`;
       } else if (hasFrom) {
-        collSql = `SELECT COALESCE(SUM("totalPaid"),0)::numeric(14,2) AS collected FROM "Payment" WHERE "createdAt" >= ${fromLit}`;
+        collSql = `SELECT COALESCE(SUM("totalPaid"),0)::numeric(14,2) AS collected FROM "Payment" WHERE "createdAt" >= ${fromStart}`;
       } else if (hasTo) {
-        collSql = `SELECT COALESCE(SUM("totalPaid"),0)::numeric(14,2) AS collected FROM "Payment" WHERE "createdAt" <= ${toLit}`;
+        collSql = `SELECT COALESCE(SUM("totalPaid"),0)::numeric(14,2) AS collected FROM "Payment" WHERE "createdAt" <= ${toNextStart}`;
       } else {
         collSql = `SELECT COALESCE(SUM("totalPaid"),0)::numeric(14,2) AS collected FROM "Payment"`;
       }
@@ -262,7 +246,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
                    SUM(pay."totalPaid")::numeric(14,2) AS total_paid,
                    SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted
             FROM "Payment" pay
-            WHERE pay."createdAt" >= ${fromLit} AND pay."createdAt" <= ${toLit}
+            WHERE pay."createdAt" >= ${fromStart} AND pay."createdAt" <= ${toNextStart}
             GROUP BY pay."patientId"
           ) t
           WHERE (COALESCE(t.total_charges,0) - COALESCE(t.total_paid,0) - COALESCE(t.total_adjusted,0)) > 0
@@ -275,7 +259,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
                    SUM(pay."totalPaid")::numeric(14,2) AS total_paid,
                    SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted
             FROM "Payment" pay
-            WHERE pay."createdAt" >= ${fromLit}
+            WHERE pay."createdAt" >= ${fromStart}
             GROUP BY pay."patientId"
           ) t
           WHERE (COALESCE(t.total_charges,0) - COALESCE(t.total_paid,0) - COALESCE(t.total_adjusted,0)) > 0
@@ -288,7 +272,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
                    SUM(pay."totalPaid")::numeric(14,2) AS total_paid,
                    SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted
             FROM "Payment" pay
-            WHERE pay."createdAt" <= ${toLit}
+            WHERE pay."createdAt" <= ${toNextStart}
             GROUP BY pay."patientId"
           ) t
           WHERE (COALESCE(t.total_charges,0) - COALESCE(t.total_paid,0) - COALESCE(t.total_adjusted,0)) > 0
@@ -355,17 +339,19 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
 
       const hasFrom = from !== undefined && from !== null;
       const hasTo = to !== undefined && to !== null;
-      const fromLit = fmtDateLiteral(from);
-      const toLit = fmtDateLiteral(to);
+
+      // Use inclusive start-of-day for 'from' and exclusive start-of-next-day for 'to'
+      const fromStart = isoStartOfDayLiteral(from); // 'YYYY-MM-DDT00:00:00.000Z'
+      const toNextStart = isoStartOfNextDayLiteral(to); // 'YYYY-MM-DDT00:00:00.000Z' of next day
 
       // Build payment subquery (aggregated payments by patient, filtered by createdAt if provided)
       const paymentWhereClause =
         hasFrom && hasTo
-          ? `WHERE pay."createdAt" >= ${fromLit} AND pay."createdAt" <= ${toLit}`
+          ? `WHERE pay."createdAt" >= ${fromStart} AND pay."createdAt" <= ${toNextStart}`
           : hasFrom
-            ? `WHERE pay."createdAt" >= ${fromLit}`
+            ? `WHERE pay."createdAt" >= ${fromStart}`
             : hasTo
-              ? `WHERE pay."createdAt" <= ${toLit}`
+              ? `WHERE pay."createdAt" <= ${toNextStart}`
               : "";
 
       const pmSubquery = `
@@ -562,17 +548,19 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
 
     const hasFrom = from !== undefined && from !== null;
     const hasTo = to !== undefined && to !== null;
-    const fromLit = fmtDateLiteral(from);
-    const toLit = fmtDateLiteral(to);
+
+    // Use inclusive start-of-day for 'from' and exclusive start-of-next-day for 'to'
+    const fromStart = isoStartOfDayLiteral(from); // 'YYYY-MM-DDT00:00:00.000Z'
+    const toNextStart = isoStartOfNextDayLiteral(to); // 'YYYY-MM-DDT00:00:00.000Z' of next day
 
     // Filter payments by createdAt (time window) when provided
     const paymentTimeFilter =
       hasFrom && hasTo
-        ? `AND pay."createdAt" >= ${fromLit} AND pay."createdAt" <= ${toLit}`
+        ? `AND pay."createdAt" >= ${fromStart} AND pay."createdAt" <= ${toNextStart}`
         : hasFrom
-          ? `AND pay."createdAt" >= ${fromLit}`
+          ? `AND pay."createdAt" >= ${fromStart}`
           : hasTo
-            ? `AND pay."createdAt" <= ${toLit}`
+            ? `AND pay."createdAt" <= ${toNextStart}`
             : "";
 
     // Keyset predicate must use columns present in the 'patients' CTE rows (alias p).

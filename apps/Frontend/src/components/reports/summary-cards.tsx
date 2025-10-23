@@ -42,7 +42,6 @@ export default function SummaryCards({
       return res.json();
     },
     enabled: Boolean(startDate && endDate),
-    staleTime: 30_000,
   });
 
   const totalPatients = data?.totalPatients ?? 0;
