@@ -68,7 +68,6 @@ function isoStartOfNextDayLiteral(d?: Date | null): string | null {
 function encodeCursor(obj: {
   staffId?: number;
   lastPaymentDate: string | null;
-  lastPatientCreatedAt: string; // ISO string
   lastPatientId: number;
 }) {
   return Buffer.from(JSON.stringify(obj)).toString("base64");
@@ -77,7 +76,6 @@ function encodeCursor(obj: {
 function decodeCursor(token?: string | null): {
   staffId?: number; // optional because older cursors might not include it
   lastPaymentDate: string | null;
-  lastPatientCreatedAt: string;
   lastPatientId: number;
 } | null {
   if (!token) return null;
@@ -86,7 +84,6 @@ function decodeCursor(token?: string | null): {
     if (
       typeof parsed === "object" &&
       "lastPaymentDate" in parsed &&
-      "lastPatientCreatedAt" in parsed &&
       "lastPatientId" in parsed
     ) {
       return {
@@ -96,7 +93,6 @@ function decodeCursor(token?: string | null): {
           (parsed as any).lastPaymentDate === null
             ? null
             : String((parsed as any).lastPaymentDate),
-        lastPatientCreatedAt: String((parsed as any).lastPatientCreatedAt),
         lastPatientId: Number((parsed as any).lastPatientId),
       };
     }
@@ -331,7 +327,6 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         current_balance: string;
         last_payment_date: Date | null;
         last_appointment_date: Date | null;
-        patient_created_at: Date | null; // we select patient.createdAt for cursor tie-breaker
       };
 
       const safeLimit = Math.max(1, Math.min(200, Number(limit) || 25));
@@ -376,7 +371,6 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         const lp = cursor.lastPaymentDate
           ? `'${cursor.lastPaymentDate}'`
           : "NULL";
-        const lc = `'${cursor.lastPatientCreatedAt}'`;
         const id = Number(cursor.lastPatientId);
 
         // We handle NULL last_payment_date ordering: since we use "NULLS LAST" in ORDER BY,
@@ -385,19 +379,12 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         // This predicate tries to cover both cases.
         keysetPredicate = `
           AND (
-            -- case: both sides have non-null last_payment_date
             (pm.last_payment_date IS NOT NULL AND ${lp} IS NOT NULL AND (
-               pm.last_payment_date < ${lp}
-               OR (pm.last_payment_date = ${lp} AND p."createdAt" < ${lc})
-               OR (pm.last_payment_date = ${lp} AND p."createdAt" = ${lc} AND p.id < ${id})
+              pm.last_payment_date < ${lp}
+              OR (pm.last_payment_date = ${lp} AND p.id < ${id})
             ))
-            -- case: cursor lastPaymentDate IS NULL -> we need rows with last_payment_date IS NULL but earlier createdAt/id
-            OR (pm.last_payment_date IS NULL AND ${lp} IS NULL AND (
-               p."createdAt" < ${lc}
-               OR (p."createdAt" = ${lc} AND p.id < ${id})
-            ))
-            -- case: cursor had non-null lastPaymentDate but pm.last_payment_date IS NULL:
-            -- since NULLS LAST, pm.last_payment_date IS NULL are after non-null dates, so they are NOT < cursor -> excluded
+            OR (pm.last_payment_date IS NULL AND ${lp} IS NOT NULL) 
+            OR (pm.last_payment_date IS NULL AND ${lp} IS NULL AND p.id < ${id})
           )
         `;
       }
@@ -412,8 +399,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
           COALESCE(pm.total_adjusted,0)::numeric(12,2) AS total_adjusted,
           (COALESCE(pm.total_charges,0) - COALESCE(pm.total_paid,0) - COALESCE(pm.total_adjusted,0))::numeric(12,2) AS current_balance,
           pm.last_payment_date,
-          apt.last_appointment_date,
-          p."createdAt" AS patient_created_at
+          apt.last_appointment_date
         FROM "Patient" p
         LEFT JOIN ${pmSubquery} ON pm.patient_id = p.id
         LEFT JOIN (
@@ -424,7 +410,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         WHERE (COALESCE(pm.total_charges,0) - COALESCE(pm.total_paid,0) - COALESCE(pm.total_adjusted,0)) > 0
       `;
 
-      const orderBy = `ORDER BY pm.last_payment_date DESC NULLS LAST, p."createdAt" DESC, p.id DESC`;
+      const orderBy = `ORDER BY pm.last_payment_date DESC NULLS LAST, p.id DESC`;
       const limitClause = `LIMIT ${safeLimit}`;
 
       const query = `
@@ -453,14 +439,9 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
             ? new Date(last.last_payment_date).toISOString()
             : null;
 
-          const lastPatientCreatedAtIso = last.patient_created_at
-            ? new Date(last.patient_created_at).toISOString()
-            : new Date().toISOString();
-
           if (rows.length === safeLimit) {
             nextCursor = encodeCursor({
               lastPaymentDate: lastPaymentDateIso,
-              lastPatientCreatedAt: lastPatientCreatedAtIso,
               lastPatientId: Number(last.patient_id),
             });
           } else {
@@ -486,9 +467,6 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
           : null,
         lastAppointmentDate: r.last_appointment_date
           ? new Date(r.last_appointment_date).toISOString()
-          : null,
-        patientCreatedAt: r.patient_created_at
-          ? new Date(r.patient_created_at).toISOString()
           : null,
       }));
 
@@ -536,15 +514,13 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
     const safeLimit = Math.max(1, Math.min(200, Number(limit) || 25));
     const decoded = decodeCursor(cursorToken);
 
-    // Accept older cursors that didn't include staffId; if cursor has staffId and it doesn't match, ignore.
+    // Do NOT accept cursors without staffId — they may belong to another listing.
     const effectiveCursor =
       decoded &&
       typeof decoded.staffId === "number" &&
       decoded.staffId === Number(staffId)
         ? decoded
-        : decoded && typeof decoded.staffId === "undefined"
-          ? decoded
-          : null;
+        : null;
 
     const hasFrom = from !== undefined && from !== null;
     const hasTo = to !== undefined && to !== null;
@@ -565,26 +541,37 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
 
     // Keyset predicate must use columns present in the 'patients' CTE rows (alias p).
     // We'll compare p.last_payment_date, p.patient_created_at and p.id
+
     let pageKeysetPredicate = "";
     if (effectiveCursor) {
       const lp = effectiveCursor.lastPaymentDate
         ? `'${effectiveCursor.lastPaymentDate}'`
         : "NULL";
-      const lc = `'${effectiveCursor.lastPatientCreatedAt}'`;
       const id = Number(effectiveCursor.lastPatientId);
 
       pageKeysetPredicate = `AND (
-      (p.last_payment_date IS NOT NULL AND ${lp} IS NOT NULL AND (
-         p.last_payment_date < ${lp}
-         OR (p.last_payment_date = ${lp} AND p.patient_created_at < ${lc})
-         OR (p.last_payment_date = ${lp} AND p.patient_created_at = ${lc} AND p.id < ${id})
-      ))
-      OR (p.last_payment_date IS NULL AND ${lp} IS NULL AND (
-         p.patient_created_at < ${lc}
-         OR (p.patient_created_at = ${lc} AND p.id < ${id})
-      ))
-    )`;
+    ( ${lp} IS NOT NULL AND (
+        (p.last_payment_date IS NOT NULL AND p.last_payment_date < ${lp})
+        OR (p.last_payment_date IS NOT NULL AND p.last_payment_date = ${lp} AND p.id < ${id})
+      )
+    )
+    OR
+    ( ${lp} IS NULL AND (
+        p.last_payment_date IS NOT NULL
+        OR (p.last_payment_date IS NULL AND p.id < ${id})
+      )
+    )
+  )`;
     }
+
+    console.debug(
+      "[getBalancesAndSummaryByDoctor] decodedCursor:",
+      effectiveCursor
+    );
+    console.debug(
+      "[getBalancesAndSummaryByDoctor] pageKeysetPredicate:",
+      pageKeysetPredicate
+    );
 
     // When a time window is provided, we want the patient rows to be restricted to patients who have
     // payments in that window (and those payments must be linked to claims with this staffId).
@@ -637,8 +624,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         COALESCE(pa.total_adjusted, 0)::numeric(14,2) AS total_adjusted,
         (COALESCE(pa.total_charges,0) - COALESCE(pa.total_paid,0) - COALESCE(pa.total_adjusted,0))::numeric(14,2) AS current_balance,
         pa.last_payment_date,
-        la.last_appointment_date,
-        p."createdAt" AS patient_created_at
+        la.last_appointment_date
       FROM "Patient" p
       INNER JOIN staff_patients sp ON sp.patient_id = p.id
       ${paymentsJoinForPatients}
@@ -657,12 +643,11 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
           p.total_adjusted::text AS "totalAdjusted",
           p.current_balance::text AS "currentBalance",
           p.last_payment_date     AS "lastPaymentDate",
-          p.last_appointment_date AS "lastAppointmentDate",
-          p.patient_created_at    AS "patientCreatedAt"
+          p.last_appointment_date AS "lastAppointmentDate"
         FROM patients p
         WHERE 1=1
         ${pageKeysetPredicate}
-        ORDER BY p.last_payment_date DESC NULLS LAST, p.patient_created_at DESC, p.id DESC
+        ORDER BY p.last_payment_date DESC NULLS LAST, p.id DESC
         LIMIT ${safeLimit}
       ) t) AS balances_json,
 
@@ -728,9 +713,6 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
       lastAppointmentDate: r.lastAppointmentDate
         ? new Date(r.lastAppointmentDate).toISOString()
         : null,
-      patientCreatedAt: r.patientCreatedAt
-        ? new Date(r.patientCreatedAt).toISOString()
-        : null,
     }));
 
     const hasMore = balances.length === safeLimit;
@@ -741,8 +723,6 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         nextCursor = encodeCursor({
           staffId: Number(staffId),
           lastPaymentDate: last.lastPaymentDate,
-          lastPatientCreatedAt:
-            last.patientCreatedAt ?? new Date().toISOString(),
           lastPatientId: Number(last.patientId),
         });
       }

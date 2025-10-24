@@ -8,7 +8,6 @@ export interface PatientBalanceRow {
   currentBalance: number;
   lastPaymentDate: string | null;
   lastAppointmentDate: string | null;
-  patientCreatedAt?: string | null;
 }
 
 export interface GetPatientBalancesResult {

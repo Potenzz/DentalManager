@@ -1,11 +1,9 @@
 import React, { useState } from "react";
-import { Download } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import ReportConfig from "@/components/reports/report-config";
 import PatientsWithBalanceReport from "@/components/reports/patients-with-balance-report";
 import CollectionsByDoctorReport from "@/components/reports/collections-by-doctor-report";
 import SummaryCards from "@/components/reports/summary-cards";
-import { Button } from "@/components/ui/button";
 
 type ReportType =
   | "patients_with_balance"
@@ -32,17 +30,6 @@ export default function ReportPage() {
   const [selectedReportType, setSelectedReportType] = useState<ReportType>(
     "patients_with_balance"
   );
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const generateReport = async () => {
-    setIsGenerating(true);
-    try {
-      // placeholder: implement export per-report endpoint
-      await new Promise((r) => setTimeout(r, 900));
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   if (!user) {
     return (
@@ -62,16 +49,6 @@ export default function ReportPage() {
             Generate comprehensive financial reports for your practice
           </p>
         </div>
-
-        {/* Export Button (Top Right) */}
-        <Button
-          onClick={generateReport}
-          disabled={isGenerating}
-          className="default"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          {isGenerating ? "Generating..." : "Export Report"}
-        </Button>
       </div>
 
       <div className="mb-4">

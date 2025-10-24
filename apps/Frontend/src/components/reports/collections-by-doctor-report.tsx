@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DoctorBalancesAndSummary } from "@repo/db/types";
+import ExportReportButton from "./export-button";
 
 type StaffOption = { id: number; name: string };
 
@@ -259,6 +260,15 @@ export default function CollectionsByDoctorReport({
           onNext={handleNext}
           hasPrev={cursorIndex > 0}
           hasNext={hasMore}
+          headerRight={
+            <ExportReportButton
+              reportType="collections_by_doctor"
+              from={startDate}
+              to={endDate}
+              staffId={Number(staffId)}
+              className="mr-2"
+            />
+          }
         />
       )}
     </div>

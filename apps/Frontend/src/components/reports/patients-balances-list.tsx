@@ -23,6 +23,7 @@ export default function PatientsBalancesList({
   onNext,
   hasPrev,
   hasNext,
+  headerRight, // optional UI node to render in header
 }: {
   rows: GenericRow[];
   reportType?: string | null;
@@ -37,6 +38,7 @@ export default function PatientsBalancesList({
   onNext: () => void;
   hasPrev: boolean;
   hasNext: boolean;
+  headerRight?: React.ReactNode;
 }) {
   const fmt = (v: number) =>
     new Intl.NumberFormat("en-US", {
@@ -66,6 +68,9 @@ export default function PatientsBalancesList({
           <h3 className="font-medium text-gray-900">
             {reportTypeTitle(reportType)}
           </h3>
+
+          {/* headerRight rendered here (if provided) */}
+          <div>{headerRight ?? null}</div>
         </div>
 
         <div className="divide-y min-h-[120px]">

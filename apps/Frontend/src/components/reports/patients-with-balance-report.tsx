@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { PatientBalanceRow } from "@repo/db/types";
 import PatientsBalancesList from "./patients-balances-list";
+import ExportReportButton from "./export-button";
 
 type Resp = {
   balances: PatientBalanceRow[];
@@ -117,6 +118,14 @@ export default function PatientsWithBalanceReport({
           onNext={handleNext}
           hasPrev={cursorIndex > 0}
           hasNext={hasMore}
+          headerRight={
+            <ExportReportButton
+              reportType="patients_with_balance"
+              from={startDate}
+              to={endDate}
+              className="mr-2"
+            />
+          }
         />
       </div>
     </div>
