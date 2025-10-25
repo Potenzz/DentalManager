@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import { getPatientFinancialRowsFn } from "./patients-storage";
+import { GetPatientBalancesResult } from "@repo/db/types";
 
 type PatientSummaryRow = {
   patientId: number;
@@ -20,12 +21,8 @@ export async function fetchAllPatientsWithBalances(
   const all: PatientSummaryRow[] = [];
   let cursor: string | null = null;
   while (true) {
-    const page = await storage.getPatientsWithBalances(
-      pageSize,
-      cursor,
-      from,
-      to
-    );
+    const page: GetPatientBalancesResult =
+      await storage.getPatientsWithBalances(pageSize, cursor, from, to);
     if (!page) break;
     if (Array.isArray(page.balances) && page.balances.length) {
       for (const b of page.balances) {
@@ -44,7 +41,7 @@ export async function fetchAllPatientsWithBalances(
 }
 
 /**
- * Page through storage.getBalancesAndSummaryByDoctor to return full patient list for the staff.
+ * Page through storage.getPatientsBalancesByDoctor to return full patient list for the staff.
  */
 export async function fetchAllPatientsForDoctor(
   staffId: number,
@@ -55,13 +52,14 @@ export async function fetchAllPatientsForDoctor(
   const all: PatientSummaryRow[] = [];
   let cursor: string | null = null;
   while (true) {
-    const page = await storage.getBalancesAndSummaryByDoctor(
-      staffId,
-      pageSize,
-      cursor,
-      from,
-      to
-    );
+    const page: GetPatientBalancesResult =
+      await storage.getPatientsBalancesByDoctor(
+        staffId,
+        pageSize,
+        cursor,
+        from,
+        to
+      );
     if (!page) break;
     if (Array.isArray(page.balances) && page.balances.length) {
       for (const b of page.balances) {

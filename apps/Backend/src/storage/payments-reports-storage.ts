@@ -31,20 +31,36 @@ export interface IPaymentsReportsStorage {
   ): Promise<GetPatientBalancesResult>;
 
   /**
-   * One-query approach: returns both page of patient balances for the staff and a summary
+   * Returns the paginated patient balances for a specific staff (doctor).
+   * Same semantics / columns / ordering / cursor behavior as the previous combined function.
    *
    * - staffId required
    * - limit: page size
    * - cursorToken: optional base64 cursor (must have been produced for same staffId)
    * - from/to: optional date range applied to Payment."createdAt"
    */
-  getBalancesAndSummaryByDoctor(
+  getPatientsBalancesByDoctor(
     staffId: number,
     limit: number,
     cursorToken?: string | null,
     from?: Date | null,
     to?: Date | null
-  ): Promise<DoctorBalancesAndSummary>;
+  ): Promise<GetPatientBalancesResult>;
+
+  /**
+   * Returns only the summary object for the given staff (doctor).
+   * Same summary shape as getSummary(), but scoped to claims/payments associated with the given staffId.
+   */
+  getSummaryByDoctor(
+    staffId: number,
+    from?: Date | null,
+    to?: Date | null
+  ): Promise<{
+    totalPatients: number;
+    totalOutstanding: number;
+    totalCollected: number;
+    patientsWithBalance: number;
+  }>;
 }
 
 /** Return ISO literal for inclusive start-of-day (UTC midnight) */
@@ -500,13 +516,21 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
     }
   },
 
-  async getBalancesAndSummaryByDoctor(
+  /**
+   * Return just the paged balances for a doctor (same logic/filters as previous single-query approach)
+   */
+  async getPatientsBalancesByDoctor(
     staffId: number,
     limit = 25,
     cursorToken?: string | null,
     from?: Date | null,
     to?: Date | null
-  ): Promise<DoctorBalancesAndSummary> {
+  ): Promise<{
+    balances: PatientBalanceRow[];
+    totalCount: number;
+    nextCursor: string | null;
+    hasMore: boolean;
+  }> {
     if (!Number.isFinite(Number(staffId)) || Number(staffId) <= 0) {
       throw new Error("Invalid staffId");
     }
@@ -526,8 +550,8 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
     const hasTo = to !== undefined && to !== null;
 
     // Use inclusive start-of-day for 'from' and exclusive start-of-next-day for 'to'
-    const fromStart = isoStartOfDayLiteral(from); // 'YYYY-MM-DDT00:00:00.000Z'
-    const toNextStart = isoStartOfNextDayLiteral(to); // 'YYYY-MM-DDT00:00:00.000Z' of next day
+    const fromStart = isoStartOfDayLiteral(from);
+    const toNextStart = isoStartOfNextDayLiteral(to);
 
     // Filter payments by createdAt (time window) when provided
     const paymentTimeFilter =
@@ -539,9 +563,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
             ? `AND pay."createdAt" <= ${toNextStart}`
             : "";
 
-    // Keyset predicate must use columns present in the 'patients' CTE rows (alias p).
-    // We'll compare p.last_payment_date, p.patient_created_at and p.id
-
+    // Keyset predicate for paging (same semantics as before)
     let pageKeysetPredicate = "";
     if (effectiveCursor) {
       const lp = effectiveCursor.lastPaymentDate
@@ -550,90 +572,77 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
       const id = Number(effectiveCursor.lastPatientId);
 
       pageKeysetPredicate = `AND (
-    ( ${lp} IS NOT NULL AND (
-        (p.last_payment_date IS NOT NULL AND p.last_payment_date < ${lp})
-        OR (p.last_payment_date IS NOT NULL AND p.last_payment_date = ${lp} AND p.id < ${id})
-      )
-    )
-    OR
-    ( ${lp} IS NULL AND (
-        p.last_payment_date IS NOT NULL
-        OR (p.last_payment_date IS NULL AND p.id < ${id})
-      )
-    )
-  )`;
+        ( ${lp} IS NOT NULL AND (
+            (p.last_payment_date IS NOT NULL AND p.last_payment_date < ${lp})
+            OR (p.last_payment_date IS NOT NULL AND p.last_payment_date = ${lp} AND p.id < ${id})
+          )
+        )
+        OR
+        ( ${lp} IS NULL AND (
+            p.last_payment_date IS NOT NULL
+            OR (p.last_payment_date IS NULL AND p.id < ${id})
+          )
+        )
+      )`;
     }
 
-    console.debug(
-      "[getBalancesAndSummaryByDoctor] decodedCursor:",
-      effectiveCursor
-    );
-    console.debug(
-      "[getBalancesAndSummaryByDoctor] pageKeysetPredicate:",
-      pageKeysetPredicate
-    );
-
-    // When a time window is provided, we want the patient rows to be restricted to patients who have
-    // payments in that window (and those payments must be linked to claims with this staffId).
-    // When no time-window provided, we want all patients who have appointments with this staff.
-    // We'll implement that by conditionally INNER JOINing payments_agg in the patients listing when window exists.
     const paymentsJoinForPatients =
       hasFrom || hasTo
         ? "INNER JOIN payments_agg pa ON pa.patient_id = p.id"
         : "LEFT JOIN payments_agg pa ON pa.patient_id = p.id";
 
-    const sql = `
-    WITH
-    -- patients that have at least one appointment with this staff (roster)
-    staff_patients AS (
-      SELECT DISTINCT "patientId" AS patient_id
-      FROM "Appointment"
-      WHERE "staffId" = ${Number(staffId)}
-    ),
+    // Common CTEs (identical to previous single-query approach)
+    const commonCtes = `
+      WITH
+      staff_patients AS (
+        SELECT DISTINCT "patientId" AS patient_id
+        FROM "Appointment"
+        WHERE "staffId" = ${Number(staffId)}
+      ),
 
-    -- aggregate payments, but only payments that link to Claims with this staffId,
-    -- and additionally restricted by the optional time window (paymentTimeFilter)
-    payments_agg AS (
-      SELECT
-        pay."patientId" AS patient_id,
-        SUM(pay."totalBilled")::numeric(14,2)   AS total_charges,
-        SUM(pay."totalPaid")::numeric(14,2)     AS total_paid,
-        SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted,
-        MAX(pay."createdAt")                    AS last_payment_date
-      FROM "Payment" pay
-      JOIN "Claim" c ON pay."claimId" = c.id
-      WHERE c."staffId" = ${Number(staffId)}
-      ${paymentTimeFilter}
-      GROUP BY pay."patientId"
-    ),
+      payments_agg AS (
+        SELECT
+          pay."patientId" AS patient_id,
+          SUM(pay."totalBilled")::numeric(14,2)   AS total_charges,
+          SUM(pay."totalPaid")::numeric(14,2)     AS total_paid,
+          SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted,
+          MAX(pay."createdAt")                    AS last_payment_date
+        FROM "Payment" pay
+        JOIN "Claim" c ON pay."claimId" = c.id
+        WHERE c."staffId" = ${Number(staffId)}
+        ${paymentTimeFilter}
+        GROUP BY pay."patientId"
+      ),
 
-    last_appointments AS (
-      SELECT "patientId" AS patient_id, MAX("date") AS last_appointment_date
-      FROM "Appointment"
-      GROUP BY "patientId"
-    ),
+      last_appointments AS (
+        SELECT "patientId" AS patient_id, MAX("date") AS last_appointment_date
+        FROM "Appointment"
+        GROUP BY "patientId"
+      ),
 
-    -- Build the patient rows. If window provided we INNER JOIN payments_agg (so only patients with payments in window)
-    patients AS (
-      SELECT
-        p.id,
-        p."firstName" AS first_name,
-        p."lastName"  AS last_name,
-        COALESCE(pa.total_charges, 0)::numeric(14,2)  AS total_charges,
-        COALESCE(pa.total_paid, 0)::numeric(14,2)     AS total_paid,
-        COALESCE(pa.total_adjusted, 0)::numeric(14,2) AS total_adjusted,
-        (COALESCE(pa.total_charges,0) - COALESCE(pa.total_paid,0) - COALESCE(pa.total_adjusted,0))::numeric(14,2) AS current_balance,
-        pa.last_payment_date,
-        la.last_appointment_date
-      FROM "Patient" p
-      INNER JOIN staff_patients sp ON sp.patient_id = p.id
-      ${paymentsJoinForPatients}
-      LEFT JOIN last_appointments la ON la.patient_id = p.id
-    )
+      patients AS (
+        SELECT
+          p.id,
+          p."firstName" AS first_name,
+          p."lastName"  AS last_name,
+          COALESCE(pa.total_charges, 0)::numeric(14,2)  AS total_charges,
+          COALESCE(pa.total_paid, 0)::numeric(14,2)     AS total_paid,
+          COALESCE(pa.total_adjusted, 0)::numeric(14,2) AS total_adjusted,
+          (COALESCE(pa.total_charges,0) - COALESCE(pa.total_paid,0) - COALESCE(pa.total_adjusted,0))::numeric(14,2) AS current_balance,
+          pa.last_payment_date,
+          la.last_appointment_date
+        FROM "Patient" p
+        INNER JOIN staff_patients sp ON sp.patient_id = p.id
+        ${paymentsJoinForPatients}
+        LEFT JOIN last_appointments la ON la.patient_id = p.id
+      )
+    `;
 
-    SELECT
-      -- page rows as JSON array
-      (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
+    // Query A: fetch the page of patient rows as JSON array
+    const balancesQuery = `
+      ${commonCtes}
+
+      SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) AS balances_json FROM (
         SELECT
           p.id                   AS "patientId",
           p.first_name           AS "firstName",
@@ -649,57 +658,31 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         ${pageKeysetPredicate}
         ORDER BY p.last_payment_date DESC NULLS LAST, p.id DESC
         LIMIT ${safeLimit}
-      ) t) AS balances_json,
+      ) t;
+    `;
 
-      -- total_count: when window provided, count distinct patients that have payments in the window (payments_agg),
-      -- otherwise count all staff_patients
-      (CASE WHEN ${hasFrom || hasTo ? "true" : "false"} THEN
-         (SELECT COUNT(DISTINCT pa.patient_id) FROM payments_agg pa)
-       ELSE
-         (SELECT COUNT(*)::int FROM staff_patients)
-       END) AS total_count,
+    // Query Count: total_count (same logic as previous combined query's CASE)
+    const countQuery = `
+      ${commonCtes}
 
-      -- summary: computed from payments_agg (already filtered by staffId and time window)
-      (
-        SELECT json_build_object(
-          'totalPatients', COALESCE(COUNT(DISTINCT pa.patient_id),0),
-          'totalOutstanding', COALESCE(SUM(COALESCE(pa.total_charges,0) - COALESCE(pa.total_paid,0) - COALESCE(pa.total_adjusted,0)),0)::text,
-          'totalCollected', COALESCE(SUM(COALESCE(pa.total_paid,0)),0)::text,
-          'patientsWithBalance', COALESCE(SUM(CASE WHEN (COALESCE(pa.total_charges,0) - COALESCE(pa.total_paid,0) - COALESCE(pa.total_adjusted,0)) > 0 THEN 1 ELSE 0 END),0)
-        )
-        FROM payments_agg pa
-      ) AS summary_json
-    ;
-  `;
+      SELECT
+        (CASE WHEN ${hasFrom || hasTo ? "true" : "false"} THEN
+           (SELECT COUNT(DISTINCT pa.patient_id) FROM payments_agg pa)
+         ELSE
+           (SELECT COUNT(*)::int FROM staff_patients)
+         END) AS total_count;
+    `;
 
-    const rawRows = (await prisma.$queryRawUnsafe(sql)) as Array<{
-      balances_json?: any;
-      total_count?: number;
-      summary_json?: any;
-    }>;
+    // Execute balancesQuery
+    const balancesRawRows = (await prisma.$queryRawUnsafe(
+      balancesQuery
+    )) as Array<{ balances_json?: any }>;
 
-    const firstRow =
-      Array.isArray(rawRows) && rawRows.length > 0 ? rawRows[0] : undefined;
+    const balancesJson = (balancesRawRows?.[0]?.balances_json as any) ?? [];
 
-    if (!firstRow) {
-      return {
-        balances: [],
-        totalCount: 0,
-        nextCursor: null,
-        hasMore: false,
-        summary: {
-          totalPatients: 0,
-          totalOutstanding: 0,
-          totalCollected: 0,
-          patientsWithBalance: 0,
-        },
-      };
-    }
+    const balancesArr = Array.isArray(balancesJson) ? balancesJson : [];
 
-    const balancesRaw = Array.isArray(firstRow.balances_json)
-      ? firstRow.balances_json
-      : [];
-    const balances: PatientBalanceRow[] = balancesRaw.map((r: any) => ({
+    const balances: PatientBalanceRow[] = balancesArr.map((r: any) => ({
       patientId: Number(r.patientId),
       firstName: r.firstName ?? null,
       lastName: r.lastName ?? null,
@@ -715,6 +698,7 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         : null,
     }));
 
+    // Determine hasMore and nextCursor
     const hasMore = balances.length === safeLimit;
     let nextCursor: string | null = null;
     if (hasMore) {
@@ -728,20 +712,86 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
       }
     }
 
-    const summaryRaw = firstRow.summary_json ?? {};
-    const summary = {
+    // Execute countQuery
+    const countRows = (await prisma.$queryRawUnsafe(countQuery)) as Array<{
+      total_count?: number;
+    }>;
+    const totalCount = Number(countRows?.[0]?.total_count ?? 0);
+
+    return {
+      balances,
+      totalCount,
+      nextCursor,
+      hasMore,
+    };
+  },
+
+  /**
+   * Return only the summary data for a doctor (same logic/filters as previous single-query approach)
+   */
+  async getSummaryByDoctor(
+    staffId: number,
+    from?: Date | null,
+    to?: Date | null
+  ): Promise<{
+    totalPatients: number;
+    totalOutstanding: number;
+    totalCollected: number;
+    patientsWithBalance: number;
+  }> {
+    if (!Number.isFinite(Number(staffId)) || Number(staffId) <= 0) {
+      throw new Error("Invalid staffId");
+    }
+
+    const hasFrom = from !== undefined && from !== null;
+    const hasTo = to !== undefined && to !== null;
+
+    const fromStart = isoStartOfDayLiteral(from);
+    const toNextStart = isoStartOfNextDayLiteral(to);
+
+    const paymentTimeFilter =
+      hasFrom && hasTo
+        ? `AND pay."createdAt" >= ${fromStart} AND pay."createdAt" <= ${toNextStart}`
+        : hasFrom
+          ? `AND pay."createdAt" >= ${fromStart}`
+          : hasTo
+            ? `AND pay."createdAt" <= ${toNextStart}`
+            : "";
+
+    const summaryQuery = `
+      WITH
+      payments_agg AS (
+        SELECT
+          pay."patientId" AS patient_id,
+          SUM(pay."totalBilled")::numeric(14,2)   AS total_charges,
+          SUM(pay."totalPaid")::numeric(14,2)     AS total_paid,
+          SUM(pay."totalAdjusted")::numeric(14,2) AS total_adjusted
+        FROM "Payment" pay
+        JOIN "Claim" c ON pay."claimId" = c.id
+        WHERE c."staffId" = ${Number(staffId)}
+        ${paymentTimeFilter}
+        GROUP BY pay."patientId"
+      )
+      SELECT json_build_object(
+        'totalPatients', COALESCE(COUNT(DISTINCT pa.patient_id),0),
+        'totalOutstanding', COALESCE(SUM(COALESCE(pa.total_charges,0) - COALESCE(pa.total_paid,0) - COALESCE(pa.total_adjusted,0)),0)::text,
+        'totalCollected', COALESCE(SUM(COALESCE(pa.total_paid,0)),0)::text,
+        'patientsWithBalance', COALESCE(SUM(CASE WHEN (COALESCE(pa.total_charges,0) - COALESCE(pa.total_paid,0) - COALESCE(pa.total_adjusted,0)) > 0 THEN 1 ELSE 0 END),0)
+      ) AS summary_json
+      FROM payments_agg pa;
+    `;
+
+    const rows = (await prisma.$queryRawUnsafe(summaryQuery)) as Array<{
+      summary_json?: any;
+    }>;
+
+    const summaryRaw = (rows?.[0]?.summary_json as any) ?? {};
+
+    return {
       totalPatients: Number(summaryRaw.totalPatients ?? 0),
       totalOutstanding: Number(summaryRaw.totalOutstanding ?? 0),
       totalCollected: Number(summaryRaw.totalCollected ?? 0),
       patientsWithBalance: Number(summaryRaw.patientsWithBalance ?? 0),
-    };
-
-    return {
-      balances,
-      totalCount: Number(firstRow.total_count ?? 0),
-      nextCursor,
-      hasMore,
-      summary,
     };
   },
 };

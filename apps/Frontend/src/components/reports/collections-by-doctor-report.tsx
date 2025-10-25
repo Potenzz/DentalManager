@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DoctorBalancesAndSummary } from "@repo/db/types";
 import ExportReportButton from "./export-button";
 
 type StaffOption = { id: number; name: string };
@@ -54,16 +53,24 @@ export default function CollectionsByDoctorReport({
     staleTime: 60_000,
   });
 
-  // query balances+summary by doctor
+  // --- balances query (paged rows) ---
   const {
-    data: collectionData,
-    isLoading: isLoadingRows,
-    isError: isErrorRows,
-    refetch,
-    isFetching,
-  } = useQuery<DoctorBalancesAndSummary, Error>({
+    data: balancesResult,
+    isLoading: isLoadingBalances,
+    isError: isErrorBalances,
+    refetch: refetchBalances,
+    isFetching: isFetchingBalances,
+  } = useQuery<
+    {
+      balances: any[];
+      totalCount: number;
+      nextCursor: string | null;
+      hasMore: boolean;
+    },
+    Error
+  >({
     queryKey: [
-      "collections-by-doctor-rows",
+      "collections-by-doctor-balances",
       staffId,
       currentCursor,
       perPage,
@@ -80,24 +87,66 @@ export default function CollectionsByDoctorReport({
 
       const res = await apiRequest(
         "GET",
-        `/api/payments-reports/by-doctor?${params.toString()}`
+        `/api/payments-reports/by-doctor/balances?${params.toString()}`
       );
       if (!res.ok) {
         const b = await res
           .json()
-          .catch(() => ({ message: "Failed to load collections" }));
-        throw new Error(b.message || "Failed to load collections");
+          .catch(() => ({ message: "Failed to load collections balances" }));
+        throw new Error(b.message || "Failed to load collections balances");
       }
       return res.json();
     },
-    enabled: Boolean(staffId), // only load when a doctor is selected
+    enabled: Boolean(staffId),
   });
 
-  const balances = collectionData?.balances ?? [];
-  const totalCount = collectionData?.totalCount ?? undefined;
-  const serverNextCursor = collectionData?.nextCursor ?? null;
-  const hasMore = collectionData?.hasMore ?? false;
-  const summary = collectionData?.summary ?? null;
+  // --- summary query (staff summary) ---
+  const {
+    data: summaryData,
+    isLoading: isLoadingSummary,
+    isError: isErrorSummary,
+    refetch: refetchSummary,
+    isFetching: isFetchingSummary,
+  } = useQuery<
+    {
+      totalPatients: number;
+      totalOutstanding: number | string;
+      totalCollected: number | string;
+      patientsWithBalance: number;
+    },
+    Error
+  >({
+    queryKey: ["collections-by-doctor-summary", staffId, startDate, endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (staffId) params.set("staffId", staffId);
+      if (startDate) params.set("from", startDate);
+      if (endDate) params.set("to", endDate);
+
+      const res = await apiRequest(
+        "GET",
+        `/api/payments-reports/by-doctor/summary?${params.toString()}`
+      );
+      if (!res.ok) {
+        const b = await res
+          .json()
+          .catch(() => ({ message: "Failed to load collections summary" }));
+        throw new Error(b.message || "Failed to load collections summary");
+      }
+      return res.json();
+    },
+    enabled: Boolean(staffId),
+  });
+
+  const balances = balancesResult?.balances ?? [];
+  const totalCount = balancesResult?.totalCount ?? undefined;
+  const serverNextCursor = balancesResult?.nextCursor ?? null;
+  const hasMore = Boolean(balancesResult?.hasMore ?? false);
+  const summary = summaryData ?? null;
+
+  const isLoadingRows = isLoadingBalances;
+  const isErrorRows = isErrorBalances;
+  const isFetching = isFetchingBalances || isFetchingSummary;
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -117,7 +166,7 @@ export default function CollectionsByDoctorReport({
       if (serverNextCursor) {
         setCursorStack((s) => [...s, serverNextCursor]);
         setCursorIndex((i) => i + 1);
-        // No manual refetch — the queryKey depends on currentCursor and React Query will fetch automatically.
+        // React Query will fetch automatically because queryKey includes currentCursor
       }
     } else {
       setCursorIndex((i) => i + 1);
