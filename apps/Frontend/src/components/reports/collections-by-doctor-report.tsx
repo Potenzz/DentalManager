@@ -163,7 +163,7 @@ export default function CollectionsByDoctorReport({
     const isLastKnown = idx === cursorStack.length - 1;
 
     if (isLastKnown) {
-      if (serverNextCursor) {
+          if (serverNextCursor && serverNextCursor !== currentCursor && balances.length > 0) {
         setCursorStack((s) => [...s, serverNextCursor]);
         setCursorIndex((i) => i + 1);
         // React Query will fetch automatically because queryKey includes currentCursor
@@ -171,7 +171,7 @@ export default function CollectionsByDoctorReport({
     } else {
       setCursorIndex((i) => i + 1);
     }
-  }, [cursorIndex, cursorStack.length, serverNextCursor]);
+  }, [cursorIndex, cursorStack.length, serverNextCursor, balances, currentCursor]);
 
   // Map server rows to GenericRow
   const genericRows: GenericRow[] = balances.map((r) => {

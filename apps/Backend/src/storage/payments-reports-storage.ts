@@ -1,6 +1,5 @@
 import { prisma } from "@repo/db/client";
 import {
-  DoctorBalancesAndSummary,
   GetPatientBalancesResult,
   PatientBalanceRow,
 } from "../../../../packages/db/types/payments-reports-types";
@@ -81,10 +80,14 @@ function isoStartOfNextDayLiteral(d?: Date | null): string | null {
 }
 
 /** Cursor helpers — base64(JSON) */
+/** Cursor format (backwards compatible):
+ * { staffId?: number, lastPaymentDate: string | null, lastPatientId: number, lastPaymentMs?: number | null }
+ */
 function encodeCursor(obj: {
   staffId?: number;
   lastPaymentDate: string | null;
   lastPatientId: number;
+  lastPaymentMs?: number | null;
 }) {
   return Buffer.from(JSON.stringify(obj)).toString("base64");
 }
@@ -93,6 +96,7 @@ function decodeCursor(token?: string | null): {
   staffId?: number; // optional because older cursors might not include it
   lastPaymentDate: string | null;
   lastPatientId: number;
+  lastPaymentMs?: number | null;
 } | null {
   if (!token) return null;
   try {
@@ -110,6 +114,12 @@ function decodeCursor(token?: string | null): {
             ? null
             : String((parsed as any).lastPaymentDate),
         lastPatientId: Number((parsed as any).lastPatientId),
+        lastPaymentMs:
+          "lastPaymentMs" in parsed
+            ? parsed.lastPaymentMs === null
+              ? null
+              : Number(parsed.lastPaymentMs)
+            : undefined,
       };
     }
     return null;
@@ -563,27 +573,45 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
             ? `AND pay."createdAt" <= ${toNextStart}`
             : "";
 
-    // Keyset predicate for paging (same semantics as before)
+    // Keyset predicate — prefer numeric epoch-ms comparison for stability
     let pageKeysetPredicate = "";
     if (effectiveCursor) {
-      const lp = effectiveCursor.lastPaymentDate
-        ? `'${effectiveCursor.lastPaymentDate}'`
-        : "NULL";
+      // Use epoch ms if present in cursor (more precise); otherwise fall back to timestamptz literal.
+      const hasCursorMs =
+        typeof effectiveCursor.lastPaymentMs === "number" &&
+        !Number.isNaN(effectiveCursor.lastPaymentMs);
+
       const id = Number(effectiveCursor.lastPatientId);
 
-      pageKeysetPredicate = `AND (
-        ( ${lp} IS NOT NULL AND (
-            (p.last_payment_date IS NOT NULL AND p.last_payment_date < ${lp})
-            OR (p.last_payment_date IS NOT NULL AND p.last_payment_date = ${lp} AND p.id < ${id})
+      if (hasCursorMs) {
+        const lpMs = Number(effectiveCursor.lastPaymentMs);
+        // Compare numeric epoch ms; handle NULL last_payment_date rows too.
+        pageKeysetPredicate = `
+          AND (
+            (p.last_payment_ms IS NOT NULL AND ${lpMs} IS NOT NULL AND (
+              p.last_payment_ms < ${lpMs}
+              OR (p.last_payment_ms = ${lpMs} AND p.id < ${id})
+            ))
+            OR (p.last_payment_ms IS NULL AND ${lpMs} IS NOT NULL)
+            OR (p.last_payment_ms IS NULL AND ${lpMs} IS NULL AND p.id < ${id})
           )
-        )
-        OR
-        ( ${lp} IS NULL AND (
-            p.last_payment_date IS NOT NULL
-            OR (p.last_payment_date IS NULL AND p.id < ${id})
+  `;
+      } else {
+        // fall back to timestamptz string literal (older cursor)
+        const lpLiteral = effectiveCursor.lastPaymentDate
+          ? `('${effectiveCursor.lastPaymentDate}'::timestamptz)`
+          : "NULL";
+        pageKeysetPredicate = `
+          AND (
+            (p.last_payment_date IS NOT NULL AND ${lpLiteral} IS NOT NULL AND (
+              p.last_payment_date < ${lpLiteral}
+              OR (p.last_payment_date = ${lpLiteral} AND p.id < ${id})
+            ))
+            OR (p.last_payment_date IS NULL AND ${lpLiteral} IS NOT NULL)
+            OR (p.last_payment_date IS NULL AND ${lpLiteral} IS NULL AND p.id < ${id})
           )
-        )
-      )`;
+        `;
+      }
     }
 
     const paymentsJoinForPatients =
@@ -630,6 +658,10 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
           COALESCE(pa.total_adjusted, 0)::numeric(14,2) AS total_adjusted,
           (COALESCE(pa.total_charges,0) - COALESCE(pa.total_paid,0) - COALESCE(pa.total_adjusted,0))::numeric(14,2) AS current_balance,
           pa.last_payment_date,
+          -- epoch milliseconds for last payment date (NULL when last_payment_date is NULL)
+          (CASE WHEN pa.last_payment_date IS NULL THEN NULL
+            ELSE (EXTRACT(EPOCH FROM (pa.last_payment_date AT TIME ZONE 'UTC')) * 1000)::bigint
+          END) AS last_payment_ms,
           la.last_appointment_date
         FROM "Patient" p
         INNER JOIN staff_patients sp ON sp.patient_id = p.id
@@ -638,7 +670,9 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
       )
     `;
 
-    // Query A: fetch the page of patient rows as JSON array
+    // Fetch one extra row to detect whether there's a following page.
+    const fetchLimit = safeLimit + 1;
+
     const balancesQuery = `
       ${commonCtes}
 
@@ -651,38 +685,34 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
           p.total_paid::text     AS "totalPaid",
           p.total_adjusted::text AS "totalAdjusted",
           p.current_balance::text AS "currentBalance",
-          p.last_payment_date     AS "lastPaymentDate",
-          p.last_appointment_date AS "lastAppointmentDate"
+          -- ISO text for UI (optional)
+          to_char(p.last_payment_date AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "lastPaymentDate",
+          -- epoch ms (number) used for precise keyset comparisons
+          p.last_payment_ms::bigint AS "lastPaymentMs",
+          to_char(p.last_appointment_date AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "lastAppointmentDate"
         FROM patients p
         WHERE 1=1
         ${pageKeysetPredicate}
         ORDER BY p.last_payment_date DESC NULLS LAST, p.id DESC
-        LIMIT ${safeLimit}
+        LIMIT ${fetchLimit}
       ) t;
     `;
 
-    // Query Count: total_count (same logic as previous combined query's CASE)
-    const countQuery = `
-      ${commonCtes}
-
-      SELECT
-        (CASE WHEN ${hasFrom || hasTo ? "true" : "false"} THEN
-           (SELECT COUNT(DISTINCT pa.patient_id) FROM payments_agg pa)
-         ELSE
-           (SELECT COUNT(*)::int FROM staff_patients)
-         END) AS total_count;
-    `;
-
-    // Execute balancesQuery
     const balancesRawRows = (await prisma.$queryRawUnsafe(
       balancesQuery
     )) as Array<{ balances_json?: any }>;
-
     const balancesJson = (balancesRawRows?.[0]?.balances_json as any) ?? [];
+    const fetchedArr = Array.isArray(balancesJson) ? balancesJson : [];
 
-    const balancesArr = Array.isArray(balancesJson) ? balancesJson : [];
+    // If we fetched > safeLimit, there is another page.
+    let hasMore = false;
+    let pageRows = fetchedArr;
+    if (fetchedArr.length > safeLimit) {
+      hasMore = true;
+      pageRows = fetchedArr.slice(0, safeLimit);
+    }
 
-    const balances: PatientBalanceRow[] = balancesArr.map((r: any) => ({
+    const balances: PatientBalanceRow[] = (pageRows || []).map((r: any) => ({
       patientId: Number(r.patientId),
       firstName: r.firstName ?? null,
       lastName: r.lastName ?? null,
@@ -698,21 +728,52 @@ export const paymentsReportsStorage: IPaymentsReportsStorage = {
         : null,
     }));
 
-    // Determine hasMore and nextCursor
-    const hasMore = balances.length === safeLimit;
+    // Build nextCursor only when we actually have more rows.
     let nextCursor: string | null = null;
     if (hasMore) {
-      const last = balances[balances.length - 1];
-      if (last) {
-        nextCursor = encodeCursor({
-          staffId: Number(staffId),
-          lastPaymentDate: last.lastPaymentDate,
-          lastPatientId: Number(last.patientId),
-        });
+      // If we somehow have no balances for this page (defensive), don't build a cursor.
+      if (!Array.isArray(balances) || balances.length === 0) {
+        nextCursor = null;
+      } else {
+        // Now balances.length > 0, so last is definitely present.
+        const lastIndex = balances.length - 1;
+        const last = balances[lastIndex];
+        if (!last) {
+          // defensive fallback (shouldn't happen because of length check)
+          nextCursor = null;
+        } else {
+          // get the raw JSON row corresponding to the last returned page row so we can read the numeric ms
+          // `pageRows` is the array of raw JSON objects fetched from the DB (slice(0, safeLimit) applied above).
+          const corresponding = (pageRows as any[])[pageRows.length - 1];
+          const lastPaymentMs =
+            typeof corresponding?.lastPaymentMs === "number"
+              ? Number(corresponding.lastPaymentMs)
+              : corresponding?.lastPaymentMs === null
+                ? null
+                : undefined;
+
+          nextCursor = encodeCursor({
+            staffId: Number(staffId),
+            lastPaymentDate: last.lastPaymentDate ?? null,
+            lastPatientId: Number(last.patientId),
+            lastPaymentMs: lastPaymentMs ?? null,
+          });
+        }
       }
     }
 
-    // Execute countQuery
+    // Count query (same logic as before)
+    const countQuery = `
+      ${commonCtes}
+
+      SELECT
+        (CASE WHEN ${hasFrom || hasTo ? "true" : "false"} THEN
+           (SELECT COUNT(DISTINCT pa.patient_id) FROM payments_agg pa)
+         ELSE
+           (SELECT COUNT(*)::int FROM staff_patients)
+         END) AS total_count;
+    `;
+
     const countRows = (await prisma.$queryRawUnsafe(countQuery)) as Array<{
       total_count?: number;
     }>;
