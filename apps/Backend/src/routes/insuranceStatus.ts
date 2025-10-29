@@ -537,16 +537,50 @@ router.post(
 
           if (!memberId) {
             resultItem.error = `Missing insuranceId for ${patientLabel} — skipping ${aptLabel}`;
-
             results.push(resultItem);
             continue;
           }
 
           // prepare eligibility data; prefer patient DOB + name if present
-          const dob = patient?.dateOfBirth ? patient.dateOfBirth : null; // string | Date
+          const dob = patient?.dateOfBirth;
+          if (!dob) {
+            resultItem.error = `Missing dob for ${patientLabel} — skipping ${aptLabel}`;
+            results.push(resultItem);
+            continue;
+          }
+
+          // Convert Date object → YYYY-MM-DD string  - req for selenium agent.
+          let dobStr: string;
+          try {
+            if (dob instanceof Date) {
+              const year = dob.getFullYear();
+              const month = String(dob.getMonth() + 1).padStart(2, "0");
+              const day = String(dob.getDate()).padStart(2, "0");
+              dobStr = `${year}-${month}-${day}`;
+            } else if (typeof dob === "string") {
+              // handle stored string already formatted
+              const dateObj = new Date(dob);
+              if (!isNaN(dateObj.getTime())) {
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+                const day = String(dateObj.getDate()).padStart(2, "0");
+                dobStr = `${year}-${month}-${day}`;
+              } else {
+                // assume string is already "YYYY-MM-DD"
+                dobStr = dob;
+              }
+            } else {
+              throw new Error("Unsupported DOB format");
+            }
+          } catch (fmtErr) {
+            resultItem.error = `Invalid DOB format for ${patientLabel} — skipping ${aptLabel}`;
+            results.push(resultItem);
+            continue;
+          }
+
           const payload = {
             memberId,
-            dateOfBirth: dob,
+            dateOfBirth: dobStr,
             insuranceSiteKey: "MH",
           };
 
