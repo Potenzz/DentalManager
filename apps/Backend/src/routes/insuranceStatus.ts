@@ -13,6 +13,7 @@ import {
   InsertPatient,
   insertPatientSchema,
 } from "../../../../packages/db/types/patient-types";
+import { formatDobForAgent } from "../utils/dateUtils";
 
 const router = Router();
 
@@ -550,30 +551,9 @@ router.post(
           }
 
           // Convert Date object → YYYY-MM-DD string  - req for selenium agent.
-          let dobStr: string;
-          try {
-            if (dob instanceof Date) {
-              const year = dob.getFullYear();
-              const month = String(dob.getMonth() + 1).padStart(2, "0");
-              const day = String(dob.getDate()).padStart(2, "0");
-              dobStr = `${year}-${month}-${day}`;
-            } else if (typeof dob === "string") {
-              // handle stored string already formatted
-              const dateObj = new Date(dob);
-              if (!isNaN(dateObj.getTime())) {
-                const year = dateObj.getFullYear();
-                const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-                const day = String(dateObj.getDate()).padStart(2, "0");
-                dobStr = `${year}-${month}-${day}`;
-              } else {
-                // assume string is already "YYYY-MM-DD"
-                dobStr = dob;
-              }
-            } else {
-              throw new Error("Unsupported DOB format");
-            }
-          } catch (fmtErr) {
-            resultItem.error = `Invalid DOB format for ${patientLabel} — skipping ${aptLabel}`;
+          const dobStr = formatDobForAgent(dob);
+          if (!dobStr) {
+            resultItem.error = `Invalid or missing DOB for ${patientLabel} — skipping ${aptLabel}`;
             results.push(resultItem);
             continue;
           }
