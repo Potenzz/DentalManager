@@ -473,4 +473,286 @@ router.post(
   }
 );
 
+router.post(
+  "/appointments/check-all-eligibilities",
+  async (req: Request, res: Response): Promise<any> => {
+    // Query param: date=YYYY-MM-DD (required)
+    const date = String(req.query.date ?? "").trim();
+    if (!date) {
+      return res
+        .status(400)
+        .json({ error: "Missing date query param (YYYY-MM-DD)" });
+    }
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized: user info missing" });
+    }
+
+    // Track any paths that couldn't be cleaned immediately so we can try again at the end
+    const remainingCleanupPaths = new Set<string>();
+
+    try {
+      // 1) fetch appointments for the day (reuse your storage API)
+      const dayAppointments = await storage.getAppointmentsByDateForUser(
+        date,
+        req.user.id
+      );
+      if (!Array.isArray(dayAppointments)) {
+        return res
+          .status(500)
+          .json({ error: "Failed to load appointments for date" });
+      }
+
+      const results: Array<any> = [];
+
+      // process sequentially so selenium agent / python semaphore isn't overwhelmed
+      for (const apt of dayAppointments) {
+        // For each appointment we keep a per-appointment seleniumResult so we can cleanup its files
+        let seleniumResult: any = undefined;
+
+        const resultItem: any = {
+          appointmentId: apt.id,
+          patientId: apt.patientId ?? null,
+          processed: false,
+          error: null,
+          pdfFileId: null,
+          patientUpdateStatus: null,
+          warning: null,
+        };
+
+        try {
+          // fetch patient record (use getPatient or getPatientById depending on your storage)
+          const patient = apt.patientId
+            ? await storage.getPatient(apt.patientId)
+            : null;
+          const memberId = (patient?.insuranceId ?? "").toString().trim();
+
+          // create a readable patient label for error messages
+          const patientLabel = patient
+            ? `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() ||
+              `patient#${patient.id}`
+            : `patient#${apt.patientId ?? "unknown"}`;
+
+          const aptLabel = `appointment#${apt.id}${apt.date ? ` (${apt.date}${apt.startTime ? ` ${apt.startTime}` : ""})` : ""}`;
+
+          if (!memberId) {
+            resultItem.error = `Missing insuranceId for ${patientLabel} — skipping ${aptLabel}`;
+
+            results.push(resultItem);
+            continue;
+          }
+
+          // prepare eligibility data; prefer patient DOB + name if present
+          const dob = patient?.dateOfBirth ? patient.dateOfBirth : null; // string | Date
+          const payload = {
+            memberId,
+            dateOfBirth: dob,
+            insuranceSiteKey: "MH",
+          };
+
+          // Get credentials for this user+site
+          const credentials =
+            await storage.getInsuranceCredentialByUserAndSiteKey(
+              req.user.id,
+              payload.insuranceSiteKey
+            );
+          if (!credentials) {
+            resultItem.error = `No insurance credentials found for siteKey — skipping ${aptLabel} for ${patientLabel}`;
+            results.push(resultItem);
+            continue;
+          }
+
+          // enrich payload
+          const enriched = {
+            ...payload,
+            massdhpUsername: credentials.username,
+            massdhpPassword: credentials.password,
+          };
+
+          // forward to selenium agent (sequential)
+          try {
+            seleniumResult =
+              await forwardToSeleniumInsuranceEligibilityAgent(enriched);
+          } catch (seleniumErr: any) {
+            resultItem.error = `Selenium agent failed for ${patientLabel} (${aptLabel}): ${seleniumErr?.message ?? String(seleniumErr)}`;
+            results.push(resultItem);
+            continue;
+          }
+
+          // Attempt extraction (if pdf_path present)
+          const extracted: any = {};
+          if (
+            seleniumResult?.pdf_path &&
+            seleniumResult.pdf_path.endsWith(".pdf")
+          ) {
+            try {
+              const pdfPath = seleniumResult.pdf_path;
+              const pdfBuffer = await fs.readFile(pdfPath);
+
+              const extraction = await forwardToPatientDataExtractorService({
+                buffer: pdfBuffer,
+                originalname: path.basename(pdfPath),
+                mimetype: "application/pdf",
+              } as any);
+
+              if (extraction.name) {
+                const parts = splitName(extraction.name);
+                extracted.firstName = parts.firstName;
+                extracted.lastName = parts.lastName;
+              }
+            } catch (extractErr: any) {
+              resultItem.warning = `Extraction failed: ${extractErr?.message ?? String(extractErr)}`;
+            }
+          }
+
+          // create or update patient by insuranceId — prefer extracted name
+          const preferFirst = extracted.firstName ?? null;
+          const preferLast = extracted.lastName ?? null;
+          try {
+            await createOrUpdatePatientByInsuranceId({
+              insuranceId: memberId,
+              firstName: preferFirst,
+              lastName: preferLast,
+              dob: payload.dateOfBirth,
+              userId: req.user.id,
+            });
+          } catch (patientOpErr: any) {
+            resultItem.error = `Failed to create/update patient ${patientLabel} for ${aptLabel}: ${patientOpErr?.message ?? String(patientOpErr)}`;
+            results.push(resultItem);
+            continue;
+          }
+
+          // fetch patient again
+          const updatedPatient =
+            await storage.getPatientByInsuranceId(memberId);
+          if (!updatedPatient || !updatedPatient.id) {
+            resultItem.error = `Patient not found after create/update for ${patientLabel} (${aptLabel})`;
+            results.push(resultItem);
+            continue;
+          }
+
+          // Update patient status based on seleniumResult.eligibility
+          const newStatus =
+            seleniumResult?.eligibility === "Y" ? "active" : "inactive";
+          await storage.updatePatient(updatedPatient.id, { status: newStatus });
+          resultItem.patientUpdateStatus = `Patient status updated to ${newStatus}`;
+
+          // If PDF exists, upload to PdfGroup (ELIGIBILITY_STATUS)
+          if (
+            seleniumResult?.pdf_path &&
+            seleniumResult.pdf_path.endsWith(".pdf")
+          ) {
+            try {
+              const pdfBuf = await fs.readFile(seleniumResult.pdf_path);
+              const groupTitle = "Eligibility Status";
+              const groupTitleKey = "ELIGIBILITY_STATUS";
+
+              let group = await storage.findPdfGroupByPatientTitleKey(
+                updatedPatient.id,
+                groupTitleKey
+              );
+              if (!group) {
+                group = await storage.createPdfGroup(
+                  updatedPatient.id,
+                  groupTitle,
+                  groupTitleKey
+                );
+              }
+              if (!group?.id)
+                throw new Error("Failed to create/find pdf group");
+
+              const created = await storage.createPdfFile(
+                group.id,
+                path.basename(seleniumResult.pdf_path),
+                pdfBuf
+              );
+
+              if (created && typeof created === "object" && "id" in created) {
+                resultItem.pdfFileId = Number(created.id);
+              } else if (typeof created === "number") {
+                resultItem.pdfFileId = created;
+              } else if (created && (created as any).id) {
+                resultItem.pdfFileId = (created as any).id;
+              }
+
+              resultItem.processed = true;
+            } catch (pdfErr: any) {
+              resultItem.warning = `PDF upload failed for ${patientLabel} (${aptLabel}): ${pdfErr?.message ?? String(pdfErr)}`;
+            }
+          } else {
+            // no pdf; still mark processed true (status updated)
+            resultItem.processed = true;
+            resultItem.pdfFileId = null;
+          }
+
+          results.push(resultItem);
+        } catch (err: any) {
+          resultItem.error = `Unexpected error for appointment#${apt.id}: ${err?.message ?? String(err)}`;
+          results.push(resultItem);
+
+          console.error(
+            "[batch eligibility] unexpected error for appointment",
+            apt.id,
+            err
+          );
+        } finally {
+          // Per-appointment cleanup: always try to remove selenium temp files for this appointment
+          try {
+            if (
+              seleniumResult &&
+              (seleniumResult.pdf_path || seleniumResult.ss_path)
+            ) {
+              // prefer pdf_path, fallback to ss_path
+              const candidatePath =
+                seleniumResult.pdf_path ?? seleniumResult.ss_path;
+              try {
+                await emptyFolderContainingFile(candidatePath);
+              } catch (cleanupErr: any) {
+                console.warn(
+                  `[batch cleanup] failed to clean ${candidatePath} for appointment ${apt.id}`,
+                  cleanupErr
+                );
+                // remember path for final cleanup attempt
+                remainingCleanupPaths.add(candidatePath);
+              }
+            }
+          } catch (cleanupOuterErr: any) {
+            console.warn(
+              "[batch cleanup] unexpected error during per-appointment cleanup",
+              cleanupOuterErr
+            );
+            // don't throw — we want to continue processing next appointments
+          }
+        } // end try/catch/finally per appointment
+      } // end for appointments
+
+      // return summary
+      return res.json({ date, count: results.length, results });
+    } catch (err: any) {
+      console.error("[check-all-eligibilities] error", err);
+      return res
+        .status(500)
+        .json({ error: err?.message ?? "Internal server error" });
+    } finally {
+      // Final cleanup attempt for any remaining paths we couldn't delete earlier
+      try {
+        if (remainingCleanupPaths.size > 0) {
+          for (const p of remainingCleanupPaths) {
+            try {
+              await emptyFolderContainingFile(p);
+            } catch (finalCleanupErr: any) {
+              console.error(`[final cleanup] failed for ${p}`, finalCleanupErr);
+            }
+          }
+        }
+      } catch (outerFinalErr: any) {
+        console.error(
+          "[check-all-eligibilities final cleanup] unexpected error",
+          outerFinalErr
+        );
+      }
+    }
+  }
+);
+
 export default router;

@@ -21,6 +21,7 @@ import {
   StickyNote,
   Shield,
   FileCheck,
+  LoaderCircleIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "@/components/ui/calendar";
@@ -44,6 +45,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import {
+  clearTaskStatus,
+  setTaskStatus,
+} from "@/redux/slices/seleniumEligibilityBatchCheckTaskSlice";
+import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 
 // Define types for scheduling
 interface TimeSlot {
@@ -93,6 +100,14 @@ export default function AppointmentsPage() {
     open: boolean;
     appointmentId?: number;
   }>({ open: false });
+  const dispatch = useAppDispatch();
+  const batchTask = useAppSelector(
+    (state) => state.seleniumEligibilityBatchCheckTask
+  );
+  const [isCheckingAllElig, setIsCheckingAllElig] = useState(false);
+  const [processedAppointmentIds, setProcessedAppointmentIds] = useState<
+    Record<number, boolean>
+  >({});
 
   const [, setLocation] = useLocation();
 
@@ -688,8 +703,166 @@ export default function AppointmentsPage() {
     console.log(`Opening clinic notes for appointment: ${appointmentId}`);
   };
 
+  const handleCheckAllEligibilities = async () => {
+    if (!user) {
+      toast({
+        title: "Unauthorized",
+        description: "Please login to perform this action.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const dateParam = formattedSelectedDate; // existing variable in your component
+
+    // Start: set redux task status (visible globally)
+    dispatch(
+      setTaskStatus({
+        status: "pending",
+        message: `Checking eligibility for appointments on ${dateParam}...`,
+      })
+    );
+
+    setIsCheckingAllElig(true);
+    setProcessedAppointmentIds({});
+
+    try {
+      const res = await apiRequest(
+        "POST",
+        `/api/insurance-status/appointments/check-all-eligibilities?date=${dateParam}`,
+        {}
+      );
+
+      // read body for all cases so we can show per-appointment info
+      let body: any;
+      try {
+        body = await res.json();
+      } catch (e) {
+        body = null;
+      }
+
+      if (!res.ok) {
+        const errMsg = body?.error ?? `Server error ${res.status}`;
+        // global error
+        dispatch(
+          setTaskStatus({
+            status: "error",
+            message: `Batch eligibility failed: ${errMsg}`,
+          })
+        );
+        toast({
+          title: "Batch check failed",
+          description: errMsg,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const results: any[] = Array.isArray(body?.results) ? body.results : [];
+
+      // Map appointmentId -> appointment so we can show human friendly toasts
+      const appointmentMap = new Map<number, Appointment>();
+      for (const a of appointments) {
+        if (a && typeof a.id === "number")
+          appointmentMap.set(a.id as number, a);
+      }
+
+      // Counters for summary
+      let successCount = 0;
+      let skippedCount = 0;
+      let warningCount = 0;
+
+      // Show toast for each skipped appointment (error) and for warnings.
+      for (const r of results) {
+        const aptId = Number(r.appointmentId);
+        const apt = appointmentMap.get(aptId);
+        const patientName = apt
+          ? patientsFromDay.find((p) => p.id === apt.patientId)
+            ? `${patientsFromDay.find((p) => p.id === apt.patientId)!.firstName ?? ""} ${patientsFromDay.find((p) => p.id === apt.patientId)!.lastName ?? ""}`.trim()
+            : `patient#${apt.patientId ?? "?"}`
+          : `appointment#${aptId}`;
+
+        const aptTime = apt ? `${apt.date ?? ""} ${apt.startTime ?? ""}` : "";
+
+        if (r.error) {
+          skippedCount++;
+          toast({
+            title: `Skipped: ${patientName}`,
+            description: `${aptTime} — ${r.error}`,
+            variant: "destructive",
+          });
+          console.warn("[batch skipped]", aptId, r.error);
+        } else if (r.warning) {
+          warningCount++;
+          toast({
+            title: `Warning: ${patientName}`,
+            description: `${aptTime} — ${r.warning}`,
+            variant: "destructive",
+          });
+          console.info("[batch warning]", aptId, r.warning);
+        } else if (r.processed) {
+          successCount++;
+          // optional: show small non-intrusive toast or nothing for each success.
+          // comment-in to notify successes (may create many toasts):
+          // toast({ title: `Processed: ${patientName}`, description: `${aptTime}`, variant: "default" });
+        } else {
+          // fallback: treat as skipped
+          skippedCount++;
+          toast({
+            title: `Skipped: ${patientName}`,
+            description: `${aptTime} — Unknown reason`,
+            variant: "destructive",
+          });
+        }
+      }
+
+      // Invalidate queries so UI repaints with updated patient statuses
+      queryClient.invalidateQueries({
+        queryKey: qkAppointmentsDay(formattedSelectedDate),
+      });
+
+      // global success status (summary)
+      dispatch(
+        setTaskStatus({
+          status: skippedCount > 0 ? "error" : "success",
+          message: `Batch processed ${results.length} appointments — success: ${successCount}, warnings: ${warningCount}, skipped: ${skippedCount}.`,
+        })
+      );
+
+      // also show final toast summary
+      toast({
+        title: "Batch complete",
+        description: `Processed ${results.length} appointments — success: ${successCount}, warnings: ${warningCount}, skipped: ${skippedCount}.`,
+        variant: skippedCount > 0 ? "destructive" : "default",
+      });
+
+    } catch (err: any) {
+      console.error("[check-all-eligibilities] error", err);
+      dispatch(
+        setTaskStatus({
+          status: "error",
+          message: `Batch eligibility error: ${err?.message ?? String(err)}`,
+        })
+      );
+      toast({
+        title: "Batch check failed",
+        description: err?.message ?? String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingAllElig(false);
+      // intentionally do not clear task status here so banner persists until user dismisses it
+    }
+  };
   return (
-    <div className="">
+    <div>
+      <SeleniumTaskBanner
+        status={batchTask.status}
+        message={batchTask.message}
+        show={batchTask.show}
+        onClear={() => dispatch(clearTaskStatus())}
+      />
+
       <div className="container mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -700,17 +873,36 @@ export default function AppointmentsPage() {
               View and manage the dental practice schedule
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setEditingAppointment(undefined);
-              setIsAddModalOpen(true);
-            }}
-            className="gap-1"
-            disabled={isLoading}
-          >
-            <Plus className="h-4 w-4" />
-            New Appointment
-          </Button>
+
+          <div className="flex justify-between gap-2">
+            <Button
+              onClick={() => {
+                setEditingAppointment(undefined);
+                setIsAddModalOpen(true);
+              }}
+              disabled={isLoading}
+            >
+              <Plus className="h-4 w-4" />
+              New Appointment
+            </Button>
+
+            <Button
+              onClick={() => handleCheckAllEligibilities()}
+              disabled={isLoading || isCheckingAllElig}
+            >
+              {isCheckingAllElig ? (
+                <>
+                  <LoaderCircleIcon className="h-4 w-4 mr-2 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Check all eligibilities
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Context Menu */}

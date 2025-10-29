@@ -14,8 +14,8 @@ const initialState: SeleniumTaskState = {
   show: false,
 };
 
-const seleniumClaimSubmitTaskSlice = createSlice({
-  name: "seleniumClaimSubmitTask",
+const seleniumEligibilityBatchCheckTaskSlice = createSlice({
+  name: "seleniumEligibilityBatchCheckTask",
   initialState,
   reducers: {
     setTaskStatus: (
@@ -28,5 +28,5 @@ const seleniumClaimSubmitTaskSlice = createSlice({
   },
 });
 
-export const { setTaskStatus, clearTaskStatus } = seleniumClaimSubmitTaskSlice.actions;
-export default seleniumClaimSubmitTaskSlice.reducer;
+export const { setTaskStatus, clearTaskStatus } = seleniumEligibilityBatchCheckTaskSlice.actions;
+export default seleniumEligibilityBatchCheckTaskSlice.reducer;

@@ -45,6 +45,7 @@ export interface IStorage {
     startTime: string,
     excludeId: number
   ): Promise<Appointment | undefined>;
+  getAppointmentsByDateForUser(dateStr: string, userId: number): Promise<Appointment[]>;
 }
 
 export const appointmentsStorage: IStorage = {
@@ -195,4 +196,31 @@ export const appointmentsStorage: IStorage = {
       })) ?? undefined
     );
   },
+
+  /**
+   * getAppointmentsByDateForUser
+   * dateStr expected as "YYYY-MM-DD" (same string your frontend sends)
+   * returns appointments for that date (local midnight-to-midnight) filtered by userId
+   */
+  async getAppointmentsByDateForUser(dateStr: string, userId: number): Promise<Appointment[]> {
+    // defensive parsing — if invalid, throw so caller can handle
+    const start = new Date(dateStr);
+    if (Number.isNaN(start.getTime())) {
+      throw new Error(`Invalid date string passed to getAppointmentsByDateForUser: ${dateStr}`);
+    }
+    // create exclusive end (next day midnight)
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+
+    return db.appointment.findMany({
+      where: {
+        userId,
+        date: {
+          gte: start,
+          lt: end,
+        },
+      },
+      orderBy: { startTime: "asc" },
+    });
+  }
 };
