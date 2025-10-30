@@ -77,7 +77,6 @@ async function createOrUpdatePatientByInsuranceId(options: {
       gender: "",
       phone: "",
       userId,
-      status: "inactive",
       insuranceId,
     };
 
@@ -219,7 +218,7 @@ router.post(
 
       if (patient && patient.id !== undefined) {
         const newStatus =
-          seleniumResult.eligibility === "Y" ? "active" : "inactive";
+          seleniumResult.eligibility === "Y" ? "ACTIVE" : "INACTIVE";
         await storage.updatePatient(patient.id, { status: newStatus });
         outputResult.patientUpdateStatus = `Patient status updated to ${newStatus}`;
 
@@ -647,7 +646,7 @@ router.post(
 
           // Update patient status based on seleniumResult.eligibility
           const newStatus =
-            seleniumResult?.eligibility === "Y" ? "active" : "inactive";
+            seleniumResult?.eligibility === "Y" ? "ACTIVE" : "INACTIVE";
           await storage.updatePatient(updatedPatient.id, { status: newStatus });
           resultItem.patientUpdateStatus = `Patient status updated to ${newStatus}`;
 

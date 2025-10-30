@@ -24,11 +24,14 @@ import {
   InsertPatient,
   insertPatientSchema,
   Patient,
+  PatientStatus,
+  patientStatusOptions,
   UpdatePatient,
   updatePatientSchema,
 } from "@repo/db/types";
 import { z } from "zod";
 import { DateInputField } from "@/components/ui/dateInputField";
+import { PatientStatusSchema } from "@repo/db/usedSchemas";
 
 interface PatientFormProps {
   patient?: Patient;
@@ -84,7 +87,7 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
         policyHolder: "",
         allergies: "",
         medicalConditions: "",
-        status: "active",
+        status: "UNKNOWN",
         userId: user?.id,
       };
     }, [isEditing, patient, extractedInfo, user?.id]);
@@ -297,27 +300,39 @@ export const PatientForm = forwardRef<PatientFormRef, PatientFormProps>(
               <FormField
                 control={form.control}
                 name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      defaultValue="active"
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const options = Object.values(
+                    patientStatusOptions
+                  ) as PatientStatus[]; // ['ACTIVE','INACTIVE','UNKNOWN']
+                  const toLabel = (v: PatientStatus) =>
+                    v[0] + v.slice(1).toLowerCase(); // ACTIVE -> Active
+
+                  return (
+                    <FormItem>
+                      <FormLabel>Status *</FormLabel>
+                      <Select
+                        value={(field.value as PatientStatus) ?? "UNKNOWN"}
+                        onValueChange={(v) =>
+                          field.onChange(v as PatientStatus)
+                        }
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {options.map((v) => (
+                            <SelectItem key={v} value={v}>
+                              {toLabel(v)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField

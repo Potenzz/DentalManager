@@ -254,7 +254,6 @@ export default function PatientsPage() {
             gender: "",
             phone: "",
             userId: user?.id ?? 1,
-            status: "active",
             insuranceId: data.memberId || "",
           };
 

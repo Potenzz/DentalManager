@@ -52,7 +52,7 @@ model Patient {
   policyHolder      String?
   allergies         String?
   medicalConditions String?
-  status            String        @default("active")
+  status            PatientStatus @default(UNKNOWN)
   userId            Int
   createdAt         DateTime      @default(now())
   user              User          @relation(fields: [userId], references: [id])
@@ -63,6 +63,12 @@ model Patient {
 
   @@index([insuranceId])
   @@index([createdAt])
+}
+
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+  UNKNOWN
 }
 
 model Appointment {

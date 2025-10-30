@@ -251,7 +251,6 @@ export default function InsuranceStatusPage() {
       gender: "",
       phone: "",
       userId: user?.id ?? 1,
-      status: "active",
       insuranceId: memberId,
     };
     await addPatientMutation.mutateAsync(newPatient);

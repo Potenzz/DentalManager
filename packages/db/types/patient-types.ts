@@ -1,5 +1,9 @@
-import { PatientUncheckedCreateInputObjectSchema } from "@repo/db/usedSchemas";
+import {
+  PatientStatusSchema,
+  PatientUncheckedCreateInputObjectSchema,
+} from "@repo/db/usedSchemas";
 import { z } from "zod";
+import { makeEnumOptions } from "../utils";
 
 export type Patient = z.infer<typeof PatientUncheckedCreateInputObjectSchema>;
 
@@ -27,6 +31,17 @@ export const insuranceIdSchema = z.preprocess(
     .optional()
     .nullable()
 );
+
+//patient status
+export type PatientStatus = z.infer<typeof PatientStatusSchema>;
+
+// enum → select options
+export const patientStatusOptions =
+  makeEnumOptions<
+    typeof PatientStatusSchema extends z.ZodTypeAny
+      ? z.infer<typeof PatientStatusSchema>
+      : string
+  >(PatientStatusSchema);
 
 export const insertPatientSchema = (
   PatientUncheckedCreateInputObjectSchema as unknown as z.ZodObject<any>

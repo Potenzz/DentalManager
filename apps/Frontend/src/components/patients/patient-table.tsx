@@ -39,6 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
 import { Patient, UpdatePatient } from "@repo/db/types";
 import { PatientFinancialsModal } from "./patient-financial-modal";
+import { getPageNumbers } from "@/utils/pageNumberGenerator";
 
 interface PatientApiResponse {
   patients: Patient[];
@@ -309,25 +310,6 @@ export function PatientTable({
     return colorClasses[id % colorClasses.length];
   };
 
-  function getPageNumbers(current: number, total: number): (number | "...")[] {
-    const delta = 2;
-    const range: (number | "...")[] = [];
-    const left = Math.max(2, current - delta);
-    const right = Math.min(total - 1, current + delta);
-
-    range.push(1);
-    if (left > 2) range.push("...");
-
-    for (let i = left; i <= right; i++) {
-      range.push(i);
-    }
-
-    if (right < total - 1) range.push("...");
-    if (total > 1) range.push(total);
-
-    return range;
-  }
-
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
@@ -440,18 +422,26 @@ export function PatientTable({
                   </TableCell>
                   <TableCell>
                     <div className="col-span-1">
-                      <span
-                        className={cn(
-                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                          patient.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        )}
-                      >
-                        {patient.status === "active" ? "Active" : "Inactive"}
-                      </span>
+                      {patient.status === "ACTIVE" && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Active
+                        </span>
+                      )}
+
+                      {patient.status === "INACTIVE" && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          Inactive
+                        </span>
+                      )}
+
+                      {patient.status === "UNKNOWN" && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                          Unknown
+                        </span>
+                      )}
                     </div>
                   </TableCell>
+
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-2">
                       {allowDelete && (
@@ -573,15 +563,18 @@ export function PatientTable({
                     <p>
                       <span className="text-gray-500">Status:</span>{" "}
                       <span
-                        className={`${
-                          currentPatient.status === "active"
+                        className={cn(
+                          currentPatient.status === "ACTIVE"
                             ? "text-green-600"
-                            : "text-red-600"
-                        } font-medium`}
+                            : currentPatient.status === "INACTIVE"
+                              ? "text-red-600"
+                              : "text-gray-600", // UNKNOWN or fallback
+                          "font-medium"
+                        )}
                       >
                         {currentPatient.status
                           ? currentPatient.status.charAt(0).toUpperCase() +
-                            currentPatient.status.slice(1)
+                            currentPatient.status.slice(1).toLowerCase()
                           : "Unknown"}
                       </span>
                     </p>
