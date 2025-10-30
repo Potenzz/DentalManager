@@ -23,6 +23,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import DocumentsFilePreviewModal from "@/components/documents/file-preview-modal";
+import { getPageNumbers } from "@/utils/pageNumberGenerator";
 
 export default function DocumentsPage() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -204,23 +205,6 @@ export default function DocumentsPage() {
   const endItem = totalForExpandedGroup
     ? Math.min(offset + limit, totalForExpandedGroup)
     : 0;
-
-  function getPageNumbers(current: number, total: number) {
-    const delta = 2;
-    const range: (number | "...")[] = [];
-    for (
-      let i = Math.max(2, current - delta);
-      i <= Math.min(total - 1, current + delta);
-      i++
-    ) {
-      range.push(i);
-    }
-    if (current - delta > 2) range.unshift("...");
-    if (current + delta < total - 1) range.push("...");
-    range.unshift(1);
-    if (total > 1) range.push(total);
-    return range;
-  }
 
   return (
     <div>

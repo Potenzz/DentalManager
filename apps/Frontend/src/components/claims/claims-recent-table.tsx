@@ -35,6 +35,7 @@ import { formatDateToHumanReadable } from "@/utils/dateUtils";
 import ClaimViewModal from "./claim-view-modal";
 import ClaimEditModal from "./claim-edit-modal";
 import { Claim, ClaimStatus, ClaimWithServiceLines } from "@repo/db/types";
+import { getPageNumbers } from "@/utils/pageNumberGenerator";
 
 interface ClaimApiResponse {
   claims: ClaimWithServiceLines[];
@@ -293,25 +294,6 @@ export default function ClaimsRecentTable({
       0
     );
   };
-
-  function getPageNumbers(current: number, total: number): (number | "...")[] {
-    const delta = 2;
-    const range: (number | "...")[] = [];
-    const left = Math.max(2, current - delta);
-    const right = Math.min(total - 1, current + delta);
-
-    range.push(1);
-    if (left > 2) range.push("...");
-
-    for (let i = left; i <= right; i++) {
-      range.push(i);
-    }
-
-    if (right < total - 1) range.push("...");
-    if (total > 1) range.push(total);
-
-    return range;
-  }
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
