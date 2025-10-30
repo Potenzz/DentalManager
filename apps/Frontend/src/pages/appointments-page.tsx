@@ -37,6 +37,7 @@ import {
   Appointment,
   InsertAppointment,
   Patient,
+  PatientStatus,
   UpdateAppointment,
 } from "@repo/db/types";
 import {
@@ -51,6 +52,7 @@ import {
   setTaskStatus,
 } from "@/redux/slices/seleniumEligibilityBatchCheckTaskSlice";
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
+import { PatientStatusBadge } from "@/components/appointments/patient-status-badge";
 
 // Define types for scheduling
 interface TimeSlot {
@@ -69,6 +71,7 @@ interface ScheduledAppointment {
   id?: number;
   patientId: number;
   patientName: string;
+  patientStatus: PatientStatus;
   staffId: number;
   date: string | Date;
   startTime: string | Date;
@@ -163,12 +166,12 @@ export default function AppointmentsPage() {
   });
 
   const colors = [
-    "bg-blue-600",
-    "bg-emerald-600",
-    "bg-purple-600",
-    "bg-pink-600",
-    "bg-yellow-500",
-    "bg-red-600",
+    "bg-sky-500", // light blue
+    "bg-teal-500", // teal
+    "bg-indigo-500", // soft indigo
+    "bg-rose-400", // muted rose
+    "bg-amber-400", // muted amber
+    "bg-orange-500", // softer warm orange
   ];
 
   // Assign colors cycling through the list
@@ -403,6 +406,7 @@ export default function AppointmentsPage() {
     const patientName = patient
       ? `${patient.firstName} ${patient.lastName}`
       : "Unknown Patient";
+    const patientStatus = patient?.status;
 
     const staffId = Number(apt.staffId ?? 1);
 
@@ -418,6 +422,7 @@ export default function AppointmentsPage() {
     const processed = {
       ...apt,
       patientName,
+      patientStatus,
       staffId,
       status: apt.status ?? null,
       date: formatLocalDate(apt.date),
@@ -615,6 +620,12 @@ export default function AppointmentsPage() {
         }}
         onContextMenu={(e) => handleContextMenu(e, appointment.id ?? 0)}
       >
+        <PatientStatusBadge
+          status={appointment.patientStatus ?? "UNKNOWN"}
+          className="pointer-events-auto" // ensure tooltip works
+          size={30} // bump size up from 10 → 14
+        />
+
         <div className="font-bold truncate flex items-center gap-1">
           <Move className="h-3 w-3" />
           {appointment.patientName}
@@ -835,7 +846,6 @@ export default function AppointmentsPage() {
         description: `Processed ${results.length} appointments — success: ${successCount}, warnings: ${warningCount}, skipped: ${skippedCount}.`,
         variant: skippedCount > 0 ? "destructive" : "default",
       });
-
     } catch (err: any) {
       console.error("[check-all-eligibilities] error", err);
       dispatch(
