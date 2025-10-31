@@ -37,10 +37,10 @@ export const SeleniumTaskBanner = ({
         <div>
           <div className="font-medium text-gray-800">
             {status === "pending"
-              ? "Selenium Task In Progress"
+              ? "Task In Progress"
               : status === "success"
-                ? "Selenium Task Completed"
-                : "Selenium Task Error"}
+                ? "Task Completed"
+                : "Task Error"}
           </div>
           <p className="text-gray-600 text-sm">{message}</p>
         </div>
