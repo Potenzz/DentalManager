@@ -7,12 +7,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import Select
 import time
-from datetime import datetime
 import tempfile
 import base64
 import os
 
-class AutomationMassHealth:    
+class AutomationMassHealthPreAuth:    
     def __init__(self, data):
         self.headless = False
         self.driver = None
@@ -69,7 +68,7 @@ class AutomationMassHealth:
 
         try:
             claim_upload_link = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//a[text()='Claim Upload']"))
+            EC.element_to_be_clickable((By.XPATH, "//a[text()='PA Upload']"))
             )
             claim_upload_link.click()
 
@@ -140,20 +139,7 @@ class AutomationMassHealth:
                 select_element = wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='Select3']")))
                 Select(select_element).select_by_value(proc['procedureCode'])
 
-                # Fill Procedure Date if present
-                if proc.get("procedureDate"):
-                    try:
-                        # Try to normalize date to MM/DD/YYYY format
-                        parsed_date = datetime.strptime(proc["procedureDate"], "%Y-%m-%d")
-                        formatted_date = parsed_date.strftime("%m/%d/%Y")
-
-                        date_xpath = "//input[@name='ProcedureDate']"
-                        wait.until(EC.presence_of_element_located((By.XPATH, date_xpath))).clear()
-                        self.driver.find_element(By.XPATH, date_xpath).send_keys(formatted_date)
-
-                    except ValueError:
-                        # Invalid date format - skip filling ProcedureDate field
-                        pass
+                # not Filling Procedure Date
 
                 # Fill Oral Cavity Area if present
                 if proc.get("oralCavityArea"):
@@ -340,6 +326,7 @@ class AutomationMassHealth:
             if login_result.startswith("ERROR"):
                 return {"status": "error", "message": login_result}
 
+            input("Hey")
             step1_result = self.step1()
             if step1_result.startswith("ERROR"):
                 return {"status": "error", "message": step1_result}

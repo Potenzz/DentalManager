@@ -315,7 +315,7 @@ export default function ClaimsPage() {
       );
       const response = await apiRequest(
         "POST",
-        "/api/claims/selenium",
+        "/api/claims/selenium-claim",
         formData
       );
       const result1 = await response.json();
@@ -337,7 +337,8 @@ export default function ClaimsPage() {
 
       const result2 = await handleMHSeleniumPdfDownload(
         result1,
-        selectedPatientId
+        selectedPatientId,
+        "INSURANCE_CLAIM"
       );
       return result2;
     } catch (error: any) {
@@ -358,7 +359,8 @@ export default function ClaimsPage() {
   // 5. selenium pdf download handler
   const handleMHSeleniumPdfDownload = async (
     data: any,
-    selectedPatientId: number | null
+    selectedPatientId: number | null,
+    groupTitleKey: "INSURANCE_CLAIM" | "INSURANCE_CLAIM_PREAUTH"
   ) => {
     try {
       if (!selectedPatientId) {
@@ -375,6 +377,7 @@ export default function ClaimsPage() {
       const res = await apiRequest("POST", "/api/claims/selenium/fetchpdf", {
         patientId: selectedPatientId,
         pdf_url: data.pdf_url,
+        groupTitleKey,
       });
       const result = await res.json();
       if (result.error) throw new Error(result.error);
@@ -416,6 +419,69 @@ export default function ClaimsPage() {
     clearUrlParams(["newPatient", "appointmentId"]);
   };
 
+  // Pre Auth section
+  const handleMHClaimPreAuthSubmitSelenium = async (data: any) => {
+    const formData = new FormData();
+    formData.append("data", JSON.stringify(data));
+    const uploadedFiles: File[] = data.uploadedFiles ?? [];
+
+    uploadedFiles.forEach((file: File) => {
+      if (file.type === "application/pdf") {
+        formData.append("pdfs", file);
+      } else if (file.type.startsWith("image/")) {
+        formData.append("images", file);
+      }
+    });
+
+    try {
+      dispatch(
+        setTaskStatus({
+          status: "pending",
+          message: "Submitting claim pre auth to Selenium...",
+        })
+      );
+      const response = await apiRequest(
+        "POST",
+        "/api/claims/selenium-claim-pre-auth",
+        formData
+      );
+      const result1 = await response.json();
+      if (result1.error) throw new Error(result1.error);
+
+      dispatch(
+        setTaskStatus({
+          status: "pending",
+          message: "Submitted to Selenium. Awaiting PDF...",
+        })
+      );
+
+      toast({
+        title: "Selenium service notified",
+        description:
+          "Your claim pre auth data was successfully sent to Selenium, Waitinig for its response.",
+        variant: "default",
+      });
+
+      const result2 = await handleMHSeleniumPdfDownload(
+        result1,
+        selectedPatientId,
+        "INSURANCE_CLAIM_PREAUTH"
+      );
+      return result2;
+    } catch (error: any) {
+      dispatch(
+        setTaskStatus({
+          status: "error",
+          message: error.message || "Selenium submission failed",
+        })
+      );
+      toast({
+        title: "Selenium service error",
+        description: error.message || "An error occurred.",
+        variant: "destructive",
+      });
+    }
+  };
   return (
     <div>
       <SeleniumTaskBanner
@@ -470,7 +536,8 @@ export default function ClaimsPage() {
           onSubmit={handleClaimSubmit}
           onHandleAppointmentSubmit={handleAppointmentSubmit}
           onHandleUpdatePatient={handleUpdatePatient}
-          onHandleForMHSelenium={handleMHClaimSubmitSelenium}
+          onHandleForMHSeleniumClaim={handleMHClaimSubmitSelenium}
+          onHandleForMHSeleniumClaimPreAuth={handleMHClaimPreAuthSubmitSelenium}
         />
       )}
     </div>

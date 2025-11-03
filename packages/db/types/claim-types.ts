@@ -82,3 +82,37 @@ export type ClaimWithServiceLines = Claim & {
   staff?: Staff | null;
   claimFiles?: ClaimFileMeta[] | null;
 };
+
+export interface ClaimFormData {
+  patientId: number;
+  appointmentId: number;
+  userId: number;
+  staffId: number;
+  patientName: string;
+  memberId: string;
+  dateOfBirth: string;
+  remarks: string;
+  serviceDate: string; // YYYY-MM-DD
+  insuranceProvider: string;
+  insuranceSiteKey?: string;
+  status: string; // default "pending"
+  serviceLines: InputServiceLine[];
+  claimId?: number;
+  claimFiles?: ClaimFileMeta[];
+}
+
+export interface ClaimPreAuthData {
+  patientId: number;
+  userId: number;
+  staffId: number;
+  patientName: string;
+  memberId: string;
+  dateOfBirth: string;
+  remarks: string;
+  serviceDate: string; // YYYY-MM-DD
+  insuranceProvider: string;
+  insuranceSiteKey?: string;
+  status: string; // default "pending"
+  serviceLines: InputServiceLine[];
+  claimFiles?: ClaimFileMeta[];
+}

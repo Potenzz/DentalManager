@@ -37,7 +37,7 @@ const upload = multer({
 });
 
 router.post(
-  "/selenium",
+  "/selenium-claim",
   upload.fields([
     { name: "pdfs", maxCount: 10 },
     { name: "images", maxCount: 10 },
@@ -108,7 +108,7 @@ router.post(
         return sendError(res, "Unauthorized: user info missing", 401);
       }
 
-      const { patientId, pdf_url } = req.body;
+      const { patientId, pdf_url, groupTitleKey } = req.body;
 
       if (!pdf_url) {
         return sendError(res, "Missing pdf_url");
@@ -126,7 +126,15 @@ router.post(
       });
 
       const groupTitle = "Claims";
-      const groupTitleKey = "INSURANCE_CLAIM";
+
+      // allowed keys
+      const allowedKeys = ["INSURANCE_CLAIM", "INSURANCE_CLAIM_PREAUTH"];
+      if (!allowedKeys.includes(groupTitleKey)) {
+        return sendError(
+          res,
+          `Invalid groupTitleKey. Must be one of: ${allowedKeys.join(", ")}`
+        );
+      }
 
       // ✅ Find or create PDF group for this claim
       let group = await storage.findPdfGroupByPatientTitleKey(
@@ -154,6 +162,65 @@ router.post(
     } catch (err) {
       console.error("Error in /selenium/fetchpdf:", err);
       return sendError(res, "Failed to Fetch and Download the pdf", 500);
+    }
+  }
+);
+
+router.post(
+  "/selenium-claim-pre-auth",
+  upload.fields([
+    { name: "pdfs", maxCount: 10 },
+    { name: "images", maxCount: 10 },
+  ]),
+  async (req: Request, res: Response): Promise<any> => {
+    if (!req.files || !req.body.data) {
+      return res
+        .status(400)
+        .json({ error: "Missing files or claim data for selenium" });
+    }
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized: user info missing" });
+    }
+
+    try {
+      const claimData = JSON.parse(req.body.data);
+      const pdfs =
+        (req.files as Record<string, Express.Multer.File[]>).pdfs ?? [];
+      const images =
+        (req.files as Record<string, Express.Multer.File[]>).images ?? [];
+
+      const credentials = await storage.getInsuranceCredentialByUserAndSiteKey(
+        req.user.id,
+        claimData.insuranceSiteKey
+      );
+      if (!credentials) {
+        return res.status(404).json({
+          error:
+            "No insurance credentials found for this provider. Kindly Update this at Settings Page.",
+        });
+      }
+
+      const enrichedData = {
+        ...claimData,
+        massdhpUsername: credentials.username,
+        massdhpPassword: credentials.password,
+      };
+
+      const result = await forwardToSeleniumClaimAgent(enrichedData, [
+        ...pdfs,
+        ...images,
+      ]);
+
+      res.json({
+        ...result,
+        claimId: claimData.claimId,
+      });
+    } catch (err: any) {
+      console.error(err);
+      return res.status(500).json({
+        error: err.message || "Failed to forward to selenium agent",
+      });
     }
   }
 );

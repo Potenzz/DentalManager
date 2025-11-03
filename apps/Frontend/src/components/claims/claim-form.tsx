@@ -33,6 +33,9 @@ import {
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import {
   Claim,
+  ClaimFileMeta,
+  ClaimFormData,
+  ClaimPreAuthData,
   InputServiceLine,
   InsertAppointment,
   Patient,
@@ -47,31 +50,7 @@ import {
   getDescriptionForCode,
 } from "@/utils/procedureCombosMapping";
 import { COMBO_CATEGORIES, PROCEDURE_COMBOS } from "@/utils/procedureCombos";
-import { DateInputField } from "../ui/dateInputField";
 import { DateInput } from "../ui/dateInput";
-
-interface ClaimFileMeta {
-  filename: string;
-  mimeType: string;
-}
-
-interface ClaimFormData {
-  patientId: number;
-  appointmentId: number;
-  userId: number;
-  staffId: number;
-  patientName: string;
-  memberId: string;
-  dateOfBirth: string;
-  remarks: string;
-  serviceDate: string; // YYYY-MM-DD
-  insuranceProvider: string;
-  insuranceSiteKey?: string;
-  status: string; // default "pending"
-  serviceLines: InputServiceLine[];
-  claimId?: number;
-  claimFiles?: ClaimFileMeta[];
-}
 
 interface ClaimFormProps {
   patientId: number;
@@ -81,7 +60,8 @@ interface ClaimFormProps {
     appointmentData: InsertAppointment | UpdateAppointment
   ) => Promise<number | { id: number }>;
   onHandleUpdatePatient: (patient: UpdatePatient & { id: number }) => void;
-  onHandleForMHSelenium: (data: ClaimFormData) => void;
+  onHandleForMHSeleniumClaim: (data: ClaimFormData) => void;
+  onHandleForMHSeleniumClaimPreAuth: (data: ClaimPreAuthData) => void;
   onClose: () => void;
 }
 
@@ -90,7 +70,8 @@ export function ClaimForm({
   appointmentId,
   onHandleAppointmentSubmit,
   onHandleUpdatePatient,
-  onHandleForMHSelenium,
+  onHandleForMHSeleniumClaim,
+  onHandleForMHSeleniumClaimPreAuth,
   onSubmit,
   onClose,
 }: ClaimFormProps) {
@@ -334,6 +315,13 @@ export function ClaimForm({
     return "";
   }
 
+  // assumes input is either "" or "YYYY-MM-DD"
+  const toMMDDYYYY = (iso: string): string => {
+    if (!iso) return "";
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    return m ? `${m[2]}-${m[3]}-${m[1]}` : "";
+  };
+
   // MAIN FORM INITIAL STATE
   const [form, setForm] = useState<ClaimFormData & { uploadedFiles: File[] }>({
     patientId: patientId || 0,
@@ -542,8 +530,9 @@ export function ClaimForm({
     });
 
     // 4. sending form data to selenium service
-    onHandleForMHSelenium({
+    onHandleForMHSeleniumClaim({
       ...f,
+      dateOfBirth: toMMDDYYYY(f.dateOfBirth),
       serviceLines: filteredServiceLines,
       staffId: Number(staff?.id),
       patientId: patientId,
@@ -557,7 +546,76 @@ export function ClaimForm({
     onClose();
   };
 
-  // 2nd Button workflow - Only Creates Data, patient, appointmetn, claim, payment, not actually submits claim to MH site.
+  // 2st Button workflow - Mass Health Pre Auth Button Handler
+  const handleMHPreAuth = async (
+    formToUse?: ClaimFormData & { uploadedFiles?: File[] }
+  ) => {
+    // Use the passed form, or fallback to current state
+    const f = formToUse ?? form;
+
+    // 0. Validate required fields
+    const missingFields: string[] = [];
+
+    if (!f.memberId?.trim()) missingFields.push("Member ID");
+    if (!f.dateOfBirth?.trim()) missingFields.push("Date of Birth");
+    if (!patient?.firstName?.trim()) missingFields.push("First Name");
+
+    if (missingFields.length > 0) {
+      toast({
+        title: "Missing Required Fields",
+        description: `Please fill out the following field(s): ${missingFields.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // require at least one procedure code before proceeding
+    const filteredServiceLines = (f.serviceLines || []).filter(
+      (line) => (line.procedureCode ?? "").trim() !== ""
+    );
+    if (filteredServiceLines.length === 0) {
+      toast({
+        title: "No procedure codes",
+        description:
+          "Please add at least one procedure code before submitting the claim preAuth.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 2. Update patient
+    if (patient && typeof patient.id === "number") {
+      const { id, createdAt, userId, ...sanitizedFields } = patient;
+      const updatedPatientFields = {
+        id,
+        ...sanitizedFields,
+        insuranceProvider: "MassHealth",
+      };
+      onHandleUpdatePatient(updatedPatientFields);
+    } else {
+      toast({
+        title: "Error",
+        description: "Cannot update patient: Missing or invalid patient data",
+        variant: "destructive",
+      });
+    }
+
+    // 4. sending form data to selenium service
+    onHandleForMHSeleniumClaimPreAuth({
+      ...f,
+      dateOfBirth: toMMDDYYYY(f.dateOfBirth),
+      serviceLines: filteredServiceLines,
+      staffId: Number(staff?.id),
+      patientId: patientId,
+      insuranceProvider: "Mass Health",
+      insuranceSiteKey: "MH",
+    });
+
+    // 5. Close form
+    onClose();
+  };
+
+  // 3nd Button workflow - Only Creates Data, patient, appointmetn, claim, payment, not actually submits claim to MH site.
   const handleAddService = async () => {
     // 0. Validate required fields
     const missingFields: string[] = [];
@@ -648,6 +706,7 @@ export function ClaimForm({
     onClose();
   };
 
+  // for direct combo button.
   const applyComboAndThenMH = async (
     comboId: keyof typeof PROCEDURE_COMBOS
   ) => {
@@ -1237,7 +1296,11 @@ export function ClaimForm({
                 >
                   MH
                 </Button>
-                <Button className="w-32" variant="secondary">
+                <Button
+                  className="w-32"
+                  variant="secondary"
+                  onClick={() => handleMHPreAuth()}
+                >
                   MH PreAuth
                 </Button>
                 <Button

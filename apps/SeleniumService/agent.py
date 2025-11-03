@@ -5,6 +5,7 @@ import asyncio
 from selenium_claimSubmitWorker import AutomationMassHealth
 from selenium_eligibilityCheckWorker import AutomationMassHealthEligibilityCheck
 from selenium_claimStatusCheckWorker import AutomationMassHealthClaimStatusCheck
+from selenium_preAuthWorker import AutomationMassHealthPreAuth
 import os
 
 from dotenv import load_dotenv
@@ -27,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Endpoint: Step 1 — Start the automation of submitting Claim.
+# Endpoint: 1 — Start the automation of submitting Claim.
 @app.post("/claimsubmit")
 async def start_workflow(request: Request):
     global active_jobs, waiting_jobs
@@ -55,7 +56,7 @@ async def start_workflow(request: Request):
             async with lock:
                 active_jobs -= 1
     
-# Endpoint: Step 2 — Start the automation of cheking eligibility
+# Endpoint: 2 — Start the automation of cheking eligibility
 @app.post("/eligibility-check")
 async def start_workflow(request: Request):
     global active_jobs, waiting_jobs
@@ -82,7 +83,7 @@ async def start_workflow(request: Request):
             async with lock:
                 active_jobs -= 1
     
-# Endpoint: Step 3 — Start the automation of cheking claim status
+# Endpoint: 3 — Start the automation of cheking claim status
 @app.post("/claim-status-check")
 async def start_workflow(request: Request):
     global active_jobs, waiting_jobs
@@ -97,6 +98,33 @@ async def start_workflow(request: Request):
             active_jobs += 1
         try:
             bot = AutomationMassHealthClaimStatusCheck(data)
+            result = bot.main_workflow("https://providers.massdhp.com/providers_login.asp")
+
+            if result.get("status") != "success":
+                return {"status": "error", "message": result.get("message")}
+            
+            return result
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        finally:
+            async with lock:
+                active_jobs -= 1
+
+# Endpoint: 4 — Start the automation of cheking claim pre auth
+@app.post("/claim-pre-auth")
+async def start_workflow(request: Request):
+    global active_jobs, waiting_jobs
+    data = await request.json()
+
+    async with lock:
+        waiting_jobs += 1
+
+    async with semaphore:
+        async with lock:
+            waiting_jobs -= 1
+            active_jobs += 1
+        try:
+            bot = AutomationMassHealthPreAuth(data)
             result = bot.main_workflow("https://providers.massdhp.com/providers_login.asp")
 
             if result.get("status") != "success":
