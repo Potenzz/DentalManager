@@ -71,7 +71,7 @@ interface ScheduledAppointment {
   id?: number;
   patientId: number;
   patientName: string;
-  patientStatus: PatientStatus;
+  eligibilityStatus: PatientStatus;
   staffId: number;
   date: string | Date;
   startTime: string | Date;
@@ -403,10 +403,12 @@ export default function AppointmentsPage() {
   ).map((apt) => {
     // Find patient name
     const patient = patientsFromDay.find((p) => p.id === apt.patientId);
+
     const patientName = patient
       ? `${patient.firstName} ${patient.lastName}`
       : "Unknown Patient";
-    const patientStatus = patient?.status;
+
+    const eligibilityStatus = (apt as any).eligibilityStatus as PatientStatus;
 
     const staffId = Number(apt.staffId ?? 1);
 
@@ -422,7 +424,7 @@ export default function AppointmentsPage() {
     const processed = {
       ...apt,
       patientName,
-      patientStatus,
+      eligibilityStatus,
       staffId,
       status: apt.status ?? null,
       date: formatLocalDate(apt.date),
@@ -621,7 +623,7 @@ export default function AppointmentsPage() {
         onContextMenu={(e) => handleContextMenu(e, appointment.id ?? 0)}
       >
         <PatientStatusBadge
-          status={appointment.patientStatus ?? "UNKNOWN"}
+          status={appointment.eligibilityStatus ?? "UNKNOWN"}
           className="pointer-events-auto" // ensure tooltip works
           size={30} // bump size up from 10 → 14
         />

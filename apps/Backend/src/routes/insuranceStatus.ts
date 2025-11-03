@@ -647,8 +647,22 @@ router.post(
           // Update patient status based on seleniumResult.eligibility
           const newStatus =
             seleniumResult?.eligibility === "Y" ? "ACTIVE" : "INACTIVE";
+
+          // 1. updating patient
           await storage.updatePatient(updatedPatient.id, { status: newStatus });
           resultItem.patientUpdateStatus = `Patient status updated to ${newStatus}`;
+
+          // 2. updating appointment status - for aptmnt page
+          try {
+            await storage.updateAppointment(Number(apt.id), {
+              eligibilityStatus: newStatus,
+            });
+            resultItem.appointmentUpdateStatus = `Appointment eligibility set to ${newStatus}`;
+          } catch (apptUpdateErr: any) {
+            resultItem.warning =
+              (resultItem.warning ? resultItem.warning + " | " : "") +
+              `Failed to update appointment eligibility: ${apptUpdateErr?.message ?? String(apptUpdateErr)}`;
+          }
 
           // If PDF exists, upload to PdfGroup (ELIGIBILITY_STATUS)
           if (

@@ -85,6 +85,8 @@ model Appointment {
   status    String   @default("scheduled") // "scheduled", "completed", "cancelled", "no-show"
   createdAt DateTime @default(now())
 
+  eligibilityStatus PatientStatus @default(UNKNOWN)
+
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id])
   staff   Staff?  @relation(fields: [staffId], references: [id])
