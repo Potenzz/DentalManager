@@ -12,7 +12,7 @@ export interface SeleniumPayload {
   }[];
 }
 
-export async function forwardToSeleniumClaimAgent(
+export async function forwardToSeleniumClaimPreAuthAgent(
   claimData: any,
   files: Express.Multer.File[]
 ): Promise<any> {

@@ -13,6 +13,7 @@ import {
   InputServiceLine,
   updateClaimSchema,
 } from "@repo/db/types";
+import { forwardToSeleniumClaimPreAuthAgent } from "../services/seleniumInsuranceClaimPreAuthClient";
 
 const router = Router();
 
@@ -207,7 +208,7 @@ router.post(
         massdhpPassword: credentials.password,
       };
 
-      const result = await forwardToSeleniumClaimAgent(enrichedData, [
+      const result = await forwardToSeleniumClaimPreAuthAgent(enrichedData, [
         ...pdfs,
         ...images,
       ]);
