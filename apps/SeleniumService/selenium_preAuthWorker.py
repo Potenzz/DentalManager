@@ -326,11 +326,10 @@ class AutomationMassHealthPreAuth:
             if login_result.startswith("ERROR"):
                 return {"status": "error", "message": login_result}
 
-            input("Hey")
             step1_result = self.step1()
             if step1_result.startswith("ERROR"):
                 return {"status": "error", "message": step1_result}
-
+            
             step2_result = self.step2()
             if step2_result.startswith("ERROR"):
                 return {"status": "error", "message": step2_result}
