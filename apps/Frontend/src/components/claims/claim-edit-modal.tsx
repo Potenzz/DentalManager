@@ -16,6 +16,12 @@ import {
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
 import React, { useState } from "react";
 import { ClaimStatus, ClaimWithServiceLines } from "@repo/db/types";
+import {
+  safeParseMissingTeeth,
+  splitTeeth,
+  ToothChip,
+  toStatusLabel,
+} from "./tooth-ui";
 
 type ClaimEditModalProps = {
   isOpen: boolean;
@@ -221,6 +227,65 @@ export default function ClaimEditModal({
                 <p className="text-gray-500">No service lines available.</p>
               )}
             </div>
+          </div>
+
+          {/* Missing Teeth */}
+          <div className="space-y-2 pt-4">
+            <h4 className="font-medium text-gray-900">Missing Teeth</h4>
+
+            <p>
+              <span className="text-gray-500">Status:</span>{" "}
+              {toStatusLabel((claim as any).missingTeethStatus)}
+            </p>
+
+            {/* Only show details when the user chose "Specify Missing" */}
+            {(claim as any).missingTeethStatus === "Yes_missing" &&
+              (() => {
+                const map = safeParseMissingTeeth((claim as any).missingTeeth);
+                const { permanent, primary } = splitTeeth(map);
+                const hasAny = permanent.length > 0 || primary.length > 0;
+
+                if (!hasAny) {
+                  return (
+                    <p className="text-gray-500">
+                      No specific teeth marked as missing.
+                    </p>
+                  );
+                }
+
+                return (
+                  <div className="mt-2 space-y-3">
+                    {permanent.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-gray-600 mb-2">
+                          Permanent
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {permanent.map((t) => (
+                            <ToothChip key={t.name} name={t.name} v={t.v} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {primary.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-gray-600 mb-2">
+                          Primary
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {primary.map((t) => (
+                            <ToothChip key={t.name} name={t.name} v={t.v} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+            {(claim as any).missingTeethStatus === "endentulous" && (
+              <p className="text-sm text-gray-700">Patient is edentulous.</p>
+            )}
           </div>
 
           {/* Actions */}

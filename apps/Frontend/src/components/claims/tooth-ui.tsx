@@ -99,3 +99,57 @@ export function TeethGrid({
     </div>
   );
 }
+
+
+// ——— Missing Teeth helpers for claim-view and edit modal———
+type MissingMap = Record<string, ToothVal | undefined>;
+
+export function toStatusLabel(s?: string) {
+  if (!s) return "Unknown";
+  if (s === "No_missing") return "No Missing";
+  if (s === "endentulous") return "Edentulous";
+  if (s === "Yes_missing") return "Specify Missing";
+  // best-effort prettify
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+export function safeParseMissingTeeth(raw: unknown): MissingMap {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed as MissingMap;
+    } catch {}
+    return {};
+  }
+  if (typeof raw === "object") return raw as MissingMap;
+  return {};
+}
+
+const PERM = new Set(Array.from({ length: 32 }, (_, i) => `T_${i + 1}`));
+const PRIM = new Set(Array.from("ABCDEFGHIJKLMNOPQRST").map((ch) => `T_${ch}`));
+
+export function splitTeeth(map: MissingMap) {
+  const permanent: Array<{ name: string; v: ToothVal }> = [];
+  const primary: Array<{ name: string; v: ToothVal }> = [];
+  for (const [k, v] of Object.entries(map)) {
+    if (!v) continue;
+    if (PERM.has(k)) permanent.push({ name: k, v });
+    else if (PRIM.has(k)) primary.push({ name: k, v });
+  }
+  // stable, human-ish order
+  permanent.sort((a, b) => Number(a.name.slice(2)) - Number(b.name.slice(2)));
+  primary.sort((a, b) => a.name.localeCompare(b.name));
+  return { permanent, primary };
+}
+
+export function ToothChip({ name, v }: { name: string; v: ToothVal }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs bg-white">
+      <span className="font-medium">{name.replace("T_", "")}</span>
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded border">
+        {v}
+      </span>
+    </span>
+  );
+}
