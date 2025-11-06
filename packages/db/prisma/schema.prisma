@@ -119,6 +119,8 @@ model Claim {
   memberId          String
   dateOfBirth       DateTime    @db.Date
   remarks           String
+  missingTeethStatus MissingTeethStatus @default(No_missing)
+  missingTeeth       Json?              // { "T_14": "X", "T_G": "O", ... }
   serviceDate       DateTime
   insuranceProvider String // e.g., "Delta MA"
   createdAt         DateTime    @default(now())
@@ -141,6 +143,12 @@ enum ClaimStatus {
   CANCELLED
   REVIEW
   VOID
+}
+
+enum MissingTeethStatus {
+  No_missing 
+  endentulous
+  Yes_missing
 }
 
 model ServiceLine {

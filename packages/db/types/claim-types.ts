@@ -83,6 +83,8 @@ export type ClaimWithServiceLines = Claim & {
   claimFiles?: ClaimFileMeta[] | null;
 };
 
+export type MissingTeethStatus = "No_missing" | "endentulous" | "Yes_missing";
+
 export interface ClaimFormData {
   patientId: number;
   appointmentId: number;
@@ -92,6 +94,8 @@ export interface ClaimFormData {
   memberId: string;
   dateOfBirth: string;
   remarks: string;
+  missingTeethStatus: MissingTeethStatus;
+  missingTeeth: Record<string, "X" | "O">; // keys: T_1..T_32, T_A..T_T
   serviceDate: string; // YYYY-MM-DD
   insuranceProvider: string;
   insuranceSiteKey?: string;
@@ -109,6 +113,8 @@ export interface ClaimPreAuthData {
   memberId: string;
   dateOfBirth: string;
   remarks: string;
+  missingTeethStatus: MissingTeethStatus;
+  missingTeeth: Record<string, "X" | "O">; // keys: T_1..T_32, T_A..T_T
   serviceDate: string; // YYYY-MM-DD
   insuranceProvider: string;
   insuranceSiteKey?: string;

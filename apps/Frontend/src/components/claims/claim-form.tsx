@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -38,6 +38,7 @@ import {
   ClaimPreAuthData,
   InputServiceLine,
   InsertAppointment,
+  MissingTeethStatus,
   Patient,
   Staff,
   UpdateAppointment,
@@ -51,6 +52,7 @@ import {
 } from "@/utils/procedureCombosMapping";
 import { COMBO_CATEGORIES, PROCEDURE_COMBOS } from "@/utils/procedureCombos";
 import { DateInput } from "../ui/dateInput";
+import { TeethGrid, ToothSelectRadix } from "./tooth-ui";
 
 interface ClaimFormProps {
   patientId: number;
@@ -63,6 +65,20 @@ interface ClaimFormProps {
   onHandleForMHSeleniumClaim: (data: ClaimFormData) => void;
   onHandleForMHSeleniumClaimPreAuth: (data: ClaimPreAuthData) => void;
   onClose: () => void;
+}
+
+const PERMANENT_TOOTH_NAMES = Array.from(
+  { length: 32 },
+  (_, i) => `T_${i + 1}`
+);
+const PRIMARY_TOOTH_NAMES = Array.from("ABCDEFGHIJKLMNOPQRST").map(
+  (ch) => `T_${ch}`
+);
+
+function isValidToothKey(key: string) {
+  return (
+    PERMANENT_TOOTH_NAMES.includes(key) || PRIMARY_TOOTH_NAMES.includes(key)
+  );
 }
 
 export function ClaimForm({
@@ -332,6 +348,8 @@ export function ClaimForm({
     memberId: patient?.insuranceId ?? "",
     dateOfBirth: normalizeToIsoDateString(patient?.dateOfBirth),
     remarks: "",
+    missingTeethStatus: "No_missing",
+    missingTeeth: {},
     serviceDate: serviceDate,
     insuranceProvider: "",
     insuranceSiteKey: "",
@@ -407,6 +425,41 @@ export function ClaimForm({
     // Uppercase and remove characters that are not A-Z, comma or space
     return raw.toUpperCase().replace(/[^A-Z,\s]/g, "");
   }
+
+  // Missing teeth section
+  const setMissingTeethStatus = (status: MissingTeethStatus) => {
+    setForm((prev) => {
+      if (prev.missingTeethStatus === status) return prev; // no-op
+      return {
+        ...prev,
+        missingTeethStatus: status,
+        missingTeeth: status === "Yes_missing" ? prev.missingTeeth : {},
+      };
+    });
+  };
+
+  const updateMissingTooth = useCallback(
+    (name: string, value: "" | "X" | "O") => {
+      if (!isValidToothKey(name)) return;
+      setForm((prev) => {
+        const current = prev.missingTeeth[name] ?? "";
+        if (current === value) return prev;
+        const nextMap = { ...prev.missingTeeth };
+        if (!value) delete nextMap[name];
+        else nextMap[name] = value;
+        return { ...prev, missingTeeth: nextMap };
+      });
+    },
+    []
+  );
+
+  const onToothChange = useCallback(
+    (name: string, v: "" | "X" | "O") => updateMissingTooth(name, v),
+    [updateMissingTooth]
+  );
+
+  const clearAllToothSelections = () =>
+    setForm((prev) => ({ ...prev, missingTeeth: {} }));
 
   // for serviceLine rows, to auto scroll when it got updated by combo buttons and all.
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -1260,6 +1313,9 @@ export function ClaimForm({
             </div>
 
             {/* File Upload Section */}
+            <h3 className="text-xl pt-8 font-semibold text-center">
+              File Upload
+            </h3>
             <div className="mt-4 bg-gray-100 p-4 rounded-md space-y-4">
               <p className="text-sm text-gray-500">
                 You can upload up to 10 files. Allowed types: PDF, JPG, PNG,
@@ -1283,8 +1339,87 @@ export function ClaimForm({
               )}
             </div>
 
+            {/* Missing Teeth (MassHealth Step 3) */}
+            <div className="mt-8 pt-8 space-y-4">
+              <h3 className="text-xl font-semibold text-center">
+                Missing Teeth
+              </h3>
+
+              {/* Status selector – must match Selenium's exact case */}
+              <div className="flex flex-wrap gap-2 items-center justify-center">
+                <Label className="mr-2">Status</Label>
+
+                <Button
+                  type="button"
+                  variant={
+                    form.missingTeethStatus === "No_missing"
+                      ? "default"
+                      : "outline"
+                  }
+                  onClick={() => setMissingTeethStatus("No_missing")}
+                  aria-pressed={form.missingTeethStatus === "No_missing"}
+                >
+                  No Missing
+                </Button>
+
+                <Button
+                  type="button"
+                  variant={
+                    form.missingTeethStatus === "endentulous"
+                      ? "default"
+                      : "outline"
+                  }
+                  onClick={() => setMissingTeethStatus("endentulous")}
+                  aria-pressed={form.missingTeethStatus === "endentulous"}
+                >
+                  Edentulous
+                </Button>
+
+                <Button
+                  type="button"
+                  variant={
+                    form.missingTeethStatus === "Yes_missing"
+                      ? "default"
+                      : "outline"
+                  }
+                  onClick={() => setMissingTeethStatus("Yes_missing")}
+                  aria-pressed={form.missingTeethStatus === "Yes_missing"}
+                >
+                  Specify Missing
+                </Button>
+
+                {form.missingTeethStatus === "Yes_missing" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearAllToothSelections}
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
+
+              {/* When specifying per-tooth values, show Permanent + Primary grids */}
+              {form.missingTeethStatus === "Yes_missing" && (
+                <div className="grid md:grid-cols-2 gap-6 overflow-visible">
+                  <TeethGrid
+                    title="PERMANENT"
+                    toothNames={PERMANENT_TOOTH_NAMES}
+                    values={form.missingTeeth}
+                    onChange={onToothChange}
+                  />
+                  <TeethGrid
+                    title="PRIMARY"
+                    toothNames={PRIMARY_TOOTH_NAMES}
+                    values={form.missingTeeth}
+                    onChange={onToothChange}
+                  />
+                </div>
+              )}
+            </div>
+
             {/* Insurance Carriers */}
-            <div>
+            <div className="pt-6">
               <h3 className="text-xl font-semibold mb-4 text-center">
                 Insurance Carriers
               </h3>
