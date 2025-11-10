@@ -43,6 +43,7 @@ export default function InsuranceStatusPage() {
   const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const isFormIncomplete = !memberId || !dateOfBirth || !firstName || !lastName;
   const [isCheckingEligibilityStatus, setIsCheckingEligibilityStatus] =
     useState(false);
   const [isCheckingClaimStatus, setIsCheckingClaimStatus] = useState(false);
@@ -153,7 +154,7 @@ export default function InsuranceStatusPage() {
       });
 
       setSelectedPatient(null);
-      
+
       // If server returned pdfFileId: open preview modal
       if (result.pdfFileId) {
         setPreviewPdfId(Number(result.pdfFileId));
@@ -568,6 +569,94 @@ export default function InsuranceStatusPage() {
                   </>
                 )}
               </Button>
+            </div>
+
+            {/* TEMP PROVIDER BUTTONS */}
+            <div className="space-y-4 mt-6">
+              <h3 className="text-sm font-medium text-muted-foreground">
+                Quick provider checks (not working)
+              </h3>
+
+              {/* Row 1 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isFormIncomplete}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Delta MA
+                </Button>
+
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isFormIncomplete}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Metlife Dental
+                </Button>
+
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isFormIncomplete}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  CCA
+                </Button>
+              </div>
+
+              {/* Row 2 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isFormIncomplete}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Tufts SCO/SWH/Navi/Mass Gen
+                </Button>
+
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isFormIncomplete}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  United SCO
+                </Button>
+
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isFormIncomplete}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  United AAPR
+                </Button>
+              </div>
+
+              {/* Row 3 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isFormIncomplete}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Aetna
+                </Button>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isFormIncomplete}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Altus
+                </Button>
+                <div /> {/* filler cell to keep grid shape */}
+              </div>
             </div>
           </CardContent>
         </Card>
