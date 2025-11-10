@@ -1,105 +1,7 @@
 import React from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-const NONE = "__NONE__" as const;
-export type ToothVal = "" | "X" | "O";
-
-interface ToothProps {
-  name: string;
-  value: ToothVal;                          // "" | "X" | "O"
-  onChange: (name: string, v: ToothVal) => void;
-}
-
-/**
- * Clean, single select:
- * - Empty state shows a blank trigger (no "None" text).
- * - First menu item sets empty value, but its label is visually blank.
- * - Cell fills column width so the grid can wrap -> no overflow.
- */
-function ToothSelect({ name, value, onChange }: ToothProps) {
-  const label = name.replace("T_", "");
-  const uiValue = (value === "" ? NONE : value) as typeof NONE | "X" | "O";
-
-  return (
-    <div className="flex flex-col items-center w-full h-16 rounded-lg border bg-white p-1">
-      <div className="text-[10px] leading-none opacity-70 mb-1">{label}</div>
-
-      <Select
-        value={uiValue}
-        onValueChange={(v) => onChange(name, v === NONE ? "" : (v as ToothVal))}
-      >
-        <SelectTrigger
-          aria-label={`${name} selection`}
-          className="
-            h-8 w-full px-2 text-xs justify-center
-            data-[placeholder]:opacity-0  /* hide placeholder text entirely */
-          "
-        >
-          {/* placeholder is a single space so trigger height stays stable */}
-          <SelectValue placeholder=" " />
-        </SelectTrigger>
-
-        <SelectContent position="popper" sideOffset={6} align="center" className="z-50">
-          {/* blank option -> sets empty string; visually blank, still accessible */}
-          <SelectItem value={NONE}>
-            {/* visually blank but keeps item height/click area */}
-            <span className="sr-only">Empty</span>
-            {" "}
-          </SelectItem>
-          <SelectItem value="X">X</SelectItem>
-          <SelectItem value="O">O</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-export const ToothSelectRadix = React.memo(
-  ToothSelect,
-  (prev, next) => prev.value === next.value && prev.name === next.name
-);
-
-export function TeethGrid({
-  title,
-  toothNames,
-  values,
-  onChange,
-}: {
-  title: string;
-  toothNames: string[];
-  values: Record<string, ToothVal | undefined>;
-  onChange: (name: string, v: ToothVal) => void;
-}) {
-  return (
-    <div className="border rounded-lg p-3">
-      <div className="text-center font-medium mb-2">{title}</div>
-
-      {/* responsive grid that auto-fits cells; no horizontal overflow */}
-      <div
-        className="
-          grid gap-2
-          [grid-template-columns:repeat(auto-fit,minmax(4.5rem,1fr))]
-        "
-      >
-        {toothNames.map((name) => (
-          <ToothSelectRadix
-            key={name}
-            name={name}
-            value={(values[name] as ToothVal) ?? ""}
-            onChange={onChange}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
+import { Label } from "recharts";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
 
 // ——— Missing Teeth helpers for claim-view and edit modal———
 type MissingMap = Record<string, ToothVal | undefined>;
@@ -151,5 +53,139 @@ export function ToothChip({ name, v }: { name: string; v: ToothVal }) {
         {v}
       </span>
     </span>
+  );
+}
+
+export type ToothVal = "X" | "O";
+export type MissingMapStrict = Record<string, ToothVal>;
+
+/* ---------- parsing helpers ---------- */
+const PERM_NUMBERS = new Set(
+  Array.from({ length: 32 }, (_, i) => String(i + 1))
+);
+const PRIM_LETTERS = new Set(Array.from("ABCDEFGHIJKLMNOPQRST"));
+
+function normalizeToothToken(token: string): string | null {
+  const t = token.trim().toUpperCase();
+  if (!t) return null;
+  if (PERM_NUMBERS.has(t)) return t; // 1..32
+  if (t.length === 1 && PRIM_LETTERS.has(t)) return t; // A..T
+  return null;
+}
+
+function listToEntries(list: string, val: ToothVal): Array<[string, ToothVal]> {
+  if (!list) return [];
+  const seen = new Set<string>();
+  return list
+    .split(/[,\s]+/g) // commas OR spaces
+    .map(normalizeToothToken) // uppercase + validate
+    .filter((t): t is string => !!t)
+    .filter((t) => {
+      // de-duplicate within field
+      if (seen.has(t)) return false;
+      seen.add(t);
+      return true;
+    })
+    .map((t) => [`T_${t}`, val]);
+}
+
+/** Build map; 'O' overrides 'X' when duplicated across fields. */
+export function mapFromLists(
+  missingList: string,
+  pullList: string
+): MissingMapStrict {
+  const map: MissingMapStrict = {};
+  for (const [k, v] of listToEntries(missingList, "X")) map[k] = v;
+  for (const [k, v] of listToEntries(pullList, "O")) map[k] = v;
+  return map;
+}
+
+/** For initializing the inputs from an existing map (used only on mount or clear). */
+export function listsFromMap(map: Record<string, ToothVal | undefined>): {
+  missing: string;
+  toPull: string;
+} {
+  const missing: string[] = [];
+  const toPull: string[] = [];
+  for (const [k, v] of Object.entries(map || {})) {
+    if (v === "X") missing.push(k.replace(/^T_/, ""));
+    else if (v === "O") toPull.push(k.replace(/^T_/, ""));
+  }
+  const sort = (a: string, b: string) => {
+    const na = Number(a),
+      nb = Number(b);
+    const an = !Number.isNaN(na),
+      bn = !Number.isNaN(nb);
+    if (an && bn) return na - nb;
+    if (an) return -1;
+    if (bn) return 1;
+    return a.localeCompare(b);
+  };
+  missing.sort(sort);
+  toPull.sort(sort);
+  return { missing: missing.join(", "), toPull: toPull.join(", ") };
+}
+
+/* ---------- UI ---------- */
+export function MissingTeethSimple({
+  value,
+  onChange,
+}: {
+  /** Must match ClaimFormData.missingTeeth exactly */
+  value: MissingMapStrict;
+  onChange: (next: MissingMapStrict) => void;
+}) {
+  // initialize text inputs from incoming map
+  const init = React.useMemo(() => listsFromMap(value), []); // only on mount
+  const [missingField, setMissingField] = React.useState(init.missing);
+  const [pullField, setPullField] = React.useState(init.toPull);
+
+  // only resync when parent CLEARS everything (so your Clear All works)
+  React.useEffect(() => {
+    if (!value || Object.keys(value).length === 0) {
+      setMissingField("");
+      setPullField("");
+    }
+  }, [value]);
+
+  const recompute = (mStr: string, pStr: string) => {
+    onChange(mapFromLists(mStr, pStr));
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-1">
+          {/* simple text label (no recharts Label) */}
+          <div className="text-sm font-medium">Tooth Number - Missing - X</div>
+          <Input
+            placeholder="e.g. 1,2,A,B"
+            value={missingField}
+            onChange={(e) => {
+              const m = e.target.value.toUpperCase(); // keep uppercase in the field
+              setMissingField(m);
+              recompute(m, pullField);
+            }}
+            aria-label="Tooth Numbers — Missing"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-sm font-medium">
+            Tooth Number - To be pulled - O
+          </div>
+          <Input
+            placeholder="e.g. 4,5,D"
+            value={pullField}
+            onChange={(e) => {
+              const p = e.target.value.toUpperCase(); // keep uppercase in the field
+              setPullField(p);
+              recompute(missingField, p);
+            }}
+            aria-label="Tooth Numbers — To be pulled"
+          />
+        </div>
+      </div>
+    </div>
   );
 }

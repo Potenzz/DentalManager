@@ -52,7 +52,8 @@ import {
 } from "@/utils/procedureCombosMapping";
 import { COMBO_CATEGORIES, PROCEDURE_COMBOS } from "@/utils/procedureCombos";
 import { DateInput } from "../ui/dateInput";
-import { TeethGrid, ToothSelectRadix } from "./tooth-ui";
+import { MissingTeethSimple, type MissingMapStrict } from "./tooth-ui";
+import { RemarksField } from "./claims-ui";
 
 interface ClaimFormProps {
   patientId: number;
@@ -349,7 +350,7 @@ export function ClaimForm({
     dateOfBirth: normalizeToIsoDateString(patient?.dateOfBirth),
     remarks: "",
     missingTeethStatus: "No_missing",
-    missingTeeth: {},
+    missingTeeth: {} as MissingMapStrict,
     serviceDate: serviceDate,
     insuranceProvider: "",
     insuranceSiteKey: "",
@@ -453,13 +454,8 @@ export function ClaimForm({
     []
   );
 
-  const onToothChange = useCallback(
-    (name: string, v: "" | "X" | "O") => updateMissingTooth(name, v),
-    [updateMissingTooth]
-  );
-
   const clearAllToothSelections = () =>
-    setForm((prev) => ({ ...prev, missingTeeth: {} }));
+    setForm((prev) => ({ ...prev, missingTeeth: {} as MissingMapStrict }));
 
   // for serviceLine rows, to auto scroll when it got updated by combo buttons and all.
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -860,20 +856,6 @@ export function ClaimForm({
                   disabled={isLoading}
                 />
               </div>
-            </div>
-
-            {/* Clinical Notes Entry */}
-            <div className="mb-4 flex items-center gap-2">
-              <Label htmlFor="remarks" className="whitespace-nowrap">
-                Remarks:
-              </Label>
-              <Input
-                id="remarks"
-                className="flex-grow"
-                placeholder="Paste clinical notes here"
-                value={form.remarks}
-                onChange={(e) => setForm({ ...form, remarks: e.target.value })}
-              />
             </div>
 
             {/* Service Lines */}
@@ -1401,21 +1383,24 @@ export function ClaimForm({
 
               {/* When specifying per-tooth values, show Permanent + Primary grids */}
               {form.missingTeethStatus === "Yes_missing" && (
-                <div className="grid md:grid-cols-2 gap-6 overflow-visible">
-                  <TeethGrid
-                    title="PERMANENT"
-                    toothNames={PERMANENT_TOOTH_NAMES}
-                    values={form.missingTeeth}
-                    onChange={onToothChange}
-                  />
-                  <TeethGrid
-                    title="PRIMARY"
-                    toothNames={PRIMARY_TOOTH_NAMES}
-                    values={form.missingTeeth}
-                    onChange={onToothChange}
-                  />
-                </div>
+                <MissingTeethSimple
+                  value={form.missingTeeth}
+                  onChange={(next) =>
+                    setForm((prev) => ({ ...prev, missingTeeth: next }))
+                  }
+                />
               )}
+            </div>
+
+            {/* Clinical Notes Entry */}
+            <div className="mt-8 pt-8 space-y-4">
+              <h3 className="text-xl font-semibold text-center">Remarks</h3>
+              <RemarksField
+                value={form.remarks}
+                onChange={(next) =>
+                  setForm((prev) => ({ ...prev, remarks: next }))
+                }
+              />
             </div>
 
             {/* Insurance Carriers */}
