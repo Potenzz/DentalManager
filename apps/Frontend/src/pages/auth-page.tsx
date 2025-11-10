@@ -67,7 +67,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user) {
-      navigate("/patients");
+      navigate("/insurance-status");
     }
   }, [user, navigate]);
 

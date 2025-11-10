@@ -31,7 +31,7 @@ const NotFound = lazy(() => import("./pages/not-found"));
 function Router() {
   return (
     <Switch>
-      <ProtectedRoute path="/" component={() => <Redirect to="/patients" />} />
+      <ProtectedRoute path="/" component={() => <Redirect to="/insurance-status" />} />
 
       <ProtectedRoute path="/dashboard" component={() => <Dashboard />} />
       <ProtectedRoute
