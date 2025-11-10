@@ -87,6 +87,7 @@ export default function DocumentsPage() {
     // Decide on a stable order for titleKey buckets: prefer enum order then any extras
     const preferredOrder = [
       "INSURANCE_CLAIM",
+      "INSURANCE_CLAIM_PREAUTH",
       "ELIGIBILITY_STATUS",
       "CLAIM_STATUS",
       "OTHER",
