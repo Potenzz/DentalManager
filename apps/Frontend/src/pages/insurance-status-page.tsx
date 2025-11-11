@@ -574,7 +574,7 @@ export default function InsuranceStatusPage() {
             {/* TEMP PROVIDER BUTTONS */}
             <div className="space-y-4 mt-6">
               <h3 className="text-sm font-medium text-muted-foreground">
-                Quick provider checks (not working)
+                Other provider checks (not working)
               </h3>
 
               {/* Row 1 */}
