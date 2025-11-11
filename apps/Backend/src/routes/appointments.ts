@@ -365,10 +365,23 @@ router.put(
         });
       }
 
+      // 6. if date gets updated, then also update the aptmnt status to unknown.
+      // Normalize to YYYY-MM-DD to avoid timezone problems (model uses @db.Date)
+      const oldYMD = new Date(existingAppointment.date)
+        .toISOString()
+        .slice(0, 10);
+      const newYMD = new Date(date).toISOString().slice(0, 10);
+      const isDateChanged = oldYMD !== newYMD;
+
+      const updatePayload = {
+        ...appointmentData,
+        ...(isDateChanged ? { eligibilityStatus: "UNKNOWN" as const } : {}),
+      };
+
       // Update appointment
       const updatedAppointment = await storage.updateAppointment(
         appointmentId,
-        appointmentData
+        updatePayload
       );
       return res.json(updatedAppointment);
     } catch (error) {
