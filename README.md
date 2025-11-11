@@ -45,6 +45,12 @@ cd apps/SeleniumService
 python3 agent.py
 ```
 
+Note. 
+
+2.1 - when linux platform
+- In python apps, package.json file, keep them python3 instead of python.
+i.e apps/PatientDataExtractorService/package.json. 
+
 ## 📖 Developer Documentation
 
 - [Development Hosts & Ports](docs/ports.md) — which app runs on which host/port
