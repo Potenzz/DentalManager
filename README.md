@@ -50,6 +50,24 @@ python3 agent.py
 - [Development Hosts & Ports](docs/ports.md) — which app runs on which host/port
 
 
+## 📖 Pre Requisites:
+
+- Device should have 
+- 1. Install Node.
+
+- 2. Install Python environment : 
+ubuntu case: 
+```
+sudo apt install -y python3 python3-pip python3-venv build-essential
+```
+
+- 3. Install Postgresql environment:
+```
+sudo apt-get install -y postgresql postgresql-contrib postgresql-client libpq-dev
+sudo systemctl enable --now postgresql
+sudo -u postgres psql -c "SELECT version();"
+```
+
 ## This in a Turborepo. What's inside?
 
 This Turborepo includes the following packages/apps:
