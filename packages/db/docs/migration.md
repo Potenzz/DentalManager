@@ -119,7 +119,7 @@ DATABASE_URL=postgresql://postgres:mypassword@localhost:5432/dentalapp
 
 # 🧠 Step 7 — Tips
 
-- Use the same PostgreSQL version as the main PC.
+- IMP: Use the same PostgreSQL version as the main PC. - currently more than v17.
 
 - For large databases, use parallel restore for speed:
 
@@ -149,4 +149,12 @@ sudo apt install -y postgresql-client-17
 
 ```
 PGPASSWORD='mypassword' /usr/lib/postgresql/17/bin/pg_restore -v -U postgres -h localhost -C -d postgres ./backup.dump
+```
+
+
+# If error comes while creating normal db with password: 
+
+- then, give the postgres user its password. 
+```
+sudo -u postgres psql -c "ALTER ROLE postgres WITH PASSWORD 'mypassword';"
 ```
