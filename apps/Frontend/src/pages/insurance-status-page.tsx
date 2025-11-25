@@ -27,6 +27,7 @@ import { DateInput } from "@/components/ui/dateInput";
 import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 import { PdfPreviewModal } from "@/components/insurance-status/pdf-preview-modal";
 import { useLocation } from "wouter";
+import { DdmaEligibilityButton } from "@/components/insurance-status/ddma-buton-modal";
 
 export default function InsuranceStatusPage() {
   const { user } = useAuth();
@@ -574,19 +575,25 @@ export default function InsuranceStatusPage() {
             {/* TEMP PROVIDER BUTTONS */}
             <div className="space-y-4 mt-6">
               <h3 className="text-sm font-medium text-muted-foreground">
-                Other provider checks (not working)
+                Other provider checks
               </h3>
 
               {/* Row 1 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  disabled={isFormIncomplete}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Delta MA
-                </Button>
+                <DdmaEligibilityButton
+                  memberId={memberId}
+                  dateOfBirth={dateOfBirth}
+                  firstName={firstName}
+                  lastName={lastName}
+                  isFormIncomplete={isFormIncomplete}
+                  onPdfReady={(pdfId, fallbackFilename) => {
+                    setPreviewPdfId(pdfId);
+                    setPreviewFallbackFilename(
+                      fallbackFilename ?? `eligibility_ddma_${memberId}.pdf`
+                    );
+                    setPreviewOpen(true);
+                  }}
+                />
 
                 <Button
                   className="w-full"

@@ -1,5 +1,7 @@
 import app from "./app";
 import dotenv from "dotenv";
+import http from "http";
+import { initSocket } from "./socket";
 
 dotenv.config();
 
@@ -11,7 +13,13 @@ const NODE_ENV = (
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT) || 5000;
 
-const server = app.listen(PORT, HOST, () => {
+// HTTP server from express app
+const server = http.createServer(app);
+
+// Initialize socket.io on this server
+initSocket(server);
+
+server.listen(PORT, HOST, () => {
   console.log(
     `✅ Server running in ${NODE_ENV} mode at http://${HOST}:${PORT}`
   );
