@@ -2,12 +2,13 @@ from selenium import webdriver
 from selenium.common import TimeoutException
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import os
-import shutil
+import base64
 import stat
 
 class AutomationDeltaDentalMAEligibilityCheck:    
@@ -108,15 +109,8 @@ class AutomationDeltaDentalMAEligibilityCheck:
         wait = WebDriverWait(self.driver, 30)
 
         try:
-            eligibility_link = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//a[text()='Member Eligibility']"))
-            )
-            eligibility_link.click()
-
-            time.sleep(3)
-
             # Fill Member ID
-            member_id_input = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="Text1"]')))
+            member_id_input = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@placeholder="Search by member ID"]')))
             member_id_input.clear()
             member_id_input.send_keys(self.memberId)
 
@@ -130,18 +124,45 @@ class AutomationDeltaDentalMAEligibilityCheck:
                 print(f"Error parsing DOB: {e}")
                 return "ERROR: PARSING DOB"
 
-            wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="Text2"]'))).send_keys(month)
-            wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="Text3"]'))).send_keys(day)
-            wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="Text4"]'))).send_keys(year)
+             # 1) locate the specific member DOB container
+            dob_container = wait.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//div[@data-testid='member-search_date-of-birth']")
+                )
+            )
+
+            # 2) find the editable spans *inside that container* using relative XPaths
+            month_elem = dob_container.find_element(By.XPATH, ".//span[@data-type='month' and @contenteditable='true']")
+            day_elem   = dob_container.find_element(By.XPATH, ".//span[@data-type='day'   and @contenteditable='true']")
+            year_elem  = dob_container.find_element(By.XPATH, ".//span[@data-type='year'  and @contenteditable='true']")
+
+            # Helper to click, select-all and type (pure send_keys approach)
+            def replace_with_sendkeys(el, value):
+                # focus (same as click)
+                el.click()
+                # select all (Ctrl+A) and delete (some apps pick up BACKSPACE better — we use BACKSPACE after select)
+                el.send_keys(Keys.CONTROL, "a")
+                el.send_keys(Keys.BACKSPACE)
+                # type the value
+                el.send_keys(value)
+                # optionally blur or tab out if app expects it
+                # el.send_keys(Keys.TAB)
+
+            replace_with_sendkeys(month_elem, month)
+            time.sleep(0.05)
+            replace_with_sendkeys(day_elem, day)
+            time.sleep(0.05)
+            replace_with_sendkeys(year_elem, year)
+
 
             # Click Continue button
-            continue_btn = wait.until(EC.element_to_be_clickable((By.XPATH, '//input[@type="submit" and @value="Add Member"]')))
+            continue_btn = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[@data-testid="member-search_search-button"]')))
             continue_btn.click()
             
             # Check for error message
             try:
                 error_msg = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located(
-                    (By.XPATH, "//td[@class='text_err_msg' and contains(text(), 'Invalid Medicaid ID or Date of Birth')]")
+                    (By.XPATH, '//div[@data-testid="member-search-result-no-results"]')
                 ))
                 if error_msg:
                     print("Error: Invalid Member ID or Date of Birth.")
@@ -177,23 +198,47 @@ class AutomationDeltaDentalMAEligibilityCheck:
         tmp_created_path = None
 
         try:
-
-            eligibilityElement = wait.until(EC.presence_of_element_located((By.XPATH, 
-            f"//table[@id='Table3']//tr[td[contains(text(), '{self.memberId}')]]/td[3]")))
-            eligibilityText = eligibilityElement.text
-
-            txReportElement = wait.until(EC.element_to_be_clickable((By.XPATH,
-            f"//table[@id='Table3']//tr[td[contains(text(), '{self.memberId}')]]//input[@value='Tx Report']"
+            # 1) find the eligibility <a> inside the correct cell
+            status_link = wait.until(EC.presence_of_element_located((
+                By.XPATH,
+                ".//td[contains(@id,'memberEligibilityStatus')]//a"
             )))
 
-            txReportElement.click()
+            eligibilityText = status_link.text.strip()
 
-            # wait for the PDF to fully appear
-            downloaded_path = wait_for_pdf_download()
-            # generate unique target path (include memberId)
+
+             # locate and click the Print button
+            print_button = wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[@data-testid='print-button']")
+            ))
+            print_button.click()
+
+            # Increase if your app needs more time to render print preview HTML.
+            time.sleep(5)
+
+            # Use Chrome DevTools Protocol to print the page to PDF:
+            # options you can tweak: landscape, displayHeaderFooter, printBackground, scale, paperWidth, paperHeight, margins
+            print_options = {
+                "landscape": False,
+                "displayHeaderFooter": False,
+                "printBackground": True,
+                "preferCSSPageSize": True,
+                # optional: "scale": 1.0,
+                # optional: specify paper size if preferCSSPageSize is False, e.g. A4: {"paperWidth": 8.27, "paperHeight": 11.69}
+            }
+
+            # execute_cdp_cmd returns a dict with 'data' being base64 PDF
+            result = self.driver.execute_cdp_cmd("Page.printToPDF", print_options)
+            pdf_b64 = result.get("data")
+            if not pdf_b64:
+                raise RuntimeError("CDP returned no PDF data")
+
+            # decode and write to unique path
             target_path = _unique_target_path()
-            # It's possible Chrome writes a file with a fixed name: copy/rename it to our target name.
-            shutil.copyfile(downloaded_path, target_path)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, "wb") as f:
+                f.write(base64.b64decode(pdf_b64))
+
             # ensure the copied file is writable / stable
             os.chmod(target_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
