@@ -47,6 +47,7 @@ python3 agent.py
 
 ## 📖 Developer Documentation
 
+- [Setting up server environment](docs/server-setup.md) — the first step, to run this app in environment.
 - [Development Hosts & Ports](docs/ports.md) — which app runs on which host/port
 
 
