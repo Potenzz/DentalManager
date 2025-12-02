@@ -1,15 +1,12 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
 import { defineConfig, env } from "prisma/config";
 
+dotenv.config({ path: path.resolve(__dirname, ".env") });
+
 export default defineConfig({
-  // if prisma.config.ts sits in the same folder as schema.prisma:
-  schema: "schema.prisma", // or "prisma/schema.prisma" if config is at project root
-
-  // required with the current Prisma types
-  engine: "classic",
-
+  schema: "schema.prisma",
   datasource: {
-    // use Prisma's env() helper instead of process.env for nicer types
     url: env("DATABASE_URL"),
   },
 });
