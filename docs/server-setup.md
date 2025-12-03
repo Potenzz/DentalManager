@@ -22,6 +22,13 @@ python3 --version
 pip3 --version
 ```
 
+## 4. Pip global config : 
+```bash
+sudo bash -c 'echo -e "[global]\nbreak-system-packages = true" > /etc/pip.conf'
+```
+
+-- this is optional, either create a venv for separate python based app in repo, or simply have global permissson by this.
+
 ## 4. Install PostgreSQL
 ```bash
 sudo apt install -y postgresql postgresql-contrib
