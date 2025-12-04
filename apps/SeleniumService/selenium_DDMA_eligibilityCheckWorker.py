@@ -71,7 +71,7 @@ class AutomationDeltaDentalMAEligibilityCheck:
             ))
             remember_me_checkbox.click()
             
-            login_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@type='button' and @aria-label='Sign in']")))
+            login_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@type='submit' and @aria-label='Sign in']")))
             login_button.click()
 
 
