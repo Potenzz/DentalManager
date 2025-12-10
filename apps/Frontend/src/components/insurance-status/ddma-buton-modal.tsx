@@ -11,7 +11,6 @@ import { setTaskStatus } from "@/redux/slices/seleniumEligibilityCheckTaskSlice"
 import { formatLocalDate } from "@/utils/dateUtils";
 import { QK_PATIENTS_BASE } from "@/components/patients/patient-table";
 
-// Use Vite env (set VITE_BACKEND_URL in your frontend .env)
 const SOCKET_URL =
   import.meta.env.VITE_API_BASE_URL_BACKEND ||
   (typeof window !== "undefined" ? window.location.origin : "");
@@ -24,7 +23,12 @@ interface DdmaOtpModalProps {
   isSubmitting: boolean;
 }
 
-function DdmaOtpModal({ open, onClose, onSubmit, isSubmitting }: DdmaOtpModalProps) {
+function DdmaOtpModal({
+  open,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: DdmaOtpModalProps) {
   const [otp, setOtp] = useState("");
 
   useEffect(() => {
@@ -135,6 +139,17 @@ export function DdmaEligibilityButton({
     };
   }, []);
 
+  const closeSocket = () => {
+    try {
+      socketRef.current?.removeAllListeners();
+      socketRef.current?.disconnect();
+    } catch (e) {
+      // ignore
+    } finally {
+      socketRef.current = null;
+    }
+  };
+
   // Lazy socket setup: called only when we actually need it (first click)
   const ensureSocketConnected = async () => {
     // If already connected, nothing to do
@@ -159,13 +174,68 @@ export function DdmaEligibilityButton({
         resolve();
       });
 
-      socket.on("connect_error", (err) => {
-        console.error("DDMA socket connect_error:", err);
-        reject(err);
+      // connection error when first connecting (or later)
+      socket.on("connect_error", (err: any) => {
+        dispatch(
+          setTaskStatus({
+            status: "error",
+            message: "Connection failed",
+          })
+        );
+        toast({
+          title: "Realtime connection failed",
+          description:
+            "Could not connect to realtime server. Retrying automatically...",
+          variant: "destructive",
+        });
+        // do not reject here because socket.io will attempt reconnection
       });
 
-      socket.on("disconnect", () => {
-        console.log("DDMA socket disconnected");
+      // socket.io will emit 'reconnect_attempt' for retries
+      socket.on("reconnect_attempt", (attempt: number) => {
+        dispatch(
+          setTaskStatus({
+            status: "pending",
+            message: `Realtime reconnect attempt #${attempt}`,
+          })
+        );
+      });
+
+      // when reconnection failed after configured attempts
+      socket.on("reconnect_failed", () => {
+        dispatch(
+          setTaskStatus({
+            status: "error",
+            message: "Reconnect failed",
+          })
+        );
+        toast({
+          title: "Realtime reconnect failed",
+          description:
+            "Connection to realtime server could not be re-established. Please try again later.",
+          variant: "destructive",
+        });
+        // terminal failure — cleanup and reject so caller can stop start flow
+        closeSocket();
+        reject(new Error("Realtime reconnect failed"));
+      });
+
+      socket.on("disconnect", (reason: any) => {
+        dispatch(
+          setTaskStatus({
+            status: "error",
+            message: "Connection disconnected",
+          })
+        );
+        toast({
+          title: "Connection Disconnected",
+          description:
+            "Connection to the server was lost. If a DDMA job was running it may have failed.",
+          variant: "destructive",
+        });
+        // clear sessionId/OTP modal
+        setSessionId(null);
+        setOtpModalOpen(false);
       });
 
       // OTP required
@@ -176,15 +246,14 @@ export function DdmaEligibilityButton({
         dispatch(
           setTaskStatus({
             status: "pending",
-            message:
-              "OTP required for DDMA eligibility. Please enter the OTP.",
+            message: "OTP required for DDMA eligibility. Please enter the OTP.",
           })
         );
       });
 
       // OTP submitted (optional UX)
       socket.on("selenium:otp_submitted", (payload: any) => {
-        if (!payload?.session_id || payload.session_id !== sessionId) return;
+        if (!payload?.session_id) return;
         dispatch(
           setTaskStatus({
             status: "pending",
@@ -196,7 +265,7 @@ export function DdmaEligibilityButton({
       // Session update
       socket.on("selenium:session_update", (payload: any) => {
         const { session_id, status, final } = payload || {};
-        if (!session_id || session_id !== sessionId) return;
+        if (!session_id) return;
 
         if (status === "completed") {
           dispatch(
@@ -238,20 +307,65 @@ export function DdmaEligibilityButton({
             description: msg,
             variant: "destructive",
           });
+
+          // Ensure socket is torn down for this session (stop receiving stale events)
+          try {
+            closeSocket();
+          } catch (e) {}
           setSessionId(null);
           setOtpModalOpen(false);
         }
 
         queryClient.invalidateQueries({ queryKey: QK_PATIENTS_BASE });
       });
+
+      // explicit session error event (helpful)
+      socket.on("selenium:session_error", (payload: any) => {
+        const msg = payload?.message || "Selenium session error";
+
+        dispatch(
+          setTaskStatus({
+            status: "error",
+            message: msg,
+          })
+        );
+
+        toast({
+          title: "Selenium session error",
+          description: msg,
+          variant: "destructive",
+        });
+
+        // tear down socket to avoid stale updates
+        try {
+          closeSocket();
+        } catch (e) {}
+        setSessionId(null);
+        setOtpModalOpen(false);
+      });
+
+      // If socket.io initial connection fails permanently (very rare: client-level)
+      // set a longer timeout to reject the first attempt to connect.
+      const initialConnectTimeout = setTimeout(() => {
+        if (!socket.connected) {
+          // if still not connected after 8s, treat as failure and reject so caller can handle it
+          closeSocket();
+          reject(new Error("Realtime initial connection timeout"));
+        }
+      }, 8000);
+
+      // When the connect resolves we should clear this timer
+      socket.once("connect", () => {
+        clearTimeout(initialConnectTimeout);
+      });
     });
 
+    // store promise to prevent multiple concurrent connections
     connectingRef.current = promise;
 
     try {
       await promise;
     } finally {
-      // Once resolved or rejected, allow future attempts if needed
       connectingRef.current = null;
     }
   };

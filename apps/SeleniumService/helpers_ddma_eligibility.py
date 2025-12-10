@@ -5,6 +5,8 @@ from typing import Dict, Any
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import WebDriverException
+import pickle
 
 from selenium_DDMA_eligibilityCheckWorker import AutomationDeltaDentalMAEligibilityCheck
 
@@ -33,22 +35,45 @@ def make_session_entry() -> str:
     return sid
 
 
-async def cleanup_session(sid: str):
-    """Close driver (if any) and remove session entry."""
+async def cleanup_session(sid: str, message: str | None = None):
+    """
+    Close driver (if any), wake OTP waiter, set final state, and remove session entry.
+    Idempotent: safe to call multiple times.
+    """
     s = sessions.get(sid)
     if not s:
         return
     try:
+        # Ensure final state
+        try:
+            if s.get("status") not in ("completed", "error", "not_found"):
+                s["status"] = "error"
+            if message:
+                s["message"] = message
+        except Exception:
+            pass
+
+        # Wake any OTP waiter (so awaiting coroutines don't hang)
+        try:
+            ev = s.get("otp_event")
+            if ev and not ev.is_set():
+                ev.set()
+        except Exception:
+            pass
+
+        # Attempt to quit driver (may already be dead)
         driver = s.get("driver")
         if driver:
             try:
                 driver.quit()
             except Exception:
+                # ignore errors from quit (session already gone)
                 pass
+
     finally:
+        # Remove session entry from map
         sessions.pop(sid, None)
         print(f"[helpers] cleaned session {sid}")
-
 
 async def _remove_session_later(sid: str, delay: int = 20):
     await asyncio.sleep(delay)
@@ -89,7 +114,18 @@ async def start_ddma_run(sid: str, data: dict, url: str):
             return {"status": "error", "message": s["message"]}
 
         # Login
-        login_result = bot.login()
+        try:
+            login_result = bot.login(url)
+        except WebDriverException as wde:
+            s["status"] = "error"
+            s["message"] = f"Selenium driver error during login: {wde}"
+            await cleanup_session(sid, s["message"])
+            return {"status": "error", "message": s["message"]}
+        except Exception as e:
+            s["status"] = "error"
+            s["message"] = f"Unexpected error during login: {e}"
+            await cleanup_session(sid, s["message"])
+            return {"status": "error", "message": s["message"]}
 
         # OTP required path
         if isinstance(login_result, str) and login_result == "OTP_REQUIRED":
@@ -138,6 +174,38 @@ async def start_ddma_run(sid: str, data: dict, url: str):
                 s["status"] = "otp_submitted"
                 s["last_activity"] = time.time()
                 await asyncio.sleep(0.5)
+
+                # Wait for post-OTP login to complete and then save cookies
+                try:
+                    driver = s["driver"]
+                    wait = WebDriverWait(driver, 30)
+                    # Wait for dashboard element or URL change indicating success
+                    logged_in_el = wait.until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//a[text()='Member Eligibility' or contains(., 'Member Eligibility')]")
+                        )
+                    )
+                    # If found, save cookies
+                    if logged_in_el:
+                        try:
+                            # Prefer direct save to avoid subtle create_if_missing behavior
+                            cookies = driver.get_cookies()
+                            pickle.dump(cookies, open(bot.cookies_path, "wb"))
+                            print(f"[start_ddma_run] Saved {len(cookies)} cookies after OTP to {bot.cookies_path}")
+                        except Exception as e:
+                            print("[start_ddma_run] Warning saving cookies after OTP:", e)
+                except Exception as e:
+                    # If waiting times out, still attempt a heuristic check by URL
+                    cur = s["driver"].current_url if s.get("driver") else ""
+                    print("[start_ddma_run] Post-OTP dashboard detection timed out. Current URL:", cur)
+                    if "dashboard" in cur or "providers" in cur:
+                        try:
+                            cookies = s["driver"].get_cookies()
+                            pickle.dump(cookies, open(bot.cookies_path, "wb"))
+                            print(f"[start_ddma_run] Saved {len(cookies)} cookies after OTP (URL heuristic).")
+                        except Exception as e2:
+                            print("[start_ddma_run] Warning saving cookies after OTP (heuristic):", e2)
+
             except Exception as e:
                 s["status"] = "error"
                 s["message"] = f"Failed to submit OTP into page: {e}"

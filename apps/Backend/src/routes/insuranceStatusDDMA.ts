@@ -6,15 +6,15 @@ import {
   getSeleniumDdmaSessionStatus,
 } from "../services/seleniumDdmaInsuranceEligibilityClient";
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
+import PDFDocument from "pdfkit";
 import { emptyFolderContainingFile } from "../utils/emptyTempFolder";
-import forwardToPatientDataExtractorService from "../services/patientDataExtractorService";
 import {
   InsertPatient,
   insertPatientSchema,
 } from "../../../../packages/db/types/patient-types";
 import { io } from "../socket";
-
 
 const router = Router();
 
@@ -33,6 +33,34 @@ function splitName(fullName?: string | null) {
   const firstName = parts.shift() ?? "";
   const lastName = parts.join(" ") ?? "";
   return { firstName, lastName };
+}
+
+async function imageToPdfBuffer(imagePath: string): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ autoFirstPage: false });
+      const chunks: Uint8Array[] = [];
+
+      doc.on("data", (chunk: any) => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", (err: any) => reject(err));
+
+      const A4_WIDTH = 595.28; // points
+      const A4_HEIGHT = 841.89; // points
+
+      doc.addPage({ size: [A4_WIDTH, A4_HEIGHT] });
+
+      doc.image(imagePath, 0, 0, {
+        fit: [A4_WIDTH, A4_HEIGHT],
+        align: "center",
+        valign: "center",
+      });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
 /**
@@ -85,10 +113,6 @@ async function createOrUpdatePatientByInsuranceId(options: {
     try {
       patientData = insertPatientSchema.parse(createPayload);
     } catch (err) {
-      console.warn(
-        "Failed to validate patient payload in ddma insurance flow:",
-        err
-      );
       const safePayload = { ...createPayload };
       delete (safePayload as any).dateOfBirth;
       patientData = insertPatientSchema.parse(safePayload);
@@ -108,125 +132,175 @@ async function handleDdmaCompletedJob(
 ) {
   let createdPdfFileId: number | null = null;
   const outputResult: any = {};
-  const extracted: any = {};
 
   const insuranceEligibilityData = job.insuranceEligibilityData;
 
-  // 1) Extract name from PDF if available
-  if (
-    seleniumResult?.pdf_path &&
-    typeof seleniumResult.pdf_path === "string" &&
-    seleniumResult.pdf_path.endsWith(".pdf")
-  ) {
-    try {
-      const pdfPath = seleniumResult.pdf_path;
-      const pdfBuffer = await fs.readFile(pdfPath);
-
-      const extraction = await forwardToPatientDataExtractorService({
-        buffer: pdfBuffer,
-        originalname: path.basename(pdfPath),
-        mimetype: "application/pdf",
-      } as any);
-
-      if (extraction.name) {
-        const parts = splitName(extraction.name);
-        extracted.firstName = parts.firstName;
-        extracted.lastName = parts.lastName;
-      }
-    } catch (err: any) {
-      outputResult.extractionError =
-        err?.message ?? "Patient data extraction failed";
+  // We'll wrap the processing in try/catch/finally so cleanup always runs
+  try {
+    // 1) ensuring memberid.
+    const insuranceId = String(insuranceEligibilityData.memberId ?? "").trim();
+    if (!insuranceId) {
+      throw new Error("Missing memberId for ddma job");
     }
-  }
 
-  // 2) Create or update patient
-  const insuranceId = String(insuranceEligibilityData.memberId ?? "").trim();
-  if (!insuranceId) {
-    throw new Error("Missing memberId for ddma job");
-  }
+    // 2) Create or update patient
+    await createOrUpdatePatientByInsuranceId({
+      insuranceId,
+      dob: insuranceEligibilityData.dateOfBirth,
+      userId: job.userId,
+    });
 
-  const preferFirst = extracted.firstName;
-  const preferLast = extracted.lastName;
+    // 3) Update patient status + PDF upload
+    const patient = await storage.getPatientByInsuranceId(
+      insuranceEligibilityData.memberId
+    );
 
-  await createOrUpdatePatientByInsuranceId({
-    insuranceId,
-    firstName: preferFirst,
-    lastName: preferLast,
-    dob: insuranceEligibilityData.dateOfBirth,
-    userId: job.userId,
-  });
+    if (patient && patient.id !== undefined) {
+      const newStatus =
+        seleniumResult.eligibility === "active" ? "ACTIVE" : "INACTIVE";
+      await storage.updatePatient(patient.id, { status: newStatus });
+      outputResult.patientUpdateStatus = `Patient status updated to ${newStatus}`;
 
-  // 3) Update patient status + PDF upload
-  const patient = await storage.getPatientByInsuranceId(
-    insuranceEligibilityData.memberId
-  );
+      // Expect only ss_path (screenshot)
+      let pdfBuffer: Buffer | null = null;
+      let generatedPdfPath: string | null = null;
 
-  if (patient && patient.id !== undefined) {
-    const newStatus =
-      seleniumResult.eligibility === "Y" ? "ACTIVE" : "INACTIVE";
-    await storage.updatePatient(patient.id, { status: newStatus });
-    outputResult.patientUpdateStatus = `Patient status updated to ${newStatus}`;
+      if (
+        seleniumResult &&
+        seleniumResult.ss_path &&
+        typeof seleniumResult.ss_path === "string" &&
+        (seleniumResult.ss_path.endsWith(".png") ||
+          seleniumResult.ss_path.endsWith(".jpg") ||
+          seleniumResult.ss_path.endsWith(".jpeg"))
+      ) {
+        try {
+          if (!fsSync.existsSync(seleniumResult.ss_path)) {
+            throw new Error(
+              `Screenshot file not found: ${seleniumResult.ss_path}`
+            );
+          }
 
-    if (
-      seleniumResult.pdf_path &&
-      typeof seleniumResult.pdf_path === "string" &&
-      seleniumResult.pdf_path.endsWith(".pdf")
-    ) {
-      const pdfBuffer = await fs.readFile(seleniumResult.pdf_path);
+          pdfBuffer = await imageToPdfBuffer(seleniumResult.ss_path);
 
-      const groupTitle = "Eligibility Status";
-      const groupTitleKey = "ELIGIBILITY_STATUS";
+          const pdfFileName = `ddma_eligibility_${insuranceEligibilityData.memberId}_${Date.now()}.pdf`;
+          generatedPdfPath = path.join(
+            path.dirname(seleniumResult.ss_path),
+            pdfFileName
+          );
+          await fs.writeFile(generatedPdfPath, pdfBuffer);
 
-      let group = await storage.findPdfGroupByPatientTitleKey(
-        patient.id,
-        groupTitleKey
-      );
-      if (!group) {
-        group = await storage.createPdfGroup(
+          // ensure cleanup uses this
+          seleniumResult.pdf_path = generatedPdfPath;
+        } catch (err: any) {
+          console.error("Failed to convert screenshot to PDF:", err);
+          outputResult.pdfUploadStatus = `Failed to convert screenshot to PDF: ${String(err)}`;
+        }
+      } else {
+        outputResult.pdfUploadStatus =
+          "No valid screenshot (ss_path) provided by Selenium; nothing to upload.";
+      }
+
+      if (pdfBuffer && generatedPdfPath) {
+        const groupTitle = "Eligibility Status";
+        const groupTitleKey = "ELIGIBILITY_STATUS";
+
+        let group = await storage.findPdfGroupByPatientTitleKey(
           patient.id,
-          groupTitle,
           groupTitleKey
         );
-      }
-      if (!group?.id) {
-        throw new Error("PDF group creation failed: missing group ID");
-      }
+        if (!group) {
+          group = await storage.createPdfGroup(
+            patient.id,
+            groupTitle,
+            groupTitleKey
+          );
+        }
+        if (!group?.id) {
+          throw new Error("PDF group creation failed: missing group ID");
+        }
 
-      const created = await storage.createPdfFile(
-        group.id,
-        path.basename(seleniumResult.pdf_path),
-        pdfBuffer
-      );
-      if (created && typeof created === "object" && "id" in created) {
-        createdPdfFileId = Number(created.id);
+        const created = await storage.createPdfFile(
+          group.id,
+          path.basename(generatedPdfPath),
+          pdfBuffer
+        );
+        if (created && typeof created === "object" && "id" in created) {
+          createdPdfFileId = Number(created.id);
+        }
+        outputResult.pdfUploadStatus = `PDF saved to group: ${group.title}`;
+      } else {
+        outputResult.pdfUploadStatus =
+          "No valid PDF path provided by Selenium, Couldn't upload pdf to server.";
       }
-      outputResult.pdfUploadStatus = `PDF saved to group: ${group.title}`;
     } else {
-      outputResult.pdfUploadStatus =
-        "No valid PDF path provided by Selenium, Couldn't upload pdf to server.";
+      outputResult.patientUpdateStatus =
+        "Patient not found or missing ID; no update performed";
     }
-  } else {
-    outputResult.patientUpdateStatus =
-      "Patient not found or missing ID; no update performed";
-  }
 
-  // 4) Cleanup PDF temp folder
+    return {
+      patientUpdateStatus: outputResult.patientUpdateStatus,
+      pdfUploadStatus: outputResult.pdfUploadStatus,
+      pdfFileId: createdPdfFileId,
+    };
+  } catch (err: any) {
+    return {
+      patientUpdateStatus: outputResult.patientUpdateStatus,
+      pdfUploadStatus:
+        outputResult.pdfUploadStatus ??
+        `Failed to process DDMA job: ${err?.message ?? String(err)}`,
+      pdfFileId: createdPdfFileId,
+      error: err?.message ?? String(err),
+    };
+  } finally {
+    // ALWAYS attempt cleanup of temp files
+    try {
+      if (seleniumResult && seleniumResult.pdf_path) {
+        await emptyFolderContainingFile(seleniumResult.pdf_path);
+      } else if (seleniumResult && seleniumResult.ss_path) {
+        await emptyFolderContainingFile(seleniumResult.ss_path);
+      } else {
+        console.log(
+          `[ddma-eligibility] no pdf_path or ss_path available to cleanup`
+        );
+      }
+    } catch (cleanupErr) {
+      console.error(
+        `[ddma-eligibility cleanup failed for ${seleniumResult?.pdf_path ?? seleniumResult?.ss_path}]`,
+        cleanupErr
+      );
+    }
+  }
+}
+
+// --- top of file, alongside ddmaJobs ---
+const finalResults: Record<string, any> = {};
+
+function now() {
+  return new Date().toISOString();
+}
+function log(tag: string, msg: string, ctx?: any) {
+  console.log(`${now()} [${tag}] ${msg}`, ctx ?? "");
+}
+
+function emitSafe(socketId: string | undefined, event: string, payload: any) {
+  if (!socketId) {
+    log("socket", "no socketId for emit", { event });
+    return;
+  }
   try {
-    if (seleniumResult && seleniumResult.pdf_path) {
-      await emptyFolderContainingFile(seleniumResult.pdf_path);
+    const socket = io?.sockets.sockets.get(socketId);
+    if (!socket) {
+      log("socket", "socket not found (maybe disconnected)", {
+        socketId,
+        event,
+      });
+      return;
     }
-  } catch (cleanupErr) {
-    console.error(
-      `[ddma-eligibility cleanup failed for ${seleniumResult?.pdf_path}]`,
-      cleanupErr
-    );
+    socket.emit(event, payload);
+    log("socket", "emitted", { socketId, event });
+  } catch (err: any) {
+    log("socket", "emit failed", { socketId, event, err: err?.message });
   }
-
-  return {
-    patientUpdateStatus: outputResult.patientUpdateStatus,
-    pdfUploadStatus: outputResult.pdfUploadStatus,
-    pdfFileId: createdPdfFileId,
-  };
 }
 
 /**
@@ -238,29 +312,66 @@ async function pollAgentSessionAndProcess(
   sessionId: string,
   socketId?: string
 ) {
-  const maxAttempts = 300; // ~5 minutes @ 1s
-  const delayMs = 1000;
+  const maxAttempts = 300; // ~5 minutes @ 1s base (adjust if needed)
+  const baseDelayMs = 1000;
+  const maxTransientErrors = 12; // tolerate more transient errors
 
   const job = ddmaJobs[sessionId];
+  let transientErrorCount = 0;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const attemptTs = new Date().toISOString();
+    log(
+      "poller",
+      `attempt=${attempt} session=${sessionId} transientErrCount=${transientErrorCount}`
+    );
+
     try {
       const st = await getSeleniumDdmaSessionStatus(sessionId);
       const status = st?.status;
+      log("poller", "got status", {
+        sessionId,
+        status,
+        message: st?.message,
+        resultKeys: st?.result ? Object.keys(st.result) : null,
+      });
 
+      // reset transient errors on success
+      transientErrorCount = 0;
+
+      // always emit debug to client if socket exists
+      emitSafe(socketId, "selenium:debug", {
+        session_id: sessionId,
+        attempt,
+        status,
+        serverTime: new Date().toISOString(),
+      });
+
+      // If agent is waiting for OTP, inform client but keep polling (do not return)
       if (status === "waiting_for_otp") {
-        if (socketId && io && io.sockets.sockets.get(socketId)) {
-          io.to(socketId).emit("selenium:otp_required", {
-            session_id: sessionId,
-            message: "OTP required. Please enter the OTP.",
-          });
-        }
-        // once waiting_for_otp, we stop polling here; OTP flow continues separately
-        return;
+        emitSafe(socketId, "selenium:otp_required", {
+          session_id: sessionId,
+          message: "OTP required. Please enter the OTP.",
+        });
+        // do not return — keep polling (allows same poller to pick up completion)
+        await new Promise((r) => setTimeout(r, baseDelayMs));
+        continue;
       }
 
+      // Completed path
       if (status === "completed") {
-        // run DB + PDF pipeline
+        log("poller", "agent completed; processing result", {
+          sessionId,
+          resultKeys: st.result ? Object.keys(st.result) : null,
+        });
+
+        // Persist raw result so frontend can fetch if socket disconnects
+        finalResults[sessionId] = {
+          rawSelenium: st.result,
+          processedAt: null,
+          final: null,
+        };
+
         let finalResult: any = null;
         if (job && st.result) {
           try {
@@ -269,53 +380,120 @@ async function pollAgentSessionAndProcess(
               job,
               st.result
             );
+            finalResults[sessionId].final = finalResult;
+            finalResults[sessionId].processedAt = Date.now();
           } catch (err: any) {
-            finalResult = {
-              error: "Failed to process ddma completed job",
+            finalResults[sessionId].final = {
+              error: "processing_failed",
               detail: err?.message ?? String(err),
             };
+            finalResults[sessionId].processedAt = Date.now();
+            log("poller", "handleDdmaCompletedJob failed", {
+              sessionId,
+              err: err?.message ?? err,
+            });
           }
+        } else {
+          finalResults[sessionId].final = { error: "no_job_or_no_result" };
+          finalResults[sessionId].processedAt = Date.now();
         }
 
-        if (socketId && io && io.sockets.sockets.get(socketId)) {
-          io.to(socketId).emit("selenium:session_update", {
-            session_id: sessionId,
-            status: "completed",
-            rawSelenium: st.result,
-            final: finalResult,
-          });
-        }
+        // Emit final update (if socket present)
+        emitSafe(socketId, "selenium:session_update", {
+          session_id: sessionId,
+          status: "completed",
+          rawSelenium: st.result,
+          final: finalResults[sessionId].final,
+        });
+
+        // cleanup job context
         delete ddmaJobs[sessionId];
         return;
       }
 
+      // Terminal error / not_found
       if (status === "error" || status === "not_found") {
-        if (socketId && io && io.sockets.sockets.get(socketId)) {
-          io.to(socketId).emit("selenium:session_update", {
-            session_id: sessionId,
-            status,
-            message: st?.message || "Selenium session error",
-          });
-        }
+        const emitPayload = {
+          session_id: sessionId,
+          status,
+          message: st?.message || "Selenium session error",
+        };
+        emitSafe(socketId, "selenium:session_update", emitPayload);
+        emitSafe(socketId, "selenium:session_error", emitPayload);
         delete ddmaJobs[sessionId];
         return;
       }
-    } catch (err) {
-      // swallow transient errors and keep polling
-      console.warn("pollAgentSessionAndProcess error", err);
+    } catch (err: any) {
+      const axiosStatus =
+        err?.response?.status ?? (err?.status ? Number(err.status) : undefined);
+      const errCode = err?.code ?? err?.errno;
+      const errMsg = err?.message ?? String(err);
+      const errData = err?.response?.data ?? null;
+
+      // If agent explicitly returned 404 -> terminal (session gone)
+      if (
+        axiosStatus === 404 ||
+        (typeof errMsg === "string" && errMsg.includes("not_found"))
+      ) {
+        console.warn(
+          `${new Date().toISOString()} [poller] terminal 404/not_found for ${sessionId}: data=${JSON.stringify(errData)}`
+        );
+
+        // Emit not_found to client
+        const emitPayload = {
+          session_id: sessionId,
+          status: "not_found",
+          message:
+            errData?.detail || "Selenium session not found (agent cleaned up).",
+        };
+        emitSafe(socketId, "selenium:session_update", emitPayload);
+        emitSafe(socketId, "selenium:session_error", emitPayload);
+
+        // Remove job context and stop polling
+        delete ddmaJobs[sessionId];
+        return;
+      }
+
+      // Detailed transient error logging
+      transientErrorCount++;
+      const backoffMs = Math.min(
+        30_000,
+        baseDelayMs * Math.pow(2, transientErrorCount - 1)
+      );
+      console.warn(
+        `${new Date().toISOString()} [poller] transient error (#${transientErrorCount}) for ${sessionId}: code=${errCode} status=${axiosStatus} msg=${errMsg} data=${JSON.stringify(errData)}`
+      );
+      console.warn(
+        `${new Date().toISOString()} [poller] backing off ${backoffMs}ms before next attempt`
+      );
+
+      if (transientErrorCount > maxTransientErrors) {
+        const emitPayload = {
+          session_id: sessionId,
+          status: "error",
+          message:
+            "Repeated network errors while polling selenium agent; giving up.",
+        };
+        emitSafe(socketId, "selenium:session_update", emitPayload);
+        emitSafe(socketId, "selenium:session_error", emitPayload);
+        delete ddmaJobs[sessionId];
+        return;
+      }
+      await new Promise((r) => setTimeout(r, backoffMs));
+      continue;
     }
 
-    await new Promise((r) => setTimeout(r, delayMs));
+    // normal poll interval
+    await new Promise((r) => setTimeout(r, baseDelayMs));
   }
 
-  // fallback: timeout
-  if (socketId && io && io.sockets.sockets.get(socketId)) {
-    io.to(socketId).emit("selenium:session_update", {
-      session_id: sessionId,
-      status: "error",
-      message: "Polling timeout while waiting for selenium session",
-    });
-  }
+  // overall timeout fallback
+  emitSafe(socketId, "selenium:session_update", {
+    session_id: sessionId,
+    status: "error",
+    message: "Polling timeout while waiting for selenium session",
+  });
+  delete ddmaJobs[sessionId];
 }
 
 /**
@@ -363,11 +541,14 @@ router.post(
 
       const socketId: string | undefined = req.body.socketId;
 
-      const agentResp = await forwardToSeleniumDdmaEligibilityAgent(
-        enrichedData,
-      );
+      const agentResp =
+        await forwardToSeleniumDdmaEligibilityAgent(enrichedData);
 
-      if (!agentResp || agentResp.status !== "started" || !agentResp.session_id) {
+      if (
+        !agentResp ||
+        agentResp.status !== "started" ||
+        !agentResp.session_id
+      ) {
         return res.status(502).json({
           error: "Selenium agent did not return a started session",
           detail: agentResp,
@@ -408,35 +589,41 @@ router.post(
   async (req: Request, res: Response): Promise<any> => {
     const { session_id: sessionId, otp, socketId } = req.body;
     if (!sessionId || !otp) {
-      return res
-        .status(400)
-        .json({ error: "session_id and otp are required" });
+      return res.status(400).json({ error: "session_id and otp are required" });
     }
 
     try {
       const r = await forwardOtpToSeleniumDdmaAgent(sessionId, otp);
 
-      // notify socket that OTP was accepted (if socketId present)
-      try {
-        const { io } = require("../socket");
-        if (socketId && io && io.sockets.sockets.get(socketId)) {
-          io.to(socketId).emit("selenium:otp_submitted", {
-            session_id: sessionId,
-            result: r,
-          });
-        }
-      } catch (emitErr) {
-        console.warn("Failed to emit selenium:otp_submitted", emitErr);
-      }
+      // emit OTP accepted (if socket present)
+      emitSafe(socketId, "selenium:otp_submitted", {
+        session_id: sessionId,
+        result: r,
+      });
 
       return res.json(r);
     } catch (err: any) {
-      console.error("Failed to forward OTP:", err?.response?.data || err?.message || err);
+      console.error(
+        "Failed to forward OTP:",
+        err?.response?.data || err?.message || err
+      );
       return res.status(500).json({
         error: "Failed to forward otp to selenium agent",
         detail: err?.message || err,
       });
     }
+  }
+);
+
+// GET /selenium/session/:sid/final
+router.get(
+  "/selenium/session/:sid/final",
+  async (req: Request, res: Response) => {
+    const sid = req.params.sid;
+    if (!sid) return res.status(400).json({ error: "session id required" });
+    const f = finalResults[sid];
+    if (!f) return res.status(404).json({ error: "final result not found" });
+    return res.json(f);
   }
 );
 
