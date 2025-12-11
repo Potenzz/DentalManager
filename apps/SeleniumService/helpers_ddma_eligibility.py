@@ -6,7 +6,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException
-import pickle
 
 from selenium_DDMA_eligibilityCheckWorker import AutomationDeltaDentalMAEligibilityCheck
 
@@ -174,37 +173,6 @@ async def start_ddma_run(sid: str, data: dict, url: str):
                 s["status"] = "otp_submitted"
                 s["last_activity"] = time.time()
                 await asyncio.sleep(0.5)
-
-                # Wait for post-OTP login to complete and then save cookies
-                try:
-                    driver = s["driver"]
-                    wait = WebDriverWait(driver, 30)
-                    # Wait for dashboard element or URL change indicating success
-                    logged_in_el = wait.until(
-                        EC.presence_of_element_located(
-                            (By.XPATH, "//a[text()='Member Eligibility' or contains(., 'Member Eligibility')]")
-                        )
-                    )
-                    # If found, save cookies
-                    if logged_in_el:
-                        try:
-                            # Prefer direct save to avoid subtle create_if_missing behavior
-                            cookies = driver.get_cookies()
-                            pickle.dump(cookies, open(bot.cookies_path, "wb"))
-                            print(f"[start_ddma_run] Saved {len(cookies)} cookies after OTP to {bot.cookies_path}")
-                        except Exception as e:
-                            print("[start_ddma_run] Warning saving cookies after OTP:", e)
-                except Exception as e:
-                    # If waiting times out, still attempt a heuristic check by URL
-                    cur = s["driver"].current_url if s.get("driver") else ""
-                    print("[start_ddma_run] Post-OTP dashboard detection timed out. Current URL:", cur)
-                    if "dashboard" in cur or "providers" in cur:
-                        try:
-                            cookies = s["driver"].get_cookies()
-                            pickle.dump(cookies, open(bot.cookies_path, "wb"))
-                            print(f"[start_ddma_run] Saved {len(cookies)} cookies after OTP (URL heuristic).")
-                        except Exception as e2:
-                            print("[start_ddma_run] Warning saving cookies after OTP (heuristic):", e2)
 
             except Exception as e:
                 s["status"] = "error"
