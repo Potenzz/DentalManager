@@ -15,13 +15,25 @@ async function throwIfResNotOk(res: Response) {
 
     // Try to parse the response as JSON for a more meaningful error message
     let message = `${res.status}: ${res.statusText}`;
+
     try {
-      const errorBody = await res.json();
-      if (errorBody?.message) {
+      const errorBody = await res.clone().json();
+
+      if (errorBody?.error) {
+        message = errorBody.error;
+      } else if (errorBody?.message) {
         message = errorBody.message;
+      } else if (errorBody?.detail) {
+        message = errorBody.detail;
       }
     } catch {
-      // ignore JSON parse errors, keep default message
+      // fallback to reading raw text so no error is lost
+      try {
+        const text = await res.clone().text();
+        if (text?.trim()) {
+          message = text.trim();
+        }
+      } catch {}
     }
 
     throw new Error(message);

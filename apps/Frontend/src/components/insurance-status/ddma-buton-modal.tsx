@@ -428,22 +428,22 @@ export function DdmaEligibilityButton({
 
       // If apiRequest threw, we would have caught above; but just in case it returns.
       let result: any = null;
-      let bodyText = "";
+      let backendError: string | null = null;
 
       try {
+        // attempt JSON first
         result = await response.clone().json();
+        backendError =
+          result?.error || result?.message || result?.detail || null;
       } catch {
+        // fallback to text response
         try {
-          bodyText = await response.clone().text();
-        } catch {}
+          const text = await response.clone().text();
+          backendError = text?.trim() || null;
+        } catch {
+          backendError = null;
+        }
       }
-
-      const backendError =
-        result?.error ||
-        result?.message ||
-        result?.detail ||
-        (bodyText && bodyText.trim()) ||
-        null;
 
       if (!response.ok) {
         throw new Error(
