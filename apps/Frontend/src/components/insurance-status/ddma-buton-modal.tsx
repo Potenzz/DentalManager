@@ -431,37 +431,21 @@ export function DdmaEligibilityButton({
       let bodyText = "";
 
       try {
-        // Try to parse JSON (works when backend returns JSON body)
-        result = await response.json();
-      } catch (jsonErr) {
-        // If JSON parsing fails, try to read raw text so we can show something meaningful
+        result = await response.clone().json();
+      } catch {
         try {
-          bodyText = await response.text();
-        } catch (textErr) {
-          bodyText = "";
-        }
+          bodyText = await response.clone().text();
+        } catch {}
       }
 
-      // Determine error message robustly
       const backendError =
-        // prefer explicit error field
         result?.error ||
-        // sometimes APIs return 'message' or 'detail'
         result?.message ||
         result?.detail ||
-        // if JSON parse failed but bodyText contains something useful, use it
-        (bodyText && bodyText.trim() ? bodyText.trim() : null);
+        (bodyText && bodyText.trim()) ||
+        null;
 
       if (!response.ok) {
-        // Log server response for debugging
-        console.warn("DDMA start failed response:", {
-          status: response.status,
-          ok: response.ok,
-          result,
-          bodyText,
-        });
-
-        // Throw with the backend message if available, otherwise throw generic
         throw new Error(
           backendError ||
             `DDMA selenium start failed (status ${response.status})`
