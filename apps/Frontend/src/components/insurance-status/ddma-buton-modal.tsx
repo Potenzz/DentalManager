@@ -426,9 +426,51 @@ export function DdmaEligibilityButton({
         }
       );
 
-      const result = await response.json();
-      if (!response.ok || result.error) {
-        throw new Error(result.error || "DDMA selenium start failed");
+      // If apiRequest threw, we would have caught above; but just in case it returns.
+      let result: any = null;
+      let bodyText = "";
+
+      try {
+        // Try to parse JSON (works when backend returns JSON body)
+        result = await response.json();
+      } catch (jsonErr) {
+        // If JSON parsing fails, try to read raw text so we can show something meaningful
+        try {
+          bodyText = await response.text();
+        } catch (textErr) {
+          bodyText = "";
+        }
+      }
+
+      // Determine error message robustly
+      const backendError =
+        // prefer explicit error field
+        result?.error ||
+        // sometimes APIs return 'message' or 'detail'
+        result?.message ||
+        result?.detail ||
+        // if JSON parse failed but bodyText contains something useful, use it
+        (bodyText && bodyText.trim() ? bodyText.trim() : null);
+
+      if (!response.ok) {
+        // Log server response for debugging
+        console.warn("DDMA start failed response:", {
+          status: response.status,
+          ok: response.ok,
+          result,
+          bodyText,
+        });
+
+        // Throw with the backend message if available, otherwise throw generic
+        throw new Error(
+          backendError ||
+            `DDMA selenium start failed (status ${response.status})`
+        );
+      }
+
+      // Normal success path: optional: if backend returns non-error shape still check for result.error
+      if (result?.error) {
+        throw new Error(result.error);
       }
 
       if (result.status === "started" && result.session_id) {
