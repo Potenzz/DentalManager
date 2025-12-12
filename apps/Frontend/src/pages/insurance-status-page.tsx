@@ -44,7 +44,7 @@ export default function InsuranceStatusPage() {
   const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const isFormIncomplete = !memberId || !dateOfBirth || !firstName || !lastName;
+  const isFormIncomplete = !memberId || !dateOfBirth;
   const [isCheckingEligibilityStatus, setIsCheckingEligibilityStatus] =
     useState(false);
   const [isCheckingClaimStatus, setIsCheckingClaimStatus] = useState(false);

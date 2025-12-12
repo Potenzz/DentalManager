@@ -101,8 +101,8 @@ function DdmaOtpModal({
 interface DdmaEligibilityButtonProps {
   memberId: string;
   dateOfBirth: Date | null;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   isFormIncomplete: boolean;
   /** Called when backend has finished and PDF is ready */
   onPdfReady: (pdfId: number, fallbackFilename: string | null) => void;
