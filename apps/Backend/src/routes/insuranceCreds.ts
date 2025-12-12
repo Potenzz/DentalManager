@@ -96,7 +96,7 @@ router.delete("/:id", async (req: Request, res: Response): Promise<any> => {
     if (isNaN(id)) return res.status(400).send("Invalid ID");
 
     // 1) Check existence
-    const existing = await storage.getInsuranceCredential(userId);
+    const existing = await storage.getInsuranceCredential(id);
     if (!existing)
       return res.status(404).json({ message: "Credential not found" });
 
