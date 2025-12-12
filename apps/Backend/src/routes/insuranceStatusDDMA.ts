@@ -326,7 +326,7 @@ async function pollAgentSessionAndProcess(
   const maxTransientErrors = 12;
 
   // NEW: give up if same non-terminal status repeats this many times
-  const noProgressLimit = 10;
+  const noProgressLimit = 100;
 
   const job = ddmaJobs[sessionId];
   let transientErrorCount = 0;
