@@ -169,6 +169,15 @@ class AutomationDeltaDentalMAEligibilityCheck:
 
             eligibilityText = status_link.text.strip().lower()
 
+            # 2) finding patient name. 
+            patient_name_div = wait.until(EC.presence_of_element_located((
+                By.XPATH,
+                '//div[@class="flex flex-row w-full items-center"]'
+            )))
+
+            patientName = patient_name_div.text.strip().lower()
+
+
 
             try:
                 WebDriverWait(self.driver, 30).until(
@@ -220,9 +229,9 @@ class AutomationDeltaDentalMAEligibilityCheck:
             output = {
                     "status": "success",
                     "eligibility": eligibilityText,
-                    "ss_path": screenshot_path
+                    "ss_path": screenshot_path,
+                    "patientName":patientName
                 }
-            print(output)
             return output
         except Exception as e:
             print("ERROR in step2:", e)

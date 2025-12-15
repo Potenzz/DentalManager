@@ -143,9 +143,18 @@ async function handleDdmaCompletedJob(
       throw new Error("Missing memberId for ddma job");
     }
 
-    // 2) Create or update patient
+    // 2) Create or update patient (with name from selenium result if available)
+    const patientNameFromResult =
+      typeof seleniumResult?.patientName === "string"
+        ? seleniumResult.patientName.trim()
+        : null;
+
+    const { firstName, lastName } = splitName(patientNameFromResult);
+
     await createOrUpdatePatientByInsuranceId({
       insuranceId,
+      firstName,
+      lastName,
       dob: insuranceEligibilityData.dateOfBirth,
       userId: job.userId,
     });
