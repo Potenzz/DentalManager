@@ -11,6 +11,7 @@ import {
   Database,
   FileText,
   Cloud,
+  Phone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
@@ -26,6 +27,11 @@ export function Sidebar() {
         name: "Dashboard",
         path: "/dashboard",
         icon: <LayoutDashboard className="h-5 w-5" />,
+      },
+      {
+        name: "Patient Connection",
+        path: "/patient-connection",
+        icon: <Phone className="h-5 w-5" />,
       },
       {
         name: "Appointments",

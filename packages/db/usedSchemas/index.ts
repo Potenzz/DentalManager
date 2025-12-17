@@ -18,3 +18,4 @@ export * from '../shared/schemas/objects/NotificationUncheckedCreateInput.schema
 export * from '../shared/schemas/objects/DatabaseBackupUncheckedCreateInput.schema'
 export * from '../shared/schemas/objects/CloudFolderUncheckedCreateInput.schema'
 export * from '../shared/schemas/objects/CloudFileUncheckedCreateInput.schema'
+export * from '../shared/schemas/objects/CommunicationUncheckedCreateInput.schema'
