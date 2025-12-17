@@ -132,12 +132,10 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
         // attempt to respond with error if possible
         try {
           if (!res.headersSent) {
-            res
-              .status(500)
-              .json({
-                error: "Failed to create archive",
-                details: err.message,
-              });
+            res.status(500).json({
+              error: "Failed to create archive",
+              details: err.message,
+            });
           } else {
             // if streaming already started, destroy the connection
             res.destroy(err);
@@ -187,12 +185,10 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
         // if headers not sent, send 500; otherwise destroy
         try {
           if (!res.headersSent) {
-            res
-              .status(500)
-              .json({
-                error: "Failed to finalize archive",
-                details: String(err),
-              });
+            res.status(500).json({
+              error: "Failed to finalize archive",
+              details: String(err),
+            });
           } else {
             res.destroy(err);
           }
@@ -222,9 +218,9 @@ router.get("/status", async (req: Request, res: Response): Promise<any> => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const size = await prisma.$queryRawUnsafe<{ size: string }[]>(
-      "SELECT pg_size_pretty(pg_database_size(current_database())) as size"
-    );
+    const size = await prisma.$queryRaw<{ size: string }[]>`
+      SELECT pg_size_pretty(pg_database_size(current_database())) as size
+    `;
 
     const patientsCount = await storage.getTotalPatientCount();
     const lastBackup = await storage.getLastBackup(userId);
