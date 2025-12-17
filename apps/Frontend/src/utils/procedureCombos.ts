@@ -220,6 +220,28 @@ export const PROCEDURE_COMBOS: Record<
     label: "Baby Teeth EXT",
     codes: ["D7111"],
   },
+
+  // Orthodontics
+  orthPerioVisitDirect: {
+    id: "orthPerioVisitDirect",
+    label: "Perio Orth Visit ",
+    codes: ["D8670"],
+  },
+  orthPreExamDirect: {
+    id: "orthPreExamDirect",
+    label: "Pre-Orth Exam",
+    codes: ["D8660"],
+  },
+  orthPA: {
+    id: "orthPA",
+    label: "Orth PA",
+    codes: ["D8080", "D8670", "D8660"],
+  },
+  orthRetentionDirect: {
+    id: "orthRetentionDirect",
+    label: "Orth Retention",
+    codes: ["D8680"],
+  },
   // add more…
 };
 
@@ -263,4 +285,5 @@ export const COMBO_CATEGORIES: Record<
     "surgicalExtraction",
     "babyTeethExtraction",
   ],
+  Orthodontics: ["orthPA"],
 };

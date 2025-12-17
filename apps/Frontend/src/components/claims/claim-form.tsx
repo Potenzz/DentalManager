@@ -1053,6 +1053,44 @@ export function ClaimForm({
                         })}
                       </div>
                     </div>
+
+                    {/* ORTH GROUP */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium opacity-80">Orth</div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          "orthPerioVisitDirect",
+                          "orthPreExamDirect",
+                          "orthRetentionDirect",
+                        ].map((comboId) => {
+                          const b = PROCEDURE_COMBOS[comboId];
+                          if (!b) return null;
+
+                          const tooltipText = b.codes.join(", ");
+
+                          return (
+                            <Tooltip key={b.id}>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => applyComboAndThenMH(b.id)}
+                                  aria-label={`${b.label} — codes: ${tooltipText}`}
+                                >
+                                  {b.label}
+                                </Button>
+                              </TooltipTrigger>
+
+                              <TooltipContent side="top" align="center">
+                                <div className="text-sm max-w-xs break-words">
+                                  {tooltipText}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
