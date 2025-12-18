@@ -29,6 +29,7 @@ model User {
   insuranceCredentials InsuranceCredential[]
   updatedPayments      Payment[]             @relation("PaymentUpdatedBy")
   backups              DatabaseBackup[]
+  backupDestinations   BackupDestination[]
   notifications        Notification[]
   cloudFolders         CloudFolder[]
   cloudFiles           CloudFile[]
@@ -301,6 +302,7 @@ enum PaymentMethod {
   OTHER
 }
 
+// Database management page
 model DatabaseBackup {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -310,6 +312,16 @@ model DatabaseBackup {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model BackupDestination {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  path      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Notification {

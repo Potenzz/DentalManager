@@ -12,6 +12,7 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDateToHumanReadable } from "@/utils/dateUtils";
+import { BackupDestinationManager } from "@/components/database-management/backup-destination-manager";
 
 export default function DatabaseManagementPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -204,6 +205,9 @@ export default function DatabaseManagementPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Externa Drive automatic backup manager */}
+        <BackupDestinationManager />
 
         {/* Database Status Section */}
         <Card>
