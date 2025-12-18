@@ -914,6 +914,14 @@ export default function AppointmentsPage() {
                 </>
               )}
             </Button>
+            <Button disabled={true}>
+              <Shield className="h-4 w-4 mr-2" />
+              Claim Column A
+            </Button>
+            <Button disabled={true}>
+              <Shield className="h-4 w-4 mr-2" />
+              Claim Column B
+            </Button>
           </div>
         </div>
 
