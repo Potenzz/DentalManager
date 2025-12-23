@@ -1060,8 +1060,9 @@ export function ClaimForm({
 
                       <div className="flex flex-wrap gap-2">
                         {[
-                          "orthPerioVisitDirect",
                           "orthPreExamDirect",
+                          "orthRecordDirect",
+                          "orthPerioVisitDirect",
                           "orthRetentionDirect",
                         ].map((comboId) => {
                           const b = PROCEDURE_COMBOS[comboId];

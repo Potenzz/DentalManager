@@ -222,25 +222,30 @@ export const PROCEDURE_COMBOS: Record<
   },
 
   // Orthodontics
+  orthPreExamDirect: {
+    id: "orthPreExamDirect",
+    label: "Pre-Orth Exam",
+    codes: ["D9310"],
+  },
+  orthRecordDirect: {
+    id: "orthRecordDirect",
+    label: "Orth Record",
+    codes: ["D8660"],
+  },
   orthPerioVisitDirect: {
     id: "orthPerioVisitDirect",
     label: "Perio Orth Visit ",
     codes: ["D8670"],
   },
-  orthPreExamDirect: {
-    id: "orthPreExamDirect",
-    label: "Pre-Orth Exam",
-    codes: ["D8660"],
+  orthRetentionDirect: {
+    id: "orthRetentionDirect",
+    label: "Orth Retention",
+    codes: ["D8680"],
   },
   orthPA: {
     id: "orthPA",
     label: "Orth PA",
     codes: ["D8080", "D8670", "D8660"],
-  },
-  orthRetentionDirect: {
-    id: "orthRetentionDirect",
-    label: "Orth Retention",
-    codes: ["D8680"],
   },
   // add more…
 };
