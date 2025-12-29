@@ -964,6 +964,9 @@ export function ClaimForm({
                           "childRecallDirect4BW",
                           "childRecallDirect2PA2BW",
                           "childRecallDirect2PA4BW",
+                          "childRecallDirect3PA2BW",
+                          "childRecallDirect3PA",
+                          "childRecallDirect4PA",
                           "childRecallDirectPANO",
                         ].map((comboId) => {
                           const b = PROCEDURE_COMBOS[comboId];
@@ -979,6 +982,9 @@ export function ClaimForm({
                             childRecallDirect4BW: "Direct 4BW",
                             childRecallDirect2PA2BW: "Direct 2PA 2BW",
                             childRecallDirect2PA4BW: "Direct 2PA 4BW",
+                            childRecallDirect3PA2BW: "Direct 3PA 2BW",
+                            childRecallDirect3PA: "Direct 3PA",
+                            childRecallDirect4PA: "Direct 4PA",
                             childRecallDirectPANO: "Direct Pano",
                           };
                           return (
@@ -1015,6 +1021,7 @@ export function ClaimForm({
                           "adultRecallDirect4BW",
                           "adultRecallDirect2PA2BW",
                           "adultRecallDirect2PA4BW",
+                          "adultRecallDirect4PA",
                           "adultRecallDirectPano",
                         ].map((comboId) => {
                           const b = PROCEDURE_COMBOS[comboId];
@@ -1030,6 +1037,7 @@ export function ClaimForm({
                             adultRecallDirect4BW: "Direct 4BW",
                             adultRecallDirect2PA2BW: "Direct 2PA 2BW",
                             adultRecallDirect2PA4BW: "Direct 2PA 4BW",
+                            adultRecallDirect4PA: "Direct 4PA",
                             adultRecallDirectPano: "Direct Pano",
                           };
                           return (
