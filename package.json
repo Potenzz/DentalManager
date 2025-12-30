@@ -8,9 +8,9 @@
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "db:generate": "prisma generate --schema=packages/db/prisma/schema.prisma && ts-node packages/db/scripts/patch-zod-buffer.ts",
-    "db:migrate": "dotenv -e packages/db/.env -- prisma migrate dev --schema=packages/db/prisma/schema.prisma",
-    "db:seed": "prisma db seed --schema=packages/db/prisma/schema.prisma",
+    "db:generate": "npx prisma generate --config=packages/db/prisma/prisma.config.ts --schema=packages/db/prisma/schema.prisma && npx ts-node packages/db/scripts/patch-prisma-imports.ts && ts-node packages/db/scripts/patch-zod-buffer.ts",
+    "db:migrate": "npx prisma migrate dev --config=packages/db/prisma/prisma.config.ts --schema=packages/db/prisma/schema.prisma",
+    "db:seed": "npx prisma db seed --config=packages/db/prisma/prisma.config.ts --schema=packages/db/prisma/schema.prisma",
     "setup:env": "shx cp packages/db/prisma/.env.example packages/db/prisma/.env && shx cp apps/Frontend/.env.example apps/Frontend/.env && shx cp apps/Backend/.env.example apps/Backend/.env && shx cp apps/PatientDataExtractorService/.env.example apps/PatientDataExtractorService/.env && shx cp apps/SeleniumService/.env.example apps/SeleniumService/.env && shx cp apps/PaymentOCRService/.env.example apps/PaymentOCRService/.env",
     "postinstall": "npm --prefix apps/PatientDataExtractorService run postinstall && npm --prefix apps/PaymentOCRService run postinstall"
   },
@@ -21,7 +21,6 @@
     "@types/react-redux": "^7.1.34",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
-    "prisma": "^6.16.2",
     "turbo": "^2.5.3"
   },
   "engines": {
@@ -33,11 +32,12 @@
     "packages/*"
   ],
   "dependencies": {
-    "@prisma/client": "^6.16.2",
+    "@prisma/client": "^7.0.1",
     "@reduxjs/toolkit": "^2.8.2",
     "decimal.js": "^10.6.0",
     "dotenv": "^16.5.0",
     "dotenv-cli": "^8.0.0",
+    "prisma": "^7.0.1",
     "react-redux": "^9.2.0",
     "shx": "^0.4.0"
   }

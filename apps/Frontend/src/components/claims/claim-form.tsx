@@ -964,6 +964,9 @@ export function ClaimForm({
                           "childRecallDirect4BW",
                           "childRecallDirect2PA2BW",
                           "childRecallDirect2PA4BW",
+                          "childRecallDirect3PA2BW",
+                          "childRecallDirect3PA",
+                          "childRecallDirect4PA",
                           "childRecallDirectPANO",
                         ].map((comboId) => {
                           const b = PROCEDURE_COMBOS[comboId];
@@ -979,6 +982,9 @@ export function ClaimForm({
                             childRecallDirect4BW: "Direct 4BW",
                             childRecallDirect2PA2BW: "Direct 2PA 2BW",
                             childRecallDirect2PA4BW: "Direct 2PA 4BW",
+                            childRecallDirect3PA2BW: "Direct 3PA 2BW",
+                            childRecallDirect3PA: "Direct 3PA",
+                            childRecallDirect4PA: "Direct 4PA",
                             childRecallDirectPANO: "Direct Pano",
                           };
                           return (
@@ -1015,6 +1021,7 @@ export function ClaimForm({
                           "adultRecallDirect4BW",
                           "adultRecallDirect2PA2BW",
                           "adultRecallDirect2PA4BW",
+                          "adultRecallDirect4PA",
                           "adultRecallDirectPano",
                         ].map((comboId) => {
                           const b = PROCEDURE_COMBOS[comboId];
@@ -1030,6 +1037,7 @@ export function ClaimForm({
                             adultRecallDirect4BW: "Direct 4BW",
                             adultRecallDirect2PA2BW: "Direct 2PA 2BW",
                             adultRecallDirect2PA4BW: "Direct 2PA 4BW",
+                            adultRecallDirect4PA: "Direct 4PA",
                             adultRecallDirectPano: "Direct Pano",
                           };
                           return (
@@ -1043,6 +1051,45 @@ export function ClaimForm({
                                   {labelMap[comboId] ?? b.label}
                                 </Button>
                               </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                <div className="text-sm max-w-xs break-words">
+                                  {tooltipText}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* ORTH GROUP */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium opacity-80">Orth</div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          "orthPreExamDirect",
+                          "orthRecordDirect",
+                          "orthPerioVisitDirect",
+                          "orthRetentionDirect",
+                        ].map((comboId) => {
+                          const b = PROCEDURE_COMBOS[comboId];
+                          if (!b) return null;
+
+                          const tooltipText = b.codes.join(", ");
+
+                          return (
+                            <Tooltip key={b.id}>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => applyComboAndThenMH(b.id)}
+                                  aria-label={`${b.label} — codes: ${tooltipText}`}
+                                >
+                                  {b.label}
+                                </Button>
+                              </TooltipTrigger>
+
                               <TooltipContent side="top" align="center">
                                 <div className="text-sm max-w-xs break-words">
                                   {tooltipText}

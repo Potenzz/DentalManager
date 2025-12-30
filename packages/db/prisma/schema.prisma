@@ -16,7 +16,6 @@ generator zod {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -30,16 +29,18 @@ model User {
   insuranceCredentials InsuranceCredential[]
   updatedPayments      Payment[]             @relation("PaymentUpdatedBy")
   backups              DatabaseBackup[]
+  backupDestinations   BackupDestination[]
   notifications        Notification[]
   cloudFolders         CloudFolder[]
   cloudFiles           CloudFile[]
+  communications       Communication[]
 }
 
 model Patient {
-  id                Int           @id @default(autoincrement())
+  id                Int             @id @default(autoincrement())
   firstName         String
   lastName          String
-  dateOfBirth       DateTime      @db.Date
+  dateOfBirth       DateTime        @db.Date
   gender            String
   phone             String
   email             String?
@@ -52,14 +53,15 @@ model Patient {
   policyHolder      String?
   allergies         String?
   medicalConditions String?
-  status            PatientStatus @default(UNKNOWN)
+  status            PatientStatus   @default(UNKNOWN)
   userId            Int
-  createdAt         DateTime      @default(now())
-  user              User          @relation(fields: [userId], references: [id])
+  createdAt         DateTime        @default(now())
+  user              User            @relation(fields: [userId], references: [id])
   appointments      Appointment[]
   claims            Claim[]
   groups            PdfGroup[]
   payment           Payment[]
+  communications    Communication[]
 
   @@index([insuranceId])
   @@index([createdAt])
@@ -110,22 +112,22 @@ model Staff {
 }
 
 model Claim {
-  id                Int         @id @default(autoincrement())
-  patientId         Int
-  appointmentId     Int
-  userId            Int
-  staffId           Int
-  patientName       String
-  memberId          String
-  dateOfBirth       DateTime    @db.Date
-  remarks           String
+  id                 Int                @id @default(autoincrement())
+  patientId          Int
+  appointmentId      Int
+  userId             Int
+  staffId            Int
+  patientName        String
+  memberId           String
+  dateOfBirth        DateTime           @db.Date
+  remarks            String
   missingTeethStatus MissingTeethStatus @default(No_missing)
-  missingTeeth       Json?              // { "T_14": "X", "T_G": "O", ... }
-  serviceDate       DateTime
-  insuranceProvider String // e.g., "Delta MA"
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  status            ClaimStatus @default(PENDING)
+  missingTeeth       Json? // { "T_14": "X", "T_G": "O", ... }
+  serviceDate        DateTime
+  insuranceProvider  String // e.g., "Delta MA"
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  status             ClaimStatus        @default(PENDING)
 
   patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
@@ -146,7 +148,7 @@ enum ClaimStatus {
 }
 
 enum MissingTeethStatus {
-  No_missing 
+  No_missing
   endentulous
   Yes_missing
 }
@@ -300,6 +302,7 @@ enum PaymentMethod {
   OTHER
 }
 
+// Database management page
 model DatabaseBackup {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -309,6 +312,16 @@ model DatabaseBackup {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model BackupDestination {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  path      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Notification {
@@ -378,4 +391,47 @@ model CloudFileChunk {
 
   @@unique([fileId, seq])
   @@index([fileId, seq])
+}
+
+// patient-connection-
+enum CommunicationChannel {
+  sms
+  voice
+}
+
+enum CommunicationDirection {
+  outbound
+  inbound
+}
+
+enum CommunicationStatus {
+  queued
+  sent
+  delivered
+  failed
+  completed
+  busy
+  no_answer
+}
+
+model Communication {
+  id        Int  @id @default(autoincrement())
+  patientId Int
+  userId    Int?
+
+  channel   CommunicationChannel
+  direction CommunicationDirection
+  status    CommunicationStatus
+
+  body         String?
+  callDuration Int?
+  twilioSid    String?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  patient Patient @relation(fields: [patientId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@map("communications")
 }

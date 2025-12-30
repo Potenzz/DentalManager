@@ -39,6 +39,30 @@ export const PROCEDURE_COMBOS: Record<
     codes: ["D0120", "D1120", "D1208", "D0220", "D0230", "D0274"],
     toothNumbers: [null, null, null, "9", "24", null], // only these two need values
   },
+  childRecallDirect3PA2BW: {
+    id: "childRecallDirect3PA2BW",
+    label: "Child Recall Direct 3PA 2BW",
+    codes: [
+      "D0120", // exam
+      "D1120", // prophy
+      "D1208", // fluoride
+      "D0220",
+      "D0230",
+      "D0230", // extra PA
+      "D0272", // 2BW
+    ],
+  },
+  childRecallDirect4PA: {
+    id: "childRecallDirect4PA",
+    label: "Child Recall Direct 4PA",
+    codes: ["D0120", "D1120", "D1208", "D0220", "D0230", "D0230", "D0230"],
+  },
+  childRecallDirect3PA: {
+    id: "childRecallDirect3PA",
+    label: "Child Recall Direct 3PA",
+    codes: ["D0120", "D1120", "D1208", "D0220", "D0230", "D0230"],
+  },
+
   childRecallDirectPANO: {
     id: "childRecallDirectPANO",
     label: "Child Recall Direct PANO",
@@ -76,6 +100,11 @@ export const PROCEDURE_COMBOS: Record<
     label: "Adult Recall Direct - 2PA 4BW",
     codes: ["D0120", "D0220", "D0230", "D0274", "D1110"],
     toothNumbers: [null, "9", "24", null, null], // only these two need values
+  },
+  adultRecallDirect4PA: {
+    id: "adultRecallDirect4PA",
+    label: "Adult Recall Direct 4PA",
+    codes: ["D0120", "D1110", "D0220", "D0230", "D0230", "D0230"],
   },
   adultRecallDirectPano: {
     id: "adultRecallDirectPano",
@@ -220,6 +249,33 @@ export const PROCEDURE_COMBOS: Record<
     label: "Baby Teeth EXT",
     codes: ["D7111"],
   },
+
+  // Orthodontics
+  orthPreExamDirect: {
+    id: "orthPreExamDirect",
+    label: "Pre-Orth Exam",
+    codes: ["D9310"],
+  },
+  orthRecordDirect: {
+    id: "orthRecordDirect",
+    label: "Orth Record",
+    codes: ["D8660"],
+  },
+  orthPerioVisitDirect: {
+    id: "orthPerioVisitDirect",
+    label: "Perio Orth Visit ",
+    codes: ["D8670"],
+  },
+  orthRetentionDirect: {
+    id: "orthRetentionDirect",
+    label: "Orth Retention",
+    codes: ["D8680"],
+  },
+  orthPA: {
+    id: "orthPA",
+    label: "Orth PA",
+    codes: ["D8080", "D8670", "D8660"],
+  },
   // add more…
 };
 
@@ -263,4 +319,5 @@ export const COMBO_CATEGORIES: Record<
     "surgicalExtraction",
     "babyTeethExtraction",
   ],
+  Orthodontics: ["orthPA"],
 };

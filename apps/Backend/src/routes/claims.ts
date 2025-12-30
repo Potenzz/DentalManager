@@ -126,16 +126,27 @@ router.post(
         responseType: "arraybuffer",
       });
 
-      const groupTitle = "Claims";
+      // Allowed keys as a literal tuple to derive a union type
+      const allowedKeys = [
+        "INSURANCE_CLAIM",
+        "INSURANCE_CLAIM_PREAUTH",
+      ] as const;
+      type GroupKey = (typeof allowedKeys)[number];
+      const isGroupKey = (v: any): v is GroupKey =>
+        (allowedKeys as readonly string[]).includes(v);
 
-      // allowed keys
-      const allowedKeys = ["INSURANCE_CLAIM", "INSURANCE_CLAIM_PREAUTH"];
-      if (!allowedKeys.includes(groupTitleKey)) {
+      if (!isGroupKey(groupTitleKey)) {
         return sendError(
           res,
           `Invalid groupTitleKey. Must be one of: ${allowedKeys.join(", ")}`
         );
       }
+
+      const GROUP_TITLES: Record<GroupKey, string> = {
+        INSURANCE_CLAIM: "Claims",
+        INSURANCE_CLAIM_PREAUTH: "Claims Preauth",
+      };
+      const groupTitle = GROUP_TITLES[groupTitleKey];
 
       // ✅ Find or create PDF group for this claim
       let group = await storage.findPdfGroupByPatientTitleKey(

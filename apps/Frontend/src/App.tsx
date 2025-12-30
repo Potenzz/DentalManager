@@ -12,6 +12,7 @@ import Dashboard from "./pages/dashboard";
 import LoadingScreen from "./components/ui/LoadingScreen";
 
 const AuthPage = lazy(() => import("./pages/auth-page"));
+const PatientConnectionPage = lazy(() => import("./pages/patient-connection-page"));
 const AppointmentsPage = lazy(() => import("./pages/appointments-page"));
 const PatientsPage = lazy(() => import("./pages/patients-page"));
 const SettingsPage = lazy(() => import("./pages/settings-page"));
@@ -34,6 +35,7 @@ function Router() {
       <ProtectedRoute path="/" component={() => <Redirect to="/insurance-status" />} />
 
       <ProtectedRoute path="/dashboard" component={() => <Dashboard />} />
+      <ProtectedRoute path="/patient-connection" component={() => <PatientConnectionPage />} />
       <ProtectedRoute
         path="/appointments"
         component={() => <AppointmentsPage />}

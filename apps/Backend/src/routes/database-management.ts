@@ -6,6 +6,7 @@ import fs from "fs";
 import { prisma } from "@repo/db/client";
 import { storage } from "../storage";
 import archiver from "archiver";
+import { backupDatabaseToPath } from "../services/databaseBackupService";
 
 const router = Router();
 
@@ -32,6 +33,8 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
+
+    const destination = await storage.getActiveBackupDestination(userId);
 
     // create a unique tmp directory for directory-format dump
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dental_backup_")); // MUST
@@ -132,12 +135,10 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
         // attempt to respond with error if possible
         try {
           if (!res.headersSent) {
-            res
-              .status(500)
-              .json({
-                error: "Failed to create archive",
-                details: err.message,
-              });
+            res.status(500).json({
+              error: "Failed to create archive",
+              details: err.message,
+            });
           } else {
             // if streaming already started, destroy the connection
             res.destroy(err);
@@ -187,12 +188,10 @@ router.post("/backup", async (req: Request, res: Response): Promise<any> => {
         // if headers not sent, send 500; otherwise destroy
         try {
           if (!res.headersSent) {
-            res
-              .status(500)
-              .json({
-                error: "Failed to finalize archive",
-                details: String(err),
-              });
+            res.status(500).json({
+              error: "Failed to finalize archive",
+              details: String(err),
+            });
           } else {
             res.destroy(err);
           }
@@ -222,9 +221,9 @@ router.get("/status", async (req: Request, res: Response): Promise<any> => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const size = await prisma.$queryRawUnsafe<{ size: string }[]>(
-      "SELECT pg_size_pretty(pg_database_size(current_database())) as size"
-    );
+    const size = await prisma.$queryRaw<{ size: string }[]>`
+      SELECT pg_size_pretty(pg_database_size(current_database())) as size
+    `;
 
     const patientsCount = await storage.getTotalPatientCount();
     const lastBackup = await storage.getLastBackup(userId);
@@ -240,6 +239,120 @@ router.get("/status", async (req: Request, res: Response): Promise<any> => {
     res.status(500).json({
       connected: false,
       error: "Could not fetch database status",
+    });
+  }
+});
+
+// ==============================
+// Backup Destination CRUD
+// ==============================
+
+// CREATE / UPDATE destination
+router.post("/destination", async (req, res) => {
+  const userId = req.user?.id;
+  const { path: destinationPath } = req.body;
+
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!destinationPath)
+    return res.status(400).json({ error: "Path is required" });
+
+  // validate path exists
+  if (!fs.existsSync(destinationPath)) {
+    return res.status(400).json({
+      error: "Backup path does not exist or drive not connected",
+    });
+  }
+
+  try {
+    const destination = await storage.createBackupDestination(
+      userId,
+      destinationPath
+    );
+    res.json(destination);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to save backup destination" });
+  }
+});
+
+// GET all destinations
+router.get("/destination", async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const destinations = await storage.getAllBackupDestination(userId);
+  res.json(destinations);
+});
+
+// UPDATE destination
+router.put("/destination/:id", async (req, res) => {
+  const userId = req.user?.id;
+  const id = Number(req.params.id);
+  const { path: destinationPath } = req.body;
+
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!destinationPath)
+    return res.status(400).json({ error: "Path is required" });
+
+  if (!fs.existsSync(destinationPath)) {
+    return res.status(400).json({ error: "Path does not exist" });
+  }
+
+  const updated = await storage.updateBackupDestination(
+    id,
+    userId,
+    destinationPath
+  );
+
+  res.json(updated);
+});
+
+// DELETE destination
+router.delete("/destination/:id", async (req, res) => {
+  const userId = req.user?.id;
+  const id = Number(req.params.id);
+
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  await storage.deleteBackupDestination(id, userId);
+  res.json({ success: true });
+});
+
+router.post("/backup-path", async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const destination = await storage.getActiveBackupDestination(userId);
+  if (!destination) {
+    return res.status(400).json({
+      error: "No backup destination configured",
+    });
+  }
+
+  if (!fs.existsSync(destination.path)) {
+    return res.status(400).json({
+      error:
+        "Backup destination not found. External drive may be disconnected.",
+    });
+  }
+
+  const filename = `dental_backup_${Date.now()}.zip`;
+
+  try {
+    await backupDatabaseToPath({
+      destinationPath: destination.path,
+      filename,
+    });
+
+    await storage.createBackup(userId);
+    await storage.deleteNotificationsByType(userId, "BACKUP");
+
+    res.json({ success: true, filename });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({
+      error: "Backup to destination failed",
+      details: err.message,
     });
   }
 });
