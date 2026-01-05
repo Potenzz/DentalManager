@@ -15,7 +15,13 @@ const router = Router();
 
 router.post("/", async (req: Request, res: Response): Promise<any> => {
   try {
-    const validatedData = staffCreateSchema.parse(req.body);
+    const userId = req.user!.id; // from auth middleware
+
+    const validatedData = staffCreateSchema.parse({
+      ...req.body,
+      userId,
+    });
+    
     const newStaff = await storage.createStaff(validatedData);
     res.status(200).json(newStaff);
   } catch (error) {

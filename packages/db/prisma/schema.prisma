@@ -100,7 +100,7 @@ model Appointment {
 
 model Staff {
   id           Int           @id @default(autoincrement())
-  userId       Int?
+  userId       Int
   name         String
   email        String?
   role         String // e.g., "Dentist", "Hygienist", "Assistant"
