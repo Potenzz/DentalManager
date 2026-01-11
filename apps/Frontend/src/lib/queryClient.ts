@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_BACKEND ?? "";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       localStorage.removeItem("token");
       if (!window.location.pathname.startsWith("/auth")) {
         window.location.href = "/auth";

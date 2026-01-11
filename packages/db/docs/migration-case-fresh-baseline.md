@@ -26,7 +26,14 @@ PGPASSWORD='mypassword' createdb -U postgres -h localhost -O postgres dentalapp
 PGPASSWORD='mypassword' pg_restore -U postgres -h localhost -d dentalapp -j 4 /tmp/dental_dump_dir
 # (or use /usr/lib/postgresql/<ver>/bin/pg_restore if version mismatch)
 ```
+# 1.2 — (If needed) fix postgres user password / auth
 
+If `createdb` or `pg_restore` fails with password auth:
+
+```bash
+# set postgres role password
+sudo -u postgres psql -c "ALTER ROLE postgres WITH PASSWORD 'mypassword';"
+```
 ---
 
 # 2 — Confirm DB has tables
@@ -37,120 +44,72 @@ PGPASSWORD='mypassword' psql -U postgres -h localhost -d dentalapp -c "\dt"
 
 ---
 
-# 3 — (If needed) fix postgres user password / auth
-
-If `createdb` or `pg_restore` fails with password auth:
+## 3 — Let Prisma create the schema (RUN ONCE)
 
 ```bash
-# set postgres role password
-sudo -u postgres psql -c "ALTER ROLE postgres WITH PASSWORD 'mypassword';"
-```
----
-
-# 4 — Inspect `_prisma_migrations` in restored DB
-
-```bash
-PGPASSWORD='mypassword' psql -U postgres -h localhost -d dentalapp -c "SELECT id, migration_name, finished_at FROM _prisma_migrations ORDER BY finished_at;"
+npx prisma migrate dev --config=packages/db/prisma/prisma.config.ts
 ```
 
-**Why:** the backup included `_prisma_migrations` from the original PC, which causes Prisma to detect "missing migrations" locally.
+Expected:
+
+```
+Your database is now in sync with your schema.
+```
+
+This step:
+
+* Creates tables, enums, indexes, FKs
+* Creates `_prisma_migrations`
+* Creates the first local migration
 
 ---
 
-# 5 — (If present) remove old Prisma bookkeeping from DB
-
-> We prefer to *not* use the old history from PC1 and create a fresh baseline on PC2.
+## 4 — Restore DATA ONLY from backup
 
 ```bash
-# truncate migration records (bookkeeping only)
+PGPASSWORD='mypassword' pg_restore -U postgres -h localhost -d dentalapp -Fd /tmp/dental_dump_dir --data-only --disable-triggers
+```
+
+⚠️ This will also restore old `_prisma_migrations` rows — we fix that next.
+
+---
+
+## 5 — Remove old Prisma bookkeeping from backup
+
+```bash
 PGPASSWORD='mypassword' psql -U postgres -h localhost -d dentalapp -c "TRUNCATE TABLE _prisma_migrations;"
-# verify
-PGPASSWORD='mypassword' psql -U postgres -h localhost -d dentalapp -c "SELECT count(*) FROM _prisma_migrations;"
 ```
 
-**Why:** remove migration rows copied from PC1 so we can register a clean baseline for PC2.
+This:
+
+* Does NOT touch data
+* Does NOT touch schema
+* Removes old PC1 migration history
 
 ---
 
-# 6 — Create a migrations directory + baseline migration folder (bookkeeping)
+## 6 — Re-register the current migration as applied (CRITICAL STEP)
 
-From project root (where `prisma/schema.prisma` lives — in your repo it’s `packages/db/prisma/schema.prisma`):
+Replace the migration name with the one created in step 3
+(example: `20260103121811`).
 
 ```bash
-# create migrations dir if missing (adjust path if your prisma folder is elsewhere)
-mkdir -p packages/db/prisma/migrations
-
-# create a timestamped folder (example uses date command)
-folder="packages/db/prisma/migrations/$(date +%Y%m%d%H%M%S)_init"
-mkdir -p "$folder"
-
-# create placeholder migration files
-cat > "$folder/migration.sql" <<'SQL'
--- Baseline migration for PC2 (will be replaced with real SQL)
-SQL
-
-cat > "$folder/README.md" <<'TXT'
-Initial baseline migration created on PC2.
-This is intended as a bookkeeping-only migration.
-TXT
-
-# confirm folder name
-ls -la packages/db/prisma/migrations
+npx prisma migrate resolve --applied 20260103121811 --config=packages/db/prisma/prisma.config.ts
 ```
 
-**Why:** Prisma requires at least one migration file locally as a baseline.
+This tells Prisma:
+
+> “Yes, this migration already created the schema.”
 
 ---
 
-# 7 — Generate the full baseline SQL (so Prisma’s expected schema matches DB)
-
-Use Prisma `migrate diff` to produce SQL that creates your current schema, writing it into the migration file you created:
+## 7 — Verify Prisma state
 
 ```bash
-# replace the folder name with the real one printed above, e.g. 20251203101323_init
-npx prisma migrate diff \
-  --from-empty \
-  --to-schema-datamodel=packages/db/prisma/schema.prisma \
-  --script > packages/db/prisma/migrations/20251203101323_init/migration.sql
+npx prisma migrate status --config=packages/db/prisma/prisma.config.ts
 ```
 
-If your shell complains about line breaks, run the whole command on one line (as above).
-
-**Fallback (if `migrate diff` not available):**
-
-```bash
-PGPASSWORD='mypassword' pg_dump -U postgres -h localhost -s dentalapp > /tmp/dental_schema.sql
-cp /tmp/dental_schema.sql packages/db/prisma/migrations/20251203101323_init/migration.sql
-```
-
-**Why:** this makes the migration file contain CREATE TABLE / CREATE TYPE / FK / INDEX statements matching the DB so Prisma's expected schema = actual DB.
-
----
-
-# 8 — Register the baseline migration with Prisma (using the exact env/schema your scripts use)
-
-Important: use same env file and `--schema` (and `--config` if used) that your npm script uses. Example for your repo:
-
-```bash
-# from repo root, mark applied for the migrations folder we created
-npx dotenv -e packages/db/.env -- npx prisma migrate resolve --applied "20251203101323_init" --schema=packages/db/prisma/schema.prisma
-```
-
-**Why:** record the baseline in `_prisma_migrations` with the checksum matching the `migration.sql` file.
-
----
-
-
-# 9 — Verify status and generate client
-
-```bash
-# same env/schema flags
-npx dotenv -e packages/db/.env -- npx prisma migrate status --schema=packages/db/prisma/schema.prisma
-
-npx dotenv -e packages/db/.env -- npx prisma generate --schema=packages/db/prisma/schema.prisma
-```
-
-You should see:
+Expected:
 
 ```
 1 migration found in prisma/migrations

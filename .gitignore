@@ -37,3 +37,5 @@ dist/
 
 # env
 *.env
+
+*chrome_profile_ddma*
