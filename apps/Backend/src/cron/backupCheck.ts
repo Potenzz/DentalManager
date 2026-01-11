@@ -9,8 +9,8 @@ import { backupDatabaseToPath } from "../services/databaseBackupService";
  * Creates a backup notification if overdue
  */
 export const startBackupCron = () => {
-  cron.schedule("0 2 * * *", async () => {
-    // Every calendar days, at 2 AM
+  cron.schedule("0 22 * * *", async () => {
+    // Every calendar days, at 10 PM
     // cron.schedule("*/10 * * * * *", async () => { // Every 10 seconds (for Test)
 
     console.log("🔄 Running backup check...");
