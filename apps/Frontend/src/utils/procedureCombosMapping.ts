@@ -308,3 +308,6 @@ export function applyComboToForm<T extends ClaimFormLike>(
 
   return next;
 }
+
+
+export { CODE_MAP, getPriceForCodeWithAgeFromMap };

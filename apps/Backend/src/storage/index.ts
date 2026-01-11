@@ -2,7 +2,8 @@
 
 import { usersStorage } from './users-storage';
 import { patientsStorage } from './patients-storage';
-import { appointmentsStorage } from './appointements-storage';
+import { appointmentsStorage } from './appointments-storage';
+import { appointmentProceduresStorage } from './appointment-procedures-storage';
 import { staffStorage } from './staff-storage';
 import { claimsStorage } from './claims-storage';
 import { insuranceCredsStorage } from './insurance-creds-storage';
@@ -19,6 +20,7 @@ export const storage = {
   ...usersStorage,
   ...patientsStorage,
   ...appointmentsStorage,
+  ...appointmentProceduresStorage,
   ...staffStorage,
   ...claimsStorage,
   ...insuranceCredsStorage,

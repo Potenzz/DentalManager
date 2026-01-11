@@ -58,6 +58,7 @@ model Patient {
   createdAt         DateTime        @default(now())
   user              User            @relation(fields: [userId], references: [id])
   appointments      Appointment[]
+  procedures AppointmentProcedure[]
   claims            Claim[]
   groups            PdfGroup[]
   payment           Payment[]
@@ -92,6 +93,7 @@ model Appointment {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id])
   staff   Staff?  @relation(fields: [staffId], references: [id])
+    procedures AppointmentProcedure[]
   claims  Claim[]
 
   @@index([patientId])
@@ -110,6 +112,40 @@ model Staff {
   appointments Appointment[]
   claims       Claim[]       @relation("ClaimStaff")
 }
+
+enum ProcedureSource {
+  COMBO
+  MANUAL
+}
+
+model AppointmentProcedure {
+  id             Int      @id @default(autoincrement())
+  appointmentId  Int
+  patientId      Int
+
+  procedureCode  String
+  procedureLabel String?
+  fee            Decimal? @db.Decimal(10,2)
+
+  category       String?
+  isDirect       Boolean  @default(false)
+
+  toothNumber    String?
+  toothSurface   String?
+  oralCavityArea String?
+
+  source         ProcedureSource @default(MANUAL)
+  comboKey       String?
+
+  createdAt      DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId])
+  @@index([patientId])
+}
+
 
 model Claim {
   id                 Int                @id @default(autoincrement())

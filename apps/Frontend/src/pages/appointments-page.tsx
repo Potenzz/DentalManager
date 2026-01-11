@@ -53,6 +53,7 @@ import {
 } from "@/redux/slices/seleniumEligibilityBatchCheckTaskSlice";
 import { SeleniumTaskBanner } from "@/components/ui/selenium-task-banner";
 import { PatientStatusBadge } from "@/components/appointments/patient-status-badge";
+import { AppointmentProceduresDialog } from "@/components/appointment-procedures/appointment-procedures-dialog";
 
 // Define types for scheduling
 interface TimeSlot {
@@ -93,6 +94,17 @@ export default function AppointmentsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [proceduresDialogOpen, setProceduresDialogOpen] = useState(false);
+  const [proceduresAppointmentId, setProceduresAppointmentId] = useState<
+    number | null
+  >(null);
+  const [proceduresPatientId, setProceduresPatientId] = useState<number | null>(
+    null
+  );
+  const [proceduresPatient, setProceduresPatient] = useState<Patient | null>(
+    null
+  );
+
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<
     Appointment | undefined
@@ -866,6 +878,34 @@ export default function AppointmentsPage() {
       // intentionally do not clear task status here so banner persists until user dismisses it
     }
   };
+
+  const handleOpenProcedures = (appointmentId: number) => {
+    const apt = appointments.find((a) => a.id === appointmentId);
+    if (!apt) {
+      toast({
+        title: "Error",
+        description: "Appointment not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const patient = patientsFromDay.find((p) => p.id === apt.patientId);
+    if (!patient) {
+      toast({
+        title: "Error",
+        description: "Patient not found for this appointment",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProceduresAppointmentId(Number(apt.id));
+    setProceduresPatientId(apt.patientId);
+    setProceduresPatient(patient);
+    setProceduresDialogOpen(true);
+  };
+
   return (
     <div>
       <SeleniumTaskBanner
@@ -999,6 +1039,16 @@ export default function AppointmentsPage() {
             </span>
           </Item>
 
+          {/* Procedures */}
+          <Item
+            onClick={({ props }) => handleOpenProcedures(props.appointmentId)}
+          >
+            <span className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Procedures
+            </span>
+          </Item>
+
           {/* Clinic Notes */}
           <Item onClick={({ props }) => handleClinicNotes(props.appointmentId)}>
             <span className="flex items-center gap-2 text-yellow-600">
@@ -1125,6 +1175,24 @@ export default function AppointmentsPage() {
         appointment={editingAppointment}
         onDelete={handleDeleteAppointment}
       />
+
+      {/* Appointment Procedure Dialog */}
+      {proceduresAppointmentId && proceduresPatientId && proceduresPatient && (
+        <AppointmentProceduresDialog
+          open={proceduresDialogOpen}
+          onOpenChange={(open) => {
+            setProceduresDialogOpen(open);
+            if (!open) {
+              setProceduresAppointmentId(null);
+              setProceduresPatientId(null);
+              setProceduresPatient(null);
+            }
+          }}
+          appointmentId={proceduresAppointmentId}
+          patientId={proceduresPatientId}
+          patient={proceduresPatient}
+        />
+      )}
 
       <DeleteConfirmationDialog
         isOpen={confirmDeleteState.open}
